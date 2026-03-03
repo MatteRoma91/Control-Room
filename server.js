@@ -47,6 +47,9 @@ app.set('trust proxy', 1);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+// Static files (favicon, icons, etc.)
+app.use(express.static(path.join(__dirname, 'public')));
+
 // Helmet - sicurezza headers
 app.use(helmet({ contentSecurityPolicy: false })); // CSP disabilitato per CDN Tailwind/Alpine
 

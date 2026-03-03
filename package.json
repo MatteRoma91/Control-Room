@@ -4,7 +4,8 @@
   "description": "PM2 Control Room Dashboard",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "pwa:icons": "node scripts/generate-pwa-icons.mjs"
   },
   "engines": {
     "node": ">=18"
@@ -23,5 +24,9 @@
     "speakeasy": "^2.0.0",
     "ssh2": "^1.16.0",
     "systeminformation": "^5.25.9"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.5",
+    "to-ico": "^1.1.5"
   }
 }
