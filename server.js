@@ -411,7 +411,19 @@ const SETTINGS_PATH = path.join(__dirname, 'settings.json');
 async function loadSettings() {
   try {
     const data = await fs.readFile(SETTINGS_PATH, 'utf8');
-    return JSON.parse(data);
+    const s = JSON.parse(data);
+    if (s.sshHost && (!s.sshProfiles || s.sshProfiles.length === 0)) {
+      s.sshProfiles = [{
+        id: 'migrated',
+        name: 'Server',
+        host: s.sshHost,
+        port: parseInt(s.sshPort || '22', 10),
+        username: s.sshUser || '',
+        authType: s.sshAuth || 'key',
+        keyPath: s.sshKeyPath || '',
+      }];
+    }
+    return s;
   } catch {
     return {};
   }
@@ -441,11 +453,9 @@ app.post('/api/settings', requireAuth, async (req, res) => {
   try {
     const body = { ...(req.body || {}) };
     const current = await loadSettings();
-    if (body.sshAuth === 'password' && (!body.sshPassword || body.sshPassword === '')) {
-      body.sshPassword = current.sshPassword || '';
-    }
     body.totpSecret = current.totpSecret;
     body.totpEnabled = current.totpEnabled;
+    if (!Array.isArray(body.sshProfiles)) body.sshProfiles = current.sshProfiles || [];
     await saveSettings(body);
     res.json({ ok: true });
   } catch (err) {
@@ -761,27 +771,35 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('join-ssh', async () => {
+  socket.on('join-ssh', async (payload) => {
     const existing = sshConnections.get(socket.id);
     if (existing) {
       existing.conn.end();
       sshConnections.delete(socket.id);
     }
+    const profileId = typeof payload === 'object' && payload ? payload.profileId : null;
+    const password = typeof payload === 'object' && payload ? payload.password : undefined;
     const settings = await loadSettings();
-    const host = settings.sshHost;
-    const port = parseInt(settings.sshPort || '22', 10);
-    const username = settings.sshUser;
-    if (!host || !username) {
-      socket.emit('term-data', '\r\n\x1b[31mSSH non configurato. Vai in Impostazioni.\x1b[0m\r\n');
+    const profiles = settings.sshProfiles || [];
+    const profile = profileId ? profiles.find((p) => p.id === profileId) : profiles[0];
+    if (!profile || !profile.host || !profile.username) {
+      socket.emit('term-data', '\r\n\x1b[31mNessuna configurazione SSH. Vai in Impostazioni.\x1b[0m\r\n');
       return;
     }
+    const host = profile.host;
+    const port = parseInt(profile.port || '22', 10);
+    const username = profile.username;
     const conn = new Client();
     const config = { host, port, username };
-    if (settings.sshAuth === 'password') {
-      config.password = settings.sshPassword || '';
+    if (profile.authType === 'password') {
+      if (!password || typeof password !== 'string') {
+        socket.emit('term-data', '\r\n\x1b[31mInserisci la password nella finestra di connessione.\x1b[0m\r\n');
+        return;
+      }
+      config.password = password;
     } else {
       try {
-        const keyPath = settings.sshKeyPath || (path.join(os.homedir(), '.ssh', 'id_rsa'));
+        const keyPath = profile.keyPath || path.join(os.homedir(), '.ssh', 'id_rsa');
         config.privateKey = await fs.readFile(keyPath, 'utf8');
       } catch (e) {
         socket.emit('term-data', `\r\n\x1b[31mErrore chiave SSH: ${e.message}\x1b[0m\r\n`);

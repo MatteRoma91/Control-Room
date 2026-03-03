@@ -69,47 +69,38 @@
       </div>
     </div>
 
-    <!-- SSH -->
-    <div class="rounded-lg border border-slate-700 bg-slate-800 p-6">
-      <h2 class="text-lg font-semibold text-slate-200 mb-4">Terminale SSH</h2>
-      <div class="space-y-4">
-        <div>
-          <label for="sshHost" class="block text-sm text-slate-400 mb-1">Host</label>
-          <input type="text" id="sshHost" name="sshHost" placeholder="57.131.40.170"
-            value="<%= (settings.sshHost || '') %>"
-            class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 font-mono" />
+    <!-- Configurazioni SSH -->
+    <div class="rounded-lg border border-slate-700 bg-slate-800 p-6" id="sshProfilesSection">
+      <h2 class="text-lg font-semibold text-slate-200 mb-2">Configurazioni SSH</h2>
+      <p class="text-sm text-slate-400 mb-4">Salva host e username per diverse connessioni. La password va inserita al momento della connessione e non viene mai salvata.</p>
+      <div id="sshProfilesList" class="space-y-4 mb-4">
+        <% (settings.sshProfiles || []).forEach((p, i) => { %>
+        <div class="ssh-profile-card p-4 bg-slate-700/50 rounded-lg border border-slate-600" data-id="<%= p.id || ('p' + i) %>">
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+            <input type="text" data-field="name" placeholder="Nome" value="<%= (p.name || '') %>"
+              class="px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100" />
+            <input type="text" data-field="host" placeholder="Host/IP" value="<%= (p.host || '') %>"
+              class="px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100 font-mono" />
+            <input type="number" data-field="port" placeholder="22" value="<%= (p.port || 22) %>"
+              class="px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100" />
+            <input type="text" data-field="username" placeholder="Utente" value="<%= (p.username || '') %>"
+              class="px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100" />
+            <select data-field="authType" class="px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100">
+              <option value="key" <%= p.authType === 'password' ? '' : 'selected' %>>Chiave</option>
+              <option value="password" <%= p.authType === 'password' ? 'selected' : '' %>>Password</option>
+            </select>
+          </div>
+          <div class="mt-2 ssh-key-path-row" style="<%= p.authType === 'password' ? 'display:none' : '' %>">
+            <input type="text" data-field="keyPath" placeholder="Path chiave (default: ~/.ssh/id_rsa)" value="<%= (p.keyPath || '') %>"
+              class="w-full mt-1 px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100 font-mono text-xs" />
+          </div>
+          <button type="button" class="ssh-remove mt-2 text-red-400 hover:text-red-300 text-xs">Rimuovi</button>
         </div>
-        <div>
-          <label for="sshPort" class="block text-sm text-slate-400 mb-1">Porta</label>
-          <input type="number" id="sshPort" name="sshPort" placeholder="22"
-            value="<%= (settings.sshPort || '22') %>"
-            class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100" />
-        </div>
-        <div>
-          <label for="sshUser" class="block text-sm text-slate-400 mb-1">Utente</label>
-          <input type="text" id="sshUser" name="sshUser" placeholder="ubuntu"
-            value="<%= (settings.sshUser || '') %>"
-            class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100" />
-        </div>
-        <div>
-          <label for="sshAuth" class="block text-sm text-slate-400 mb-1">Autenticazione</label>
-          <select id="sshAuth" name="sshAuth" class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100">
-            <option value="key" <%= (settings.sshAuth || 'key') === 'key' ? 'selected' : '' %>>Chiave privata</option>
-            <option value="password" <%= settings.sshAuth === 'password' ? 'selected' : '' %>>Password</option>
-          </select>
-        </div>
-        <div id="sshKeyFields">
-          <label for="sshKeyPath" class="block text-sm text-slate-400 mb-1">Path chiave privata</label>
-          <input type="text" id="sshKeyPath" name="sshKeyPath" placeholder="/home/ubuntu/.ssh/id_rsa"
-            value="<%= (settings.sshKeyPath || '') %>"
-            class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 font-mono text-sm" />
-        </div>
-        <div id="sshPasswordFields" class="hidden">
-          <label for="sshPassword" class="block text-sm text-slate-400 mb-1">Password</label>
-          <input type="password" id="sshPassword" name="sshPassword" placeholder="***"
-            class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100" />
-        </div>
+        <% }); %>
       </div>
+      <button type="button" id="btnAddSshProfile" class="px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 text-sm">
+        + Aggiungi connessione
+      </button>
     </div>
 
     <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium focus:ring-2 focus:ring-emerald-500">
@@ -126,12 +117,56 @@
   });
   document.getElementById('webhookType').dispatchEvent(new Event('change'));
 
-  document.getElementById('sshAuth').addEventListener('change', function() {
-    const isKey = this.value === 'key';
-    document.getElementById('sshKeyFields').classList.toggle('hidden', !isKey);
-    document.getElementById('sshPasswordFields').classList.toggle('hidden', isKey);
+  function collectSshProfiles() {
+    const cards = document.querySelectorAll('.ssh-profile-card');
+    return Array.from(cards).map(card => {
+      const id = card.dataset.id || 'p' + Date.now();
+      return {
+        id,
+        name: card.querySelector('[data-field="name"]')?.value?.trim() || '',
+        host: card.querySelector('[data-field="host"]')?.value?.trim() || '',
+        port: parseInt(card.querySelector('[data-field="port"]')?.value || '22', 10),
+        username: card.querySelector('[data-field="username"]')?.value?.trim() || '',
+        authType: card.querySelector('[data-field="authType"]')?.value || 'key',
+        keyPath: card.querySelector('[data-field="keyPath"]')?.value?.trim() || ''
+      };
+    }).filter(p => p.name || p.host || p.username);
+  }
+
+  document.getElementById('btnAddSshProfile').addEventListener('click', function() {
+    const list = document.getElementById('sshProfilesList');
+    const card = document.createElement('div');
+    card.className = 'ssh-profile-card p-4 bg-slate-700/50 rounded-lg border border-slate-600';
+    card.dataset.id = 'p' + Date.now();
+    card.innerHTML = `
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+        <input type="text" data-field="name" placeholder="Nome" class="px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100" />
+        <input type="text" data-field="host" placeholder="Host/IP" class="px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100 font-mono" />
+        <input type="number" data-field="port" placeholder="22" value="22" class="px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100" />
+        <input type="text" data-field="username" placeholder="Utente" class="px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100" />
+        <select data-field="authType" class="px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100">
+          <option value="key" selected>Chiave</option>
+          <option value="password">Password</option>
+        </select>
+      </div>
+      <div class="mt-2 ssh-key-path-row">
+        <input type="text" data-field="keyPath" placeholder="Path chiave (default: ~/.ssh/id_rsa)" class="w-full mt-1 px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100 font-mono text-xs" />
+      </div>
+      <button type="button" class="ssh-remove mt-2 text-red-400 hover:text-red-300 text-xs">Rimuovi</button>
+    `;
+    card.querySelector('[data-field="authType"]').addEventListener('change', function() {
+      card.querySelector('.ssh-key-path-row').style.display = this.value === 'password' ? 'none' : '';
+    });
+    card.querySelector('.ssh-remove').addEventListener('click', () => card.remove());
+    list.appendChild(card);
   });
-  document.getElementById('sshAuth').dispatchEvent(new Event('change'));
+
+  document.querySelectorAll('.ssh-profile-card').forEach(card => {
+    card.querySelector('[data-field="authType"]')?.addEventListener('change', function() {
+      card.querySelector('.ssh-key-path-row').style.display = this.value === 'password' ? 'none' : '';
+    });
+    card.querySelector('.ssh-remove')?.addEventListener('click', () => card.remove());
+  });
 
   document.getElementById('settingsForm').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -143,12 +178,7 @@
       telegramChatId: form.telegramChatId?.value || '',
       notifyOnCrash: form.notifyOnCrash?.checked !== false,
       notifyOnRestart: form.notifyOnRestart?.checked !== false,
-      sshHost: form.sshHost?.value || '',
-      sshPort: form.sshPort?.value || '22',
-      sshUser: form.sshUser?.value || '',
-      sshAuth: form.sshAuth?.value || 'key',
-      sshKeyPath: form.sshKeyPath?.value || '',
-      sshPassword: form.sshPassword?.value || ''
+      sshProfiles: collectSshProfiles()
     };
     try {
       const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });

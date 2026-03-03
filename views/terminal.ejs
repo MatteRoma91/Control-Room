@@ -1,6 +1,9 @@
 <section class="mb-6" aria-labelledby="terminal-heading">
-  <div class="flex items-center justify-between mb-2">
+  <div class="flex flex-wrap items-center gap-4 mb-2">
     <h1 id="terminal-heading" class="text-lg font-semibold text-slate-200">Terminale SSH</h1>
+    <select id="sshProfileSelect" class="px-3 py-1.5 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 text-sm">
+      <option value="">-- Seleziona connessione --</option>
+    </select>
     <button
       id="btnConnectSsh"
       class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
@@ -8,9 +11,28 @@
       Connetti
     </button>
   </div>
-  <p class="text-sm text-slate-400 mb-2">Se SSH non è configurato, vai in <a href="/settings" class="text-emerald-400 hover:underline">Impostazioni</a>.</p>
+  <p class="text-sm text-slate-400 mb-2">Configura le connessioni in <a href="/settings" class="text-emerald-400 hover:underline">Impostazioni</a>. Con auth password, la password va inserita al collegamento.</p>
   <div id="terminal" class="rounded-lg border border-slate-700 bg-slate-900 overflow-hidden" style="min-height: 400px;"></div>
 </section>
+
+<!-- Modale password SSH -->
+<div id="sshPasswordModal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
+  <div class="absolute inset-0 bg-black/60" id="sshPasswordModalBackdrop"></div>
+  <div class="absolute inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-96 bg-slate-800 rounded-lg border border-slate-700 p-6">
+    <h3 class="text-lg font-semibold text-slate-200 mb-2">Password SSH</h3>
+    <p class="text-sm text-slate-400 mb-4">Inserisci la password per <span id="sshPasswordModalProfile">la connessione</span></p>
+    <input type="password" id="sshPasswordInput" placeholder="Password" autocomplete="current-password"
+      class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 mb-4 focus:ring-2 focus:ring-emerald-500" />
+    <div class="flex gap-2">
+      <button type="button" id="sshPasswordConnect" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500">
+        Connetti
+      </button>
+      <button type="button" id="sshPasswordCancel" class="px-4 py-2 rounded-lg bg-slate-600 hover:bg-slate-500">
+        Annulla
+      </button>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
 <script>
@@ -24,9 +46,25 @@
 
     const socket = io();
     let connected = false;
+    let sshProfiles = [];
 
     socket.on('connect', () => {
-      term.writeln('\x1b[32mConnesso. Clicca "Connetti" per avviare la sessione SSH.\x1b[0m');
+      term.writeln('\x1b[32mCaricamento configurazioni...\x1b[0m');
+      fetch('/api/settings')
+        .then(r => r.json())
+        .then(s => {
+          sshProfiles = s.sshProfiles || [];
+          const select = document.getElementById('sshProfileSelect');
+          select.innerHTML = '<option value="">-- Seleziona connessione --</option>';
+          sshProfiles.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = (p.name || p.host || 'Senza nome') + ' (' + (p.username || '') + '@' + (p.host || '') + ')';
+            select.appendChild(opt);
+          });
+          term.writeln('\x1b[32mSeleziona una connessione e clicca "Connetti".\x1b[0m');
+        })
+        .catch(() => term.writeln('\x1b[31mErrore caricamento configurazioni.\x1b[0m'));
     });
 
     socket.on('term-data', (data) => {
@@ -35,16 +73,51 @@
 
     term.onData((data) => {
       if (connected) socket.emit('term-input', data);
-      else term.writeln('\x1b[33mClicca "Connetti" per collegarti all\'host SSH.\x1b[0m');
+      else term.writeln('\x1b[33mSeleziona una connessione e clicca "Connetti".\x1b[0m');
     });
+
+    function showPasswordModal(profile) {
+      document.getElementById('sshPasswordModalProfile').textContent = (profile.name || profile.host) + ' (' + profile.username + '@' + profile.host + ')';
+      document.getElementById('sshPasswordInput').value = '';
+      document.getElementById('sshPasswordModal').classList.remove('hidden');
+      document.getElementById('sshPasswordInput').focus();
+      const doConnect = () => {
+        const pwd = document.getElementById('sshPasswordInput').value;
+        document.getElementById('sshPasswordModal').classList.add('hidden');
+        connected = true;
+        term.clear();
+        term.writeln('\x1b[33mConnessione in corso...\x1b[0m');
+        socket.emit('join-ssh', { profileId: profile.id, password: pwd });
+      };
+      document.getElementById('sshPasswordConnect').onclick = doConnect;
+      document.getElementById('sshPasswordInput').onkeydown = (e) => {
+        if (e.key === 'Enter') doConnect();
+        if (e.key === 'Escape') closePasswordModal();
+      };
+    }
 
     document.getElementById('btnConnectSsh').addEventListener('click', () => {
+      const profileId = document.getElementById('sshProfileSelect').value;
+      const profile = sshProfiles.find(p => p.id === profileId);
+      if (!profile) {
+        term.writeln('\x1b[33mSeleziona una connessione dalle impostazioni.\x1b[0m');
+        return;
+      }
+      if (profile.authType === 'password') {
+        showPasswordModal(profile);
+        return;
+      }
       connected = true;
       term.clear();
-      term.writeln('\x1b[33mConnessione SSH in corso...\x1b[0m');
-      socket.emit('join-ssh');
+      term.writeln('\x1b[33mConnessione in corso...\x1b[0m');
+      socket.emit('join-ssh', { profileId: profile.id });
     });
 
+    function closePasswordModal() {
+      document.getElementById('sshPasswordModal').classList.add('hidden');
+    }
+    document.getElementById('sshPasswordCancel').addEventListener('click', closePasswordModal);
+    document.getElementById('sshPasswordModalBackdrop').addEventListener('click', closePasswordModal);
     socket.on('disconnect', () => {
       connected = false;
     });
