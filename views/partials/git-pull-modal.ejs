@@ -1,0 +1,28 @@
+<div
+  id="gitPullModal"
+  class="fixed inset-0 z-50"
+  x-data="{ open: false, output: '', loading: false }"
+  x-on:git-pull-show.window="open = true; output = $event.detail?.output ?? ''; loading = $event.detail?.loading ?? false"
+  x-on:git-pull-hide.window="open = false"
+  x-show="open"
+  x-cloak
+  style="display: none"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="git-pull-title"
+>
+  <div class="absolute inset-0 bg-black/60" @click="$dispatch('git-pull-hide')"></div>
+  <div class="absolute inset-4 md:inset-10 bg-slate-800 rounded-lg border border-slate-700 flex flex-col">
+    <div class="flex justify-between items-center p-4 border-b border-slate-700">
+      <h2 id="git-pull-title" class="text-lg font-semibold">Git Pull Output</h2>
+      <button
+        @click="$dispatch('git-pull-hide')"
+        class="p-2 rounded hover:bg-slate-700 focus:ring-2 focus:ring-emerald-500"
+        aria-label="Chiudi"
+      >
+        <span class="text-xl">&times;</span>
+      </button>
+    </div>
+    <pre class="flex-1 p-4 overflow-auto text-xs font-mono text-slate-300 bg-slate-900 rounded m-4 whitespace-pre-wrap" x-text="output || (loading ? 'Esecuzione in corso...' : '')"></pre>
+  </div>
+</div>

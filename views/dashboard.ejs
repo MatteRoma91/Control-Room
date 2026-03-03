@@ -1,0 +1,363 @@
+<% if (typeof error !== 'undefined' && error) { %>
+  <div class="mb-4 p-4 bg-red-900/50 border border-red-700 rounded-lg text-red-200" role="alert">
+    Errore: <%= error %>
+  </div>
+<% } %>
+
+<!-- Grafici CPU e RAM -->
+<section class="mb-8" aria-labelledby="charts-heading">
+  <h2 id="charts-heading" class="text-lg font-semibold text-slate-200 mb-4">Risorse Server (Real-time)</h2>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+      <h3 class="text-sm text-slate-400 mb-2">CPU %</h3>
+      <canvas id="chartCpu" height="120"></canvas>
+    </div>
+    <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+      <h3 class="text-sm text-slate-400 mb-2">RAM (MB)</h3>
+      <canvas id="chartRam" height="120"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- Overview Server -->
+<section class="mb-8" aria-labelledby="overview-heading">
+  <h2 id="overview-heading" class="text-lg font-semibold text-slate-200 mb-4">Overview Server</h2>
+  <div id="systemOverview" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+    <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+      <div class="text-sm text-slate-400">Uptime</div>
+      <div id="sysUptime" class="text-lg font-mono">-</div>
+    </div>
+    <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+      <div class="text-sm text-slate-400">Load 1m</div>
+      <div id="sysCpu" class="text-lg font-mono">-</div>
+    </div>
+    <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+      <div class="text-sm text-slate-400">RAM</div>
+      <div id="sysMem" class="text-lg font-mono">-</div>
+    </div>
+    <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+      <div class="text-sm text-slate-400">Disco</div>
+      <div id="sysDisk" class="text-lg font-mono">-</div>
+    </div>
+  </div>
+  <div class="flex flex-wrap gap-4 items-center">
+    <span id="nginxStatus" class="text-sm text-slate-400">Nginx: -</span>
+    <button
+      id="btnNginxReload"
+      onclick="nginxReload()"
+      class="px-3 py-1.5 rounded text-sm bg-slate-700 hover:bg-slate-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+      aria-label="Ricarica configurazione Nginx"
+    >
+      Reload Nginx
+    </button>
+  </div>
+</section>
+
+<!-- Azioni globali -->
+<section class="mb-8" aria-labelledby="global-actions-heading">
+  <h2 id="global-actions-heading" class="text-lg font-semibold text-slate-200 mb-4">Azioni globali</h2>
+  <div class="flex flex-wrap gap-4">
+    <button
+      onclick="restartAllWebapps()"
+      class="px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+    >
+      Riavvia tutte le webapp
+    </button>
+    <button
+      onclick="restoreAll()"
+      class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+    >
+      Ripristina tutti i processi
+    </button>
+  </div>
+</section>
+
+<!-- Database Backup -->
+<% if (dbConfigured) { %>
+<section class="mb-8" aria-labelledby="db-heading">
+  <h2 id="db-heading" class="text-lg font-semibold text-slate-200 mb-4">Database</h2>
+  <a
+    href="/api/db-backup"
+    class="inline-block px-4 py-2 rounded-lg bg-violet-700 hover:bg-violet-600 focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+    download
+  >
+    Backup MySQL (.sql.gz)
+  </a>
+</section>
+<% } else { %>
+<section class="mb-8" aria-labelledby="db-heading">
+  <h2 id="db-heading" class="text-lg font-semibold text-slate-200 mb-4">Database</h2>
+  <p class="text-slate-500 text-sm">Database MySQL non configurato. Imposta DB_HOST, DB_USER, DB_NAME in .env.</p>
+</section>
+<% } %>
+
+<!-- Health check -->
+<section class="mb-8" aria-labelledby="health-heading">
+  <h2 id="health-heading" class="text-lg font-semibold text-slate-200 mb-4">Health check webapp</h2>
+  <button
+    onclick="checkHealth()"
+    class="mb-4 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+  >
+    Verifica
+  </button>
+  <div id="healthResults" class="overflow-x-auto rounded-lg border border-slate-700 bg-slate-800 hidden">
+    <table class="w-full">
+      <thead class="bg-slate-700/50">
+        <tr>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">Webapp</th>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">URL</th>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">Status</th>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">Tempo (ms)</th>
+        </tr>
+      </thead>
+      <tbody id="healthBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Processi PM2 -->
+<section class="mb-8" aria-labelledby="processes-heading">
+  <h2 id="processes-heading" class="text-lg font-semibold text-slate-200 mb-4">Processi PM2</h2>
+  <div class="overflow-x-auto rounded-lg border border-slate-700 bg-slate-800">
+    <table class="w-full">
+      <thead class="bg-slate-700/50">
+        <tr>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">Nome</th>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">Status</th>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">CPU %</th>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">Memory</th>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">Uptime</th>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">Restarts</th>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% (processes || []).forEach((p) => { %>
+          <tr class="border-t border-slate-700 hover:bg-slate-700/30">
+            <td class="px-4 py-3 font-mono">
+              <a href="/process/<%= p.name %>" class="text-emerald-400 hover:underline"><%= p.name %></a>
+            </td>
+            <td class="px-4 py-3">
+              <span class="px-2 py-0.5 rounded text-xs font-medium <%= p.status === 'online' ? 'bg-emerald-900/60 text-emerald-300' : p.status === 'stopped' ? 'bg-amber-900/60 text-amber-300' : 'bg-red-900/60 text-red-300' %>">
+                <%= p.status %>
+              </span>
+            </td>
+            <td class="px-4 py-3"><%= p.cpu %>%</td>
+            <td class="px-4 py-3"><%= p.memory %> MB</td>
+            <td class="px-4 py-3"><%= p.uptime %></td>
+            <td class="px-4 py-3"><%= p.restart_time %></td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                <button onclick="processAction('<%= p.name %>', 'start')" class="px-2 py-1 rounded text-xs bg-emerald-700 hover:bg-emerald-600">Start</button>
+                <button onclick="processAction('<%= p.name %>', 'stop')" class="px-2 py-1 rounded text-xs bg-amber-700 hover:bg-amber-600">Stop</button>
+                <button onclick="processAction('<%= p.name %>', 'restart')" class="px-2 py-1 rounded text-xs bg-blue-700 hover:bg-blue-600">Restart</button>
+                <button onclick="processFlush('<%= p.name %>')" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500">Flush</button>
+                <button onclick="gitPull('<%= p.name %>')" class="px-2 py-1 rounded text-xs bg-violet-700 hover:bg-violet-600">Git Pull</button>
+              </div>
+            </td>
+          </tr>
+        <% }); %>
+        <% if (!processes || processes.length === 0) { %>
+          <tr>
+            <td colspan="7" class="px-4 py-8 text-center text-slate-500">Nessun processo PM2</td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+  function showToast(message, type) {
+    window.dispatchEvent(new CustomEvent('toast', { detail: { message, type } }));
+  }
+
+  async function processAction(name, action) {
+    try {
+      const res = await fetch(`/api/process/${action}/${encodeURIComponent(name)}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('Operazione completata', 'success');
+        setTimeout(() => location.reload(), 500);
+      } else {
+        showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
+      }
+    } catch (e) {
+      showToast('Errore: ' + e.message, 'error');
+    }
+  }
+
+  async function processFlush(name) {
+    try {
+      const res = await fetch(`/api/process/flush/${encodeURIComponent(name)}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('Log svuotati', 'success');
+        setTimeout(() => location.reload(), 500);
+      } else {
+        showToast('Errore: ' + (data.error || 'Flush fallito'), 'error');
+      }
+    } catch (e) {
+      showToast('Errore: ' + e.message, 'error');
+    }
+  }
+
+  async function gitPull(name) {
+    window.dispatchEvent(new CustomEvent('git-pull-show', { detail: { output: '', loading: true } }));
+    try {
+      const res = await fetch(`/api/process/git-pull/${encodeURIComponent(name)}`, { method: 'POST' });
+      const data = await res.json();
+      const output = (data.output || data.error || '').trim() || (data.ok ? 'Git pull e restart completati.' : 'Operazione fallita.');
+      window.dispatchEvent(new CustomEvent('git-pull-show', { detail: { output, loading: false } }));
+      if (data.ok) {
+        showToast('Deployment completato', 'success');
+        setTimeout(() => location.reload(), 1000);
+      }
+    } catch (e) {
+      window.dispatchEvent(new CustomEvent('git-pull-show', { detail: { output: 'Errore: ' + e.message, loading: false } }));
+      showToast('Errore: ' + e.message, 'error');
+    }
+  }
+
+  async function loadSystem() {
+    try {
+      const [sysRes, nginxRes] = await Promise.all([fetch('/api/system'), fetch('/api/nginx-status')]);
+      const sys = await sysRes.json();
+      const nginx = await nginxRes.json();
+      if (sys.uptime !== undefined) {
+        document.getElementById('sysUptime').textContent = sys.uptime;
+        document.getElementById('sysCpu').textContent = sys.loadAvg1;
+        document.getElementById('sysMem').textContent = sys.memoryUsedMB + ' / ' + sys.memoryTotalMB + ' MB (' + sys.memoryPercent + '%)';
+        document.getElementById('sysDisk').textContent = sys.diskUsedGB + ' / ' + sys.diskTotalGB + ' GB (' + sys.diskPercent + '%)';
+      }
+      document.getElementById('nginxStatus').textContent = 'Nginx: ' + (nginx.active ? 'attivo' : 'non attivo');
+    } catch (e) {
+      document.getElementById('sysUptime').textContent = 'Errore';
+    }
+  }
+
+  async function restartAllWebapps() {
+    try {
+      const res = await fetch('/api/process/restart-all', { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('Webapp riavviate', 'success');
+        setTimeout(() => location.reload(), 500);
+      } else {
+        showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
+      }
+    } catch (e) {
+      showToast('Errore: ' + e.message, 'error');
+    }
+  }
+
+  async function restoreAll() {
+    try {
+      const res = await fetch('/api/process/restore-all', { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('Processi ripristinati', 'success');
+        setTimeout(() => location.reload(), 500);
+      } else {
+        showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
+      }
+    } catch (e) {
+      showToast('Errore: ' + e.message, 'error');
+    }
+  }
+
+  async function checkHealth() {
+    try {
+      const res = await fetch('/api/health');
+      const data = await res.json();
+      const tbody = document.getElementById('healthBody');
+      const container = document.getElementById('healthResults');
+      tbody.innerHTML = '';
+      (data.results || []).forEach(function (r) {
+        const tr = document.createElement('tr');
+        tr.className = 'border-t border-slate-700';
+        const statusCls = r.ok ? 'text-emerald-300' : 'text-red-400';
+        const statusText = r.ok ? r.status + ' OK' : (r.error || 'Errore');
+        tr.innerHTML = '<td class="px-4 py-3">' + (r.name || '') + '</td><td class="px-4 py-3 font-mono text-sm">' + (r.url || '') + '</td><td class="px-4 py-3 ' + statusCls + '">' + statusText + '</td><td class="px-4 py-3">' + (r.elapsed || '-') + '</td>';
+        tbody.appendChild(tr);
+      });
+      container.classList.remove('hidden');
+    } catch (e) {
+      showToast('Errore: ' + e.message, 'error');
+    }
+  }
+
+  async function nginxReload() {
+    try {
+      const res = await fetch('/api/nginx-reload', { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('Nginx ricaricato', 'success');
+        loadSystem();
+      } else {
+        showToast('Errore: ' + (data.error || 'Reload fallito'), 'error');
+      }
+    } catch (e) {
+      showToast('Errore: ' + e.message, 'error');
+    }
+  }
+
+  // Chart.js - CPU e RAM
+  const chartConfig = {
+    type: 'line',
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          grid: { color: 'rgba(148, 163, 184, 0.2)' },
+          ticks: { color: '#94a3b8', maxTicksLimit: 8 }
+        },
+        y: {
+          grid: { color: 'rgba(148, 163, 184, 0.2)' },
+          ticks: { color: '#94a3b8' }
+        }
+      }
+    }
+  };
+
+  const cpuData = { labels: [], datasets: [{ label: 'CPU %', data: [], borderColor: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.1)', fill: true }] };
+  const ramData = { labels: [], datasets: [{ label: 'RAM MB', data: [], borderColor: '#60a5fa', backgroundColor: 'rgba(96, 165, 250, 0.1)', fill: true }] };
+
+  const chartCpu = new Chart(document.getElementById('chartCpu'), {
+    ...chartConfig,
+    data: cpuData
+  });
+  const chartRam = new Chart(document.getElementById('chartRam'), {
+    ...chartConfig,
+    data: ramData
+  });
+
+  const maxPoints = 30;
+  function addChartPoint(chart, label, value) {
+    chart.data.labels.push(label);
+    chart.data.datasets[0].data.push(value);
+    if (chart.data.labels.length > maxPoints) {
+      chart.data.labels.shift();
+      chart.data.datasets[0].data.shift();
+    }
+    chart.update('none');
+  }
+
+  async function fetchStats() {
+    try {
+      const res = await fetch('/api/system/stats');
+      const data = await res.json();
+      if (data.cpuPercent !== undefined) {
+        const now = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        addChartPoint(chartCpu, now, data.cpuPercent);
+        addChartPoint(chartRam, now, data.memoryUsedMB);
+      }
+    } catch (_) {}
+  }
+
+  loadSystem();
+  fetchStats();
+  setInterval(fetchStats, 3000);
+</script>

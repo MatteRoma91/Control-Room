@@ -13,7 +13,11 @@
     "dotenv": "^16.4.5",
     "ejs": "^3.1.10",
     "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
     "express-session": "^1.18.1",
-    "pm2": "^5.4.3"
+    "helmet": "^8.0.0",
+    "pm2": "^5.4.3",
+    "socket.io": "^4.8.1",
+    "systeminformation": "^5.25.9"
   }
 }
