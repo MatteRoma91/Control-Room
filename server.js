@@ -317,16 +317,43 @@ app.get('/api/system', requireAuth, async (req, res) => {
   }
 });
 
-// API: system stats per Chart.js (CPU %, RAM MB)
+// Buffer stats CPU/RAM dall'ultimo avvio (per grafici persistenti)
+const statsHistory = [];
+const STATS_HISTORY_MAX = 100;
+const STATS_INTERVAL_MS = 3000;
+
+async function collectStatsPoint() {
+  try {
+    const [load, mem] = await Promise.all([si.currentLoad(), si.mem()]);
+    const usedMemMB = Math.round((mem.total - mem.free) / 1024 / 1024);
+    const now = new Date();
+    statsHistory.push({
+      label: now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      cpu: load.currentLoad ?? 0,
+      ram: usedMemMB,
+    });
+    if (statsHistory.length > STATS_HISTORY_MAX) statsHistory.shift();
+  } catch (_) {}
+}
+setInterval(collectStatsPoint, STATS_INTERVAL_MS);
+collectStatsPoint();
+
+// API: system stats per Chart.js (CPU %, RAM MB) + history dall'avvio
 app.get('/api/system/stats', requireAuth, async (req, res) => {
   try {
     const [load, mem] = await Promise.all([si.currentLoad(), si.mem()]);
     const usedMemMB = Math.round((mem.total - mem.free) / 1024 / 1024);
+    const history = {
+      labels: statsHistory.map((p) => p.label),
+      cpu: statsHistory.map((p) => p.cpu),
+      ram: statsHistory.map((p) => p.ram),
+    };
     res.json({
       cpuPercent: load.currentLoad ?? 0,
       memoryUsedMB: usedMemMB,
       memoryTotalMB: Math.round(mem.total / 1024 / 1024),
       timestamp: new Date().toISOString(),
+      history,
     });
   } catch (err) {
     console.error('System stats error:', err);

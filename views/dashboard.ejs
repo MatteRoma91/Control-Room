@@ -369,10 +369,16 @@
     data: ramData
   });
 
-  const maxPoints = 30;
-  function addChartPoint(chart, label, value) {
+  function setChartFromHistory(chart, labels, values) {
+    chart.data.labels = labels.slice();
+    chart.data.datasets[0].data = values.slice();
+    chart.update('none');
+  }
+
+  function appendChartPoint(chart, label, value) {
     chart.data.labels.push(label);
     chart.data.datasets[0].data.push(value);
+    const maxPoints = 100;
     if (chart.data.labels.length > maxPoints) {
       chart.data.labels.shift();
       chart.data.datasets[0].data.shift();
@@ -384,10 +390,18 @@
     try {
       const res = await fetch('/api/system/stats');
       const data = await res.json();
-      if (data.cpuPercent !== undefined) {
-        const now = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        addChartPoint(chartCpu, now, data.cpuPercent);
-        addChartPoint(chartRam, now, data.memoryUsedMB);
+      if (data.cpuPercent === undefined) return;
+      const now = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      if (data.history && data.history.labels && data.history.labels.length > 0) {
+        setChartFromHistory(chartCpu, data.history.labels, data.history.cpu);
+        setChartFromHistory(chartRam, data.history.labels, data.history.ram);
+        if (data.history.labels[data.history.labels.length - 1] !== now) {
+          appendChartPoint(chartCpu, now, data.cpuPercent);
+          appendChartPoint(chartRam, now, data.memoryUsedMB);
+        }
+      } else {
+        appendChartPoint(chartCpu, now, data.cpuPercent);
+        appendChartPoint(chartRam, now, data.memoryUsedMB);
       }
     } catch (_) {}
   }
