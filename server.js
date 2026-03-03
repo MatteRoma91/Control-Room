@@ -997,6 +997,16 @@ io.on('connection', (socket) => {
     if (entry?.stream) entry.stream.write(data);
   });
 
+  socket.on('term-disconnect', () => {
+    const ssh = sshConnections.get(socket.id);
+    if (ssh) {
+      ssh.conn.end();
+      sshConnections.delete(socket.id);
+      socket.emit('term-data', '\r\n\x1b[33mConnessione chiusa.\x1b[0m\r\n');
+      socket.emit('term-disconnected');
+    }
+  });
+
   socket.on('join-logs', async (payload) => {
     const processName = typeof payload === 'string' ? payload : payload?.processName;
     if (!processName || typeof processName !== 'string') return;
@@ -1074,6 +1084,13 @@ io.on('connection', (socket) => {
           return;
         }
         stream.on('data', (chunk) => socket.emit('term-data', chunk.toString()));
+        conn.on('close', () => {
+          if (sshConnections.get(socket.id)?.conn === conn) {
+            sshConnections.delete(socket.id);
+            socket.emit('term-data', '\r\n\x1b[33mConnessione chiusa dal server remoto.\x1b[0m\r\n');
+            socket.emit('term-disconnected');
+          }
+        });
         sshConnections.set(socket.id, { conn, stream });
       });
     }).on('error', (err) => {
