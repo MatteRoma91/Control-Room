@@ -1,0 +1,19 @@
+{
+  "name": "control-room",
+  "version": "1.0.0",
+  "description": "PM2 Control Room Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.21.1",
+    "express-session": "^1.18.1",
+    "pm2": "^5.4.3"
+  }
+}
