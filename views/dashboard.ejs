@@ -100,25 +100,53 @@
   >
     Verifica
   </button>
-  <div id="healthResults" class="overflow-x-auto rounded-lg border border-slate-700 bg-slate-800 hidden">
-    <table class="w-full">
-      <thead class="bg-slate-700/50">
-        <tr>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">Webapp</th>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">URL</th>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">Status</th>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">Tempo (ms)</th>
-        </tr>
-      </thead>
-      <tbody id="healthBody"></tbody>
-    </table>
+  <div id="healthResults" class="hidden">
+    <div class="md:hidden space-y-3" id="healthCards"></div>
+    <div class="hidden md:block rounded-lg border border-slate-700 bg-slate-800">
+      <table class="w-full">
+        <thead class="bg-slate-700/50">
+          <tr>
+            <th class="text-left px-4 py-3 text-slate-300 font-medium">Webapp</th>
+            <th class="text-left px-4 py-3 text-slate-300 font-medium">URL</th>
+            <th class="text-left px-4 py-3 text-slate-300 font-medium">Status</th>
+            <th class="text-left px-4 py-3 text-slate-300 font-medium">Tempo (ms)</th>
+          </tr>
+        </thead>
+        <tbody id="healthBody"></tbody>
+      </table>
+    </div>
   </div>
 </section>
 
 <!-- Processi PM2 -->
 <section class="mb-8" aria-labelledby="processes-heading">
   <h2 id="processes-heading" class="text-lg font-semibold text-slate-200 mb-4">Processi PM2</h2>
-  <div class="overflow-x-auto rounded-lg border border-slate-700 bg-slate-800">
+  <div class="md:hidden space-y-3">
+    <% (processes || []).forEach((p) => { %>
+    <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+      <a href="/process/<%= p.name %>" class="text-emerald-400 hover:underline font-mono font-medium block mb-2"><%= p.name %></a>
+      <div class="flex flex-wrap gap-2 text-sm text-slate-400 mb-3">
+        <span class="px-2 py-0.5 rounded text-xs font-medium <%= p.status === 'online' ? 'bg-emerald-900/60 text-emerald-300' : p.status === 'stopped' ? 'bg-amber-900/60 text-amber-300' : 'bg-red-900/60 text-red-300' %>"><%= p.status %></span>
+        <span>CPU <%= p.cpu %>%</span>
+        <span><%= p.memory %> MB</span>
+        <span>Uptime <%= p.uptime %></span>
+        <span>Restart <%= p.restart_time %></span>
+      </div>
+      <div class="flex flex-wrap gap-1">
+        <button onclick="processAction('<%= p.name %>', 'start')" class="px-2 py-1.5 rounded text-xs bg-emerald-700 hover:bg-emerald-600 min-h-[36px]">Start</button>
+        <button onclick="processAction('<%= p.name %>', 'stop')" class="px-2 py-1.5 rounded text-xs bg-amber-700 hover:bg-amber-600 min-h-[36px]">Stop</button>
+        <button onclick="processAction('<%= p.name %>', 'restart')" class="px-2 py-1.5 rounded text-xs bg-blue-700 hover:bg-blue-600 min-h-[36px]">Restart</button>
+        <button onclick="processFlush('<%= p.name %>')" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px]">Flush</button>
+        <button onclick="gitPull('<%= p.name %>')" class="px-2 py-1.5 rounded text-xs bg-violet-700 hover:bg-violet-600 min-h-[36px]">Git Pull</button>
+        <button onclick="window.dispatchEvent(new CustomEvent('env-editor-show', { detail: { processName: '<%= p.name %>' } }))" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px]">Carica .env</button>
+      </div>
+    </div>
+    <% }); %>
+    <% if (!processes || processes.length === 0) { %>
+    <p class="text-slate-500 text-center py-8">Nessun processo PM2</p>
+    <% } %>
+  </div>
+  <div class="hidden md:block rounded-lg border border-slate-700 bg-slate-800">
     <table class="w-full">
       <thead class="bg-slate-700/50">
         <tr>
@@ -272,15 +300,21 @@
       const res = await fetch('/api/health');
       const data = await res.json();
       const tbody = document.getElementById('healthBody');
+      const cardsContainer = document.getElementById('healthCards');
       const container = document.getElementById('healthResults');
       tbody.innerHTML = '';
+      cardsContainer.innerHTML = '';
       (data.results || []).forEach(function (r) {
-        const tr = document.createElement('tr');
-        tr.className = 'border-t border-slate-700';
         const statusCls = r.ok ? 'text-emerald-300' : 'text-red-400';
         const statusText = r.ok ? r.status + ' OK' : (r.error || 'Errore');
+        const tr = document.createElement('tr');
+        tr.className = 'border-t border-slate-700';
         tr.innerHTML = '<td class="px-4 py-3">' + (r.name || '') + '</td><td class="px-4 py-3 font-mono text-sm">' + (r.url || '') + '</td><td class="px-4 py-3 ' + statusCls + '">' + statusText + '</td><td class="px-4 py-3">' + (r.elapsed || '-') + '</td>';
         tbody.appendChild(tr);
+        const card = document.createElement('div');
+        card.className = 'rounded-lg border border-slate-700 bg-slate-800 p-4';
+        card.innerHTML = '<div class="font-medium text-slate-200 mb-1">' + (r.name || '') + '</div><div class="font-mono text-sm text-slate-400 mb-2 break-all">' + (r.url || '') + '</div><div class="flex flex-wrap gap-2"><span class="' + statusCls + ' text-sm">' + statusText + '</span><span class="text-slate-400 text-sm">' + (r.elapsed || '-') + ' ms</span></div>';
+        cardsContainer.appendChild(card);
       });
       container.classList.remove('hidden');
     } catch (e) {

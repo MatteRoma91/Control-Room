@@ -108,7 +108,7 @@
       <div id="sshProfilesList" class="space-y-4 mb-4">
         <% (settings.sshProfiles || []).forEach((p, i) => { %>
         <div class="ssh-profile-card p-4 bg-slate-700/50 rounded-lg border border-slate-600" data-id="<%= p.id || ('p' + i) %>">
-          <div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2 text-sm">
             <input type="text" data-field="name" placeholder="Nome" value="<%= (p.name || '') %>"
               class="px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100" />
             <input type="text" data-field="host" placeholder="Host/IP" value="<%= (p.host || '') %>"
@@ -171,7 +171,7 @@
     card.className = 'ssh-profile-card p-4 bg-slate-700/50 rounded-lg border border-slate-600';
     card.dataset.id = 'p' + Date.now();
     card.innerHTML = `
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2 text-sm">
         <input type="text" data-field="name" placeholder="Nome" class="px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100" />
         <input type="text" data-field="host" placeholder="Host/IP" class="px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100 font-mono" />
         <input type="number" data-field="port" placeholder="22" value="22" class="px-2 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-100" />
