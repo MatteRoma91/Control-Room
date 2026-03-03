@@ -1,0 +1,53 @@
+<section class="mb-6" aria-labelledby="terminal-heading">
+  <div class="flex items-center justify-between mb-2">
+    <h1 id="terminal-heading" class="text-lg font-semibold text-slate-200">Terminale SSH</h1>
+    <button
+      id="btnConnectSsh"
+      class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+    >
+      Connetti
+    </button>
+  </div>
+  <p class="text-sm text-slate-400 mb-2">Se SSH non è configurato, vai in <a href="/settings" class="text-emerald-400 hover:underline">Impostazioni</a>.</p>
+  <div id="terminal" class="rounded-lg border border-slate-700 bg-slate-900 overflow-hidden" style="min-height: 400px;"></div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+<script>
+  (function () {
+    const terminalEl = document.getElementById('terminal');
+    const term = new Terminal({
+      cursorBlink: true,
+      theme: { background: '#0f172a', foreground: '#e2e8f0' },
+    });
+    term.open(terminalEl);
+
+    const socket = io();
+    let connected = false;
+
+    socket.on('connect', () => {
+      term.writeln('\x1b[32mConnesso. Clicca "Connetti" per avviare la sessione SSH.\x1b[0m');
+    });
+
+    socket.on('term-data', (data) => {
+      term.write(data);
+    });
+
+    term.onData((data) => {
+      if (connected) socket.emit('term-input', data);
+      else term.writeln('\x1b[33mClicca "Connetti" per collegarti all\'host SSH.\x1b[0m');
+    });
+
+    document.getElementById('btnConnectSsh').addEventListener('click', () => {
+      connected = true;
+      term.clear();
+      term.writeln('\x1b[33mConnessione SSH in corso...\x1b[0m');
+      socket.emit('join-ssh');
+    });
+
+    socket.on('disconnect', () => {
+      connected = false;
+    });
+
+  })();
+</script>

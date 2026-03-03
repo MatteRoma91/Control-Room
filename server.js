@@ -16,6 +16,9 @@ const rateLimit = require('express-rate-limit');
 const { Server } = require('socket.io');
 const pm2 = require('pm2');
 const si = require('systeminformation');
+const { Client } = require('ssh2');
+const speakeasy = require('speakeasy');
+const QRCode = require('qrcode');
 
 const ECOSYSTEMS = [
   { path: '/home/ubuntu/Sito-Padel/ecosystem.config.js', name: 'padel-tour' },
@@ -71,6 +74,14 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const login2FALimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  handler: (req, res) => res.redirect('/login/2fa?rateLimited=1'),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Auth middleware - redirect to login if not authenticated
 function requireAuth(req, res, next) {
   if (req.session?.user) return next();
@@ -89,13 +100,53 @@ app.get('/login', (req, res) => {
 });
 
 // Login (POST) - con rate limiting
-app.post('/login', loginLimiter, (req, res) => {
+app.post('/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body || {};
   if (username === AUTH_USER && password === AUTH_PASSWORD) {
+    const settings = await loadSettings();
+    if (settings.totpEnabled && settings.totpSecret) {
+      req.session.pending2FA = username;
+      req.session.pending2FATime = Date.now();
+      return res.redirect('/login/2fa');
+    }
     req.session.user = username;
     return res.redirect('/');
   }
   res.redirect('/login?error=1');
+});
+
+// Login 2FA (GET) - form codice a 6 cifre
+app.get('/login/2fa', (req, res) => {
+  if (req.session?.user) return res.redirect('/');
+  if (!req.session?.pending2FA) return res.redirect('/login');
+  res.render('login-2fa', {
+    error: req.query.error === '1',
+    rateLimited: req.query.rateLimited === '1',
+  });
+});
+
+// Login 2FA (POST) - verifica codice
+app.post('/login/2fa', login2FALimiter, async (req, res) => {
+  const username = req.session?.pending2FA;
+  if (!username) return res.redirect('/login');
+  const { code } = req.body || {};
+  const settings = await loadSettings();
+  if (!settings.totpSecret || !code || code.length !== 6) {
+    return res.redirect('/login/2fa?error=1');
+  }
+  const valid = speakeasy.totp.verify({
+    secret: settings.totpSecret,
+    encoding: 'base32',
+    token: code.trim(),
+    window: 1,
+  });
+  if (valid) {
+    req.session.user = username;
+    delete req.session.pending2FA;
+    delete req.session.pending2FATime;
+    return res.redirect('/');
+  }
+  res.redirect('/login/2fa?error=1');
 });
 
 // Logout
@@ -353,6 +404,184 @@ app.get('/api/db-configured', requireAuth, (req, res) => {
   res.json({ configured: DB_CONFIGURED });
 });
 
+// ============ SETTINGS (settings.json) ============
+
+const SETTINGS_PATH = path.join(__dirname, 'settings.json');
+
+async function loadSettings() {
+  try {
+    const data = await fs.readFile(SETTINGS_PATH, 'utf8');
+    return JSON.parse(data);
+  } catch {
+    return {};
+  }
+}
+
+async function saveSettings(obj) {
+  await fs.writeFile(SETTINGS_PATH, JSON.stringify(obj, null, 2), 'utf8');
+  try {
+    await fs.chmod(SETTINGS_PATH, 0o600);
+  } catch (_) {}
+}
+
+// Pagina Settings
+app.get('/settings', requireAuth, async (req, res) => {
+  const settings = await loadSettings();
+  res.render('layout', { contentPartial: 'settings', settings });
+});
+
+// API: GET settings
+app.get('/api/settings', requireAuth, async (req, res) => {
+  const settings = await loadSettings();
+  res.json(settings);
+});
+
+// API: POST settings (salva)
+app.post('/api/settings', requireAuth, async (req, res) => {
+  try {
+    const body = { ...(req.body || {}) };
+    const current = await loadSettings();
+    if (body.sshAuth === 'password' && (!body.sshPassword || body.sshPassword === '')) {
+      body.sshPassword = current.sshPassword || '';
+    }
+    body.totpSecret = current.totpSecret;
+    body.totpEnabled = current.totpEnabled;
+    await saveSettings(body);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Settings save error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ============ 2FA (Google Authenticator) ============
+
+// Pagina setup 2FA
+app.get('/settings/2fa-setup', requireAuth, async (req, res) => {
+  const settings = await loadSettings();
+  res.render('layout', { contentPartial: 'settings-2fa-setup', settings });
+});
+
+// API: genera secret per setup 2FA
+app.post('/api/2fa/setup', requireAuth, async (req, res) => {
+  try {
+    const secret = speakeasy.generateSecret({
+      name: `Control Room (${AUTH_USER})`,
+      length: 20,
+      issuer: 'Control Room',
+    });
+    const qrDataUrl = await QRCode.toDataURL(secret.otpauth_url);
+    req.session.temp2FASecret = secret.base32;
+    res.json({ secret: secret.base32, otpauth_url: secret.otpauth_url, qrDataUrl });
+  } catch (err) {
+    console.error('2FA setup error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// API: verifica codice e attiva 2FA
+app.post('/api/2fa/verify-setup', requireAuth, async (req, res) => {
+  try {
+    const tempSecret = req.session?.temp2FASecret;
+    const { code } = req.body || {};
+    if (!tempSecret || !code || code.length !== 6) {
+      return res.status(400).json({ ok: false, error: 'Codice non valido' });
+    }
+    const valid = speakeasy.totp.verify({
+      secret: tempSecret,
+      encoding: 'base32',
+      token: code.trim(),
+      window: 1,
+    });
+    if (!valid) {
+      return res.status(400).json({ ok: false, error: 'Codice non corretto' });
+    }
+    const current = await loadSettings();
+    current.totpSecret = tempSecret;
+    current.totpEnabled = true;
+    await saveSettings(current);
+    delete req.session.temp2FASecret;
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('2FA verify-setup error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// API: disattiva 2FA
+app.post('/api/2fa/disable', requireAuth, async (req, res) => {
+  try {
+    const { password } = req.body || {};
+    if (password !== AUTH_PASSWORD) {
+      return res.status(401).json({ ok: false, error: 'Password non valida' });
+    }
+    const current = await loadSettings();
+    current.totpEnabled = false;
+    current.totpSecret = '';
+    await saveSettings(current);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('2FA disable error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Vista Terminale SSH
+app.get('/terminal', requireAuth, (req, res) => {
+  const headExtra = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />';
+  res.render('layout', { contentPartial: 'terminal', headExtra });
+});
+
+// ============ EDITOR .ENV ============
+
+const ALLOWED_CWD_PREFIX = '/home/ubuntu/';
+
+function isPathAllowed(filePath) {
+  const resolved = path.resolve(filePath);
+  return resolved.startsWith(ALLOWED_CWD_PREFIX);
+}
+
+// API: GET .env di un processo
+app.get('/api/env/:name', requireAuth, async (req, res) => {
+  const { name } = req.params;
+  try {
+    const cwd = await pm2GetCwd(name);
+    if (!cwd || !isPathAllowed(cwd)) return res.status(403).json({ ok: false, error: 'Accesso non consentito' });
+    const envPath = path.join(cwd, '.env');
+    try {
+      const content = await fs.readFile(envPath, 'utf8');
+      res.json({ content, exists: true, cwd });
+    } catch {
+      res.json({ content: '', exists: false, cwd });
+    }
+  } catch (err) {
+    console.error('Env read error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// API: POST .env (salva con backup)
+app.post('/api/env/:name', requireAuth, async (req, res) => {
+  const { name } = req.params;
+  const { content } = req.body || {};
+  if (typeof content !== 'string' || content.trim() === '') {
+    return res.status(400).json({ ok: false, error: 'Contenuto non valido' });
+  }
+  try {
+    const cwd = await pm2GetCwd(name);
+    if (!cwd || !isPathAllowed(cwd)) return res.status(403).json({ ok: false, error: 'Accesso non consentito' });
+    const envPath = path.join(cwd, '.env');
+    try {
+      await fs.copyFile(envPath, envPath + '.backup.' + Date.now());
+    } catch (_) {}
+    await fs.writeFile(envPath, content, 'utf8');
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Env save error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // ============ PM2 HELPERS ============
 
 function pm2List() {
@@ -489,8 +718,14 @@ io.use((socket, next) => {
 
 // Mappa socket.id -> tail processes (per kill on disconnect)
 const tailProcesses = new Map();
+const sshConnections = new Map();
 
 io.on('connection', (socket) => {
+  socket.on('term-input', (data) => {
+    const entry = sshConnections.get(socket.id);
+    if (entry?.stream) entry.stream.write(data);
+  });
+
   socket.on('join-logs', async (payload) => {
     const processName = typeof payload === 'string' ? payload : payload?.processName;
     if (!processName || typeof processName !== 'string') return;
@@ -526,6 +761,47 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('join-ssh', async () => {
+    const existing = sshConnections.get(socket.id);
+    if (existing) {
+      existing.conn.end();
+      sshConnections.delete(socket.id);
+    }
+    const settings = await loadSettings();
+    const host = settings.sshHost;
+    const port = parseInt(settings.sshPort || '22', 10);
+    const username = settings.sshUser;
+    if (!host || !username) {
+      socket.emit('term-data', '\r\n\x1b[31mSSH non configurato. Vai in Impostazioni.\x1b[0m\r\n');
+      return;
+    }
+    const conn = new Client();
+    const config = { host, port, username };
+    if (settings.sshAuth === 'password') {
+      config.password = settings.sshPassword || '';
+    } else {
+      try {
+        const keyPath = settings.sshKeyPath || (path.join(os.homedir(), '.ssh', 'id_rsa'));
+        config.privateKey = await fs.readFile(keyPath, 'utf8');
+      } catch (e) {
+        socket.emit('term-data', `\r\n\x1b[31mErrore chiave SSH: ${e.message}\x1b[0m\r\n`);
+        return;
+      }
+    }
+    conn.on('ready', () => {
+      conn.shell((err, stream) => {
+        if (err) {
+          socket.emit('term-data', `\r\n\x1b[31mShell error: ${err.message}\x1b[0m\r\n`);
+          return;
+        }
+        stream.on('data', (chunk) => socket.emit('term-data', chunk.toString()));
+        sshConnections.set(socket.id, { conn, stream });
+      });
+    }).on('error', (err) => {
+      socket.emit('term-data', `\r\n\x1b[31mSSH error: ${err.message}\x1b[0m\r\n`);
+    }).connect(config);
+  });
+
   socket.on('disconnect', () => {
     const procs = tailProcesses.get(socket.id);
     if (procs) {
@@ -533,8 +809,59 @@ io.on('connection', (socket) => {
       procs.err?.kill();
       tailProcesses.delete(socket.id);
     }
+    const ssh = sshConnections.get(socket.id);
+    if (ssh) {
+      ssh.conn.end();
+      sshConnections.delete(socket.id);
+    }
   });
 });
+
+// ============ NOTIFICHE (pm2.launchBus) ============
+
+const notifyDebounce = new Map();
+const NOTIFY_DEBOUNCE_MS = 30000;
+
+async function sendNotification(message) {
+  const settings = await loadSettings();
+  const type = settings.webhookType || 'discord';
+  const text = message.slice(0, 1950);
+
+  if (type === 'discord' && settings.webhookUrl) {
+    try {
+      await fetch(settings.webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: text }),
+      });
+    } catch (err) {
+      console.error('Discord webhook error:', err);
+    }
+    return;
+  }
+
+  if (type === 'telegram' && settings.telegramBotToken && settings.telegramChatId) {
+    try {
+      const url = `https://api.telegram.org/bot${settings.telegramBotToken}/sendMessage`;
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: settings.telegramChatId, text }),
+      });
+    } catch (err) {
+      console.error('Telegram send error:', err);
+    }
+  }
+}
+
+function shouldNotifyProcess(processName, eventType) {
+  const key = `${processName}:${eventType}`;
+  const now = Date.now();
+  const last = notifyDebounce.get(key) || 0;
+  if (now - last < NOTIFY_DEBOUNCE_MS) return false;
+  notifyDebounce.set(key, now);
+  return true;
+}
 
 // ============ STARTUP ============
 
@@ -543,6 +870,30 @@ pm2.connect((err) => {
     console.error('PM2 connect failed:', err);
     process.exit(1);
   }
+  pm2.launchBus((errBus, bus) => {
+    if (errBus) return;
+    bus.on('process:event', async (data) => {
+      const ev = data?.event;
+      const name = data?.process?.name || data?.name || 'unknown';
+      const restartTime = data?.process?.restart_time ?? 0;
+      const settings = await loadSettings();
+      if (ev === 'exit' && settings.notifyOnCrash !== false && shouldNotifyProcess(name, 'exit')) {
+        await sendNotification(`PM2: [${name}] Processo terminato (exit). Restart #${restartTime}.`);
+      }
+      if (ev === 'restart' && settings.notifyOnRestart !== false && restartTime >= 3 && shouldNotifyProcess(name, 'restart')) {
+        await sendNotification(`PM2: [${name}] Restart continuo (#${restartTime}). Possibile crash loop.`);
+      }
+    });
+    bus.on('log:err', async (data) => {
+      const settings = await loadSettings();
+      if (!settings.notifyOnCrash && !settings.notifyOnRestart) return;
+      const name = data?.process?.name || 'unknown';
+      const msg = (data?.data || '').toString().slice(0, 500);
+      if (msg && shouldNotifyProcess(name, 'logerr')) {
+        await sendNotification(`PM2 stderr [${name}]: ${msg}`);
+      }
+    });
+  });
   httpServer.listen(PORT, () => {
     console.log(`Control Room running on http://localhost:${PORT}`);
   });

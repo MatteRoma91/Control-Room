@@ -1,0 +1,165 @@
+<section class="mb-8" aria-labelledby="settings-heading">
+  <h1 id="settings-heading" class="text-2xl font-bold text-slate-200 mb-6">Impostazioni</h1>
+
+  <!-- Autenticazione a due fattori -->
+  <div class="rounded-lg border border-slate-700 bg-slate-800 p-6 mb-8 max-w-2xl">
+    <h2 class="text-lg font-semibold text-slate-200 mb-4">Autenticazione a due fattori</h2>
+    <p class="text-slate-300 mb-4">Proteggi l'accesso con Google Authenticator. Ogni login richiederà un codice a 6 cifre generato dall'app.</p>
+    <a
+      href="/settings/2fa-setup"
+      class="inline-block px-4 py-2 rounded-lg bg-slate-600 hover:bg-slate-500 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+    >
+      <% if (settings.totpEnabled) { %>
+        Gestisci 2FA
+      <% } else { %>
+        Configura 2FA
+      <% } %>
+    </a>
+    <% if (settings.totpEnabled) { %>
+      <span class="ml-3 px-2 py-0.5 rounded text-xs font-medium bg-emerald-900/60 text-emerald-300">Attivo</span>
+    <% } else { %>
+      <span class="ml-3 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-slate-400">Non configurato</span>
+    <% } %>
+  </div>
+
+  <form id="settingsForm" class="space-y-8 max-w-2xl">
+    <!-- Notifiche Webhook -->
+    <div class="rounded-lg border border-slate-700 bg-slate-800 p-6">
+      <h2 class="text-lg font-semibold text-slate-200 mb-4">Notifiche (Discord / Telegram)</h2>
+      <div class="space-y-4">
+        <div>
+          <label for="webhookType" class="block text-sm text-slate-400 mb-1">Tipo</label>
+          <select id="webhookType" name="webhookType" class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100">
+            <option value="discord" <%= (settings.webhookType || 'discord') === 'discord' ? 'selected' : '' %>>Discord Webhook</option>
+            <option value="telegram" <%= settings.webhookType === 'telegram' ? 'selected' : '' %>>Telegram</option>
+          </select>
+        </div>
+        <div id="discordFields">
+          <label for="webhookUrl" class="block text-sm text-slate-400 mb-1">URL Webhook (Discord)</label>
+          <input type="url" id="webhookUrl" name="webhookUrl" placeholder="https://discord.com/api/webhooks/..."
+            value="<%= (settings.webhookUrl || '') %>"
+            class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 font-mono text-sm" />
+        </div>
+        <div id="telegramFields" class="hidden space-y-2">
+          <div>
+            <label for="telegramBotToken" class="block text-sm text-slate-400 mb-1">Bot Token</label>
+            <input type="password" id="telegramBotToken" name="telegramBotToken" placeholder="123456:ABC..."
+              value="<%= (settings.telegramBotToken || '') %>"
+              class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 font-mono text-sm" />
+          </div>
+          <div>
+            <label for="telegramChatId" class="block text-sm text-slate-400 mb-1">Chat ID</label>
+            <input type="text" id="telegramChatId" name="telegramChatId" placeholder="-1001234567890"
+              value="<%= (settings.telegramChatId || '') %>"
+              class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 font-mono text-sm" />
+          </div>
+        </div>
+        <div class="flex gap-4">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="notifyOnCrash" value="1" <%= settings.notifyOnCrash !== false ? 'checked' : '' %>
+              class="rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500" />
+            <span class="text-slate-300">Notifica su crash</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="notifyOnRestart" value="1" <%= settings.notifyOnRestart !== false ? 'checked' : '' %>
+              class="rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500" />
+            <span class="text-slate-300">Notifica su restart</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- SSH -->
+    <div class="rounded-lg border border-slate-700 bg-slate-800 p-6">
+      <h2 class="text-lg font-semibold text-slate-200 mb-4">Terminale SSH</h2>
+      <div class="space-y-4">
+        <div>
+          <label for="sshHost" class="block text-sm text-slate-400 mb-1">Host</label>
+          <input type="text" id="sshHost" name="sshHost" placeholder="57.131.40.170"
+            value="<%= (settings.sshHost || '') %>"
+            class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 font-mono" />
+        </div>
+        <div>
+          <label for="sshPort" class="block text-sm text-slate-400 mb-1">Porta</label>
+          <input type="number" id="sshPort" name="sshPort" placeholder="22"
+            value="<%= (settings.sshPort || '22') %>"
+            class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100" />
+        </div>
+        <div>
+          <label for="sshUser" class="block text-sm text-slate-400 mb-1">Utente</label>
+          <input type="text" id="sshUser" name="sshUser" placeholder="ubuntu"
+            value="<%= (settings.sshUser || '') %>"
+            class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100" />
+        </div>
+        <div>
+          <label for="sshAuth" class="block text-sm text-slate-400 mb-1">Autenticazione</label>
+          <select id="sshAuth" name="sshAuth" class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100">
+            <option value="key" <%= (settings.sshAuth || 'key') === 'key' ? 'selected' : '' %>>Chiave privata</option>
+            <option value="password" <%= settings.sshAuth === 'password' ? 'selected' : '' %>>Password</option>
+          </select>
+        </div>
+        <div id="sshKeyFields">
+          <label for="sshKeyPath" class="block text-sm text-slate-400 mb-1">Path chiave privata</label>
+          <input type="text" id="sshKeyPath" name="sshKeyPath" placeholder="/home/ubuntu/.ssh/id_rsa"
+            value="<%= (settings.sshKeyPath || '') %>"
+            class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 font-mono text-sm" />
+        </div>
+        <div id="sshPasswordFields" class="hidden">
+          <label for="sshPassword" class="block text-sm text-slate-400 mb-1">Password</label>
+          <input type="password" id="sshPassword" name="sshPassword" placeholder="***"
+            class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100" />
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium focus:ring-2 focus:ring-emerald-500">
+      Salva impostazioni
+    </button>
+  </form>
+</section>
+
+<script>
+  document.getElementById('webhookType').addEventListener('change', function() {
+    const isDiscord = this.value === 'discord';
+    document.getElementById('discordFields').classList.toggle('hidden', !isDiscord);
+    document.getElementById('telegramFields').classList.toggle('hidden', isDiscord);
+  });
+  document.getElementById('webhookType').dispatchEvent(new Event('change'));
+
+  document.getElementById('sshAuth').addEventListener('change', function() {
+    const isKey = this.value === 'key';
+    document.getElementById('sshKeyFields').classList.toggle('hidden', !isKey);
+    document.getElementById('sshPasswordFields').classList.toggle('hidden', isKey);
+  });
+  document.getElementById('sshAuth').dispatchEvent(new Event('change'));
+
+  document.getElementById('settingsForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+      webhookType: form.webhookType?.value || 'discord',
+      webhookUrl: form.webhookUrl?.value || '',
+      telegramBotToken: form.telegramBotToken?.value || '',
+      telegramChatId: form.telegramChatId?.value || '',
+      notifyOnCrash: form.notifyOnCrash?.checked !== false,
+      notifyOnRestart: form.notifyOnRestart?.checked !== false,
+      sshHost: form.sshHost?.value || '',
+      sshPort: form.sshPort?.value || '22',
+      sshUser: form.sshUser?.value || '',
+      sshAuth: form.sshAuth?.value || 'key',
+      sshKeyPath: form.sshKeyPath?.value || '',
+      sshPassword: form.sshPassword?.value || ''
+    };
+    try {
+      const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      const json = await res.json();
+      if (json.ok) {
+        window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Impostazioni salvate', type: 'success' } }));
+      } else {
+        window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Errore: ' + (json.error || 'Salvataggio fallito'), type: 'error' } }));
+      }
+    } catch (err) {
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Errore: ' + err.message, type: 'error' } }));
+    }
+  });
+</script>
