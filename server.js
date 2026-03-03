@@ -19,6 +19,7 @@ const si = require('systeminformation');
 const { Client } = require('ssh2');
 const speakeasy = require('speakeasy');
 const QRCode = require('qrcode');
+const schedule = require('node-schedule');
 
 const ECOSYSTEMS = [
   { path: '/home/ubuntu/Sito-Padel/ecosystem.config.js', name: 'padel-tour' },
@@ -456,6 +457,7 @@ app.post('/api/settings', requireAuth, async (req, res) => {
     body.totpSecret = current.totpSecret;
     body.totpEnabled = current.totpEnabled;
     if (!Array.isArray(body.sshProfiles)) body.sshProfiles = current.sshProfiles || [];
+    if (!Array.isArray(body.cronJobs)) body.cronJobs = current.cronJobs || [];
     await saveSettings(body);
     res.json({ ok: true });
   } catch (err) {
@@ -532,6 +534,92 @@ app.post('/api/2fa/disable', requireAuth, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('2FA disable error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ============ CRON JOBS ============
+
+const cronJobHandles = new Map(); // id -> schedule.Job
+
+async function executeCronJob(job) {
+  try {
+    if (job.action === 'pm2-restart' && job.target) {
+      await pm2Action('restart', job.target);
+      console.log(`[Cron] Riavviato ${job.target}`);
+    } else if (job.action === 'pm2-start' && job.target) {
+      await pm2Action('start', job.target);
+      console.log(`[Cron] Avviato ${job.target}`);
+    } else if (job.action === 'command' && job.command) {
+      execSync(job.command, { encoding: 'utf8', stdio: 'pipe' });
+      console.log(`[Cron] Eseguito comando: ${job.command}`);
+    } else if (job.action === 'db-backup' && DB_CONFIGURED) {
+      const fname = `backup-${new Date().toISOString().slice(0, 10)}.sql.gz`;
+      const outPath = path.join(__dirname, 'backups', fname);
+      await fs.mkdir(path.join(__dirname, 'backups'), { recursive: true });
+      const args = ['-h', DB_HOST, '-u', DB_USER];
+      if (DB_PASSWORD) args.push(`-p${DB_PASSWORD}`);
+      args.push(DB_NAME);
+      const mysqldump = spawn('mysqldump', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      const gzip = spawn('gzip', ['-c'], { stdio: ['pipe', 'pipe', 'pipe'] });
+      const wstream = require('fs').createWriteStream(outPath);
+      mysqldump.stdout.pipe(gzip.stdin);
+      gzip.stdout.pipe(wstream);
+      await new Promise((resolve, reject) => {
+        let dumpOk = true;
+        mysqldump.on('close', (code) => { if (code !== 0) dumpOk = false; });
+        wstream.on('finish', () => { if (dumpOk) resolve(); else reject(new Error('mysqldump failed')); });
+        wstream.on('error', reject);
+        mysqldump.on('error', reject);
+        gzip.on('error', reject);
+      });
+      console.log(`[Cron] Backup DB salvato in ${outPath}`);
+    }
+  } catch (err) {
+    console.error(`[Cron] Errore job ${job.name}:`, err.message);
+  }
+}
+
+function registerCronJobs() {
+  cronJobHandles.forEach((j) => j.cancel());
+  cronJobHandles.clear();
+  loadSettings().then((settings) => {
+    const jobs = settings.cronJobs || [];
+    jobs.filter((j) => j.enabled !== false && j.schedule).forEach((job) => {
+      try {
+        const j = schedule.scheduleJob(job.schedule, () => executeCronJob(job));
+        if (j) cronJobHandles.set(job.id, j);
+      } catch (e) {
+        console.error(`[Cron] Job ${job.name} schedule invalido:`, e.message);
+      }
+    });
+  });
+}
+
+// Pagina Cron Jobs
+app.get('/cron', requireAuth, async (req, res) => {
+  const settings = await loadSettings();
+  const list = await pm2List();
+  res.render('layout', { contentPartial: 'cron', cronJobs: settings.cronJobs || [], processes: list });
+});
+
+// API: GET cron jobs
+app.get('/api/cron-jobs', requireAuth, async (req, res) => {
+  const settings = await loadSettings();
+  res.json(settings.cronJobs || []);
+});
+
+// API: POST cron jobs (salva tutti)
+app.post('/api/cron-jobs', requireAuth, async (req, res) => {
+  try {
+    const jobs = req.body?.jobs || req.body || [];
+    const current = await loadSettings();
+    current.cronJobs = Array.isArray(jobs) ? jobs : [];
+    await saveSettings(current);
+    registerCronJobs();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Cron jobs save error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
@@ -888,6 +976,7 @@ pm2.connect((err) => {
     console.error('PM2 connect failed:', err);
     process.exit(1);
   }
+  registerCronJobs();
   pm2.launchBus((errBus, bus) => {
     if (errBus) return;
     bus.on('process:event', async (data) => {
