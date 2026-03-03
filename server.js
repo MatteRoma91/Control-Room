@@ -57,6 +57,9 @@ app.use(helmet({ contentSecurityPolicy: false })); // CSP disabilitato per CDN T
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+const SESSION_MAX_AGE_DAYS = parseInt(process.env.SESSION_MAX_AGE_DAYS || '7', 10);
+const SESSION_MAX_AGE_MS = SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+
 const sessionMiddleware = session({
   secret: SESSION_SECRET,
   resave: false,
@@ -64,7 +67,7 @@ const sessionMiddleware = session({
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: SESSION_MAX_AGE_MS,
   },
 });
 app.use(sessionMiddleware);
@@ -88,7 +91,10 @@ const login2FALimiter = rateLimit({
 
 // Auth middleware - redirect to login if not authenticated
 function requireAuth(req, res, next) {
-  if (req.session?.user) return next();
+  if (req.session?.user) {
+    req.session._lastAccess = Date.now();
+    return next();
+  }
   res.redirect('/login');
 }
 
