@@ -89,6 +89,42 @@ function requireAuth(req, res, next) {
   res.redirect('/login');
 }
 
+// ============ IP WHITELIST MIDDLEWARE (runs before auth) ============
+
+async function ipWhitelistMiddleware(req, res, next) {
+  try {
+    const settings = await loadSettings();
+    const clientIp = (req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.connection?.remoteAddress || '').replace(/^::ffff:/, '');
+
+    // Panic Mode: only panicModeIp can access
+    if (settings.panicMode && settings.panicModeIp) {
+      if (clientIp === settings.panicModeIp) return next();
+      res.status(403).send('Accesso negato. Panic Mode attivo.');
+      return;
+    }
+
+    // If whitelist not enabled, allow all
+    if (!settings.ipWhitelistEnabled || !Array.isArray(settings.ipWhitelist) || settings.ipWhitelist.length === 0) {
+      return next();
+    }
+
+    // Check if IP is in whitelist (exact match for MVP)
+    const allowed = settings.ipWhitelist.some((entry) => {
+      const ip = String(entry).trim();
+      if (!ip) return false;
+      return clientIp === ip;
+    });
+
+    if (allowed) return next();
+    res.status(403).send('Accesso negato. IP non autorizzato.');
+  } catch (err) {
+    console.error('IP whitelist error:', err);
+    next();
+  }
+}
+
+app.use(ipWhitelistMiddleware);
+
 // ============ ROUTES ============
 
 // Login page (GET)
@@ -362,6 +398,101 @@ app.post('/api/nginx-reload', requireAuth, (req, res) => {
   }
 });
 
+// Nginx Config Generator page
+app.get('/nginx', requireAuth, (req, res) => {
+  res.render('layout', { contentPartial: 'nginx' });
+});
+
+// API: nginx config generator
+app.post('/api/nginx-generate', requireAuth, async (req, res) => {
+  let output = [];
+  try {
+    const { domain, port, ssl } = req.body || {};
+    if (!domain || typeof domain !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$/.test(domain.trim())) {
+      return res.status(400).json({ ok: false, error: 'Dominio non valido' });
+    }
+    const safeDomain = domain.trim().replace(/\./g, '_');
+    const portNum = parseInt(port || 3000, 10);
+    if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+      return res.status(400).json({ ok: false, error: 'Porta non valida' });
+    }
+
+    const httpBlock = `# Generato da Control Room - ${domain}
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${domain};
+    location / {
+        proxy_pass http://127.0.0.1:${portNum};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+`;
+    const tmpPath = `/tmp/controlroom-nginx-${safeDomain}.conf`;
+    const destPath = `/etc/nginx/sites-available/${domain}.conf`;
+
+    await fs.writeFile(tmpPath, httpBlock, 'utf8');
+    output.push('File generato: ' + tmpPath);
+
+    execSync(`sudo cp ${tmpPath} ${destPath}`, { encoding: 'utf8' });
+    output.push('Copiato in: ' + destPath);
+
+    execSync(`sudo ln -sf ${destPath} /etc/nginx/sites-enabled/${domain}.conf`, { encoding: 'utf8' });
+    output.push('Symlink creato in sites-enabled');
+
+    if (ssl) {
+      try {
+        const certbotEmail = process.env.CR_CONTACT_EMAIL || `admin@${domain}`;
+        execSync(`sudo certbot certonly --nginx -d ${domain} --non-interactive --agree-tos --email ${certbotEmail} 2>&1`, { encoding: 'utf8' });
+        output.push('Certificato SSL ottenuto con Certbot');
+        const httpsBlock = `
+# HTTPS - abilitato da Certbot
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${domain};
+    ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+
+    location / {
+        proxy_pass http://127.0.0.1:${portNum};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+`;
+        await fs.writeFile(tmpPath, httpBlock + httpsBlock, 'utf8');
+        execSync(`sudo cp ${tmpPath} ${destPath}`, { encoding: 'utf8' });
+      } catch (certErr) {
+        output.push('Certbot fallito (certificati potrebbero esistere già): ' + (certErr.message || certErr));
+      }
+    }
+
+    execSync('sudo nginx -t 2>&1', { encoding: 'utf8' });
+    output.push('nginx -t OK');
+
+    execSync('sudo /bin/systemctl reload nginx 2>&1', { encoding: 'utf8' });
+    output.push('Nginx ricaricato');
+
+    res.json({ ok: true, output: output.join('\n') });
+  } catch (err) {
+    console.error('Nginx generate error:', err);
+    res.status(500).json({ ok: false, error: err.message, output: output.join('\n') });
+  }
+});
+
 // API: db backup (mysqldump | gzip, stream download)
 app.get('/api/db-backup', requireAuth, (req, res) => {
   if (!DB_CONFIGURED) return res.status(503).json({ ok: false, error: 'Database non configurato' });
@@ -456,12 +587,44 @@ app.post('/api/settings', requireAuth, async (req, res) => {
     const current = await loadSettings();
     body.totpSecret = current.totpSecret;
     body.totpEnabled = current.totpEnabled;
+    body.panicMode = current.panicMode;
+    body.panicModeIp = current.panicModeIp;
     if (!Array.isArray(body.sshProfiles)) body.sshProfiles = current.sshProfiles || [];
     if (!Array.isArray(body.cronJobs)) body.cronJobs = current.cronJobs || [];
+    if (!Array.isArray(body.ipWhitelist)) body.ipWhitelist = current.ipWhitelist || [];
     await saveSettings(body);
     res.json({ ok: true });
   } catch (err) {
     console.error('Settings save error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// API: Attiva Panic Mode (solo IP corrente)
+app.post('/api/settings/panic-activate', requireAuth, async (req, res) => {
+  try {
+    const clientIp = (req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || '').replace(/^::ffff:/, '');
+    const current = await loadSettings();
+    current.panicMode = true;
+    current.panicModeIp = clientIp;
+    await saveSettings(current);
+    res.json({ ok: true, panicModeIp: clientIp });
+  } catch (err) {
+    console.error('Panic activate error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// API: Disattiva Panic Mode
+app.post('/api/settings/panic-disable', requireAuth, async (req, res) => {
+  try {
+    const current = await loadSettings();
+    current.panicMode = false;
+    current.panicModeIp = '';
+    await saveSettings(current);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Panic disable error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
@@ -669,8 +832,9 @@ app.post('/api/env/:name', requireAuth, async (req, res) => {
     const cwd = await pm2GetCwd(name);
     if (!cwd || !isPathAllowed(cwd)) return res.status(403).json({ ok: false, error: 'Accesso non consentito' });
     const envPath = path.join(cwd, '.env');
+    const bakPath = path.join(cwd, '.env.bak');
     try {
-      await fs.copyFile(envPath, envPath + '.backup.' + Date.now());
+      await fs.copyFile(envPath, bakPath);
     } catch (_) {}
     await fs.writeFile(envPath, content, 'utf8');
     res.json({ ok: true });
@@ -933,15 +1097,18 @@ async function sendNotification(message) {
   const type = settings.webhookType || 'discord';
   const text = message.slice(0, 1950);
 
-  if (type === 'discord' && settings.webhookUrl) {
+  if ((type === 'discord' || type === 'slack') && settings.webhookUrl) {
     try {
+      const body = type === 'slack'
+        ? { text }
+        : { content: text };
       await fetch(settings.webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: text }),
+        body: JSON.stringify(body),
       });
     } catch (err) {
-      console.error('Discord webhook error:', err);
+      console.error(`${type} webhook error:`, err);
     }
     return;
   }
@@ -985,10 +1152,19 @@ pm2.connect((err) => {
       const restartTime = data?.process?.restart_time ?? 0;
       const settings = await loadSettings();
       if (ev === 'exit' && settings.notifyOnCrash !== false && shouldNotifyProcess(name, 'exit')) {
-        await sendNotification(`PM2: [${name}] Processo terminato (exit). Restart #${restartTime}.`);
+        await sendNotification(`⚠️ Alert: Il processo '${name}' è crashato! (Riavvio automatico in corso...)`);
       }
       if (ev === 'restart' && settings.notifyOnRestart !== false && restartTime >= 3 && shouldNotifyProcess(name, 'restart')) {
-        await sendNotification(`PM2: [${name}] Restart continuo (#${restartTime}). Possibile crash loop.`);
+        await sendNotification(`🔄 Crash loop: Il processo '${name}' è stato riavviato ${restartTime} volte. Verifica i log.`);
+      }
+    });
+    bus.on('process:exception', async (data) => {
+      const settings = await loadSettings();
+      if (settings.notifyOnCrash === false) return;
+      const name = data?.process?.name || data?.name || 'unknown';
+      const msg = (data?.msg || data?.error?.message || 'Errore non gestito').toString().slice(0, 300);
+      if (shouldNotifyProcess(name, 'exception')) {
+        await sendNotification(`⚠️ Alert: Il processo '${name}' ha emesso un'eccezione: ${msg}`);
       }
     });
     bus.on('log:err', async (data) => {
@@ -997,7 +1173,7 @@ pm2.connect((err) => {
       const name = data?.process?.name || 'unknown';
       const msg = (data?.data || '').toString().slice(0, 500);
       if (msg && shouldNotifyProcess(name, 'logerr')) {
-        await sendNotification(`PM2 stderr [${name}]: ${msg}`);
+        await sendNotification(`⚠️ PM2 stderr [${name}]: ${msg}`);
       }
     });
   });

@@ -1,0 +1,70 @@
+<section class="mb-8" aria-labelledby="nginx-heading">
+  <h1 id="nginx-heading" class="text-2xl font-bold text-slate-200 mb-6">Nginx Config Generator</h1>
+  <p class="text-slate-400 mb-6">Genera e applica la configurazione Nginx per un nuovo dominio. Il file viene creato in <code class="text-emerald-400">/etc/nginx/sites-available/</code>, viene creato il symlink in sites-enabled e Nginx viene ricaricato.</p>
+
+  <div class="rounded-lg border border-slate-700 bg-slate-800 p-6 max-w-xl">
+    <form id="nginxForm" class="space-y-4">
+      <div>
+        <label for="nginxDomain" class="block text-sm text-slate-400 mb-1">Dominio</label>
+        <input type="text" id="nginxDomain" name="domain" required
+          placeholder="api.miosito.com"
+          class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 font-mono" />
+      </div>
+      <div>
+        <label for="nginxPort" class="block text-sm text-slate-400 mb-1">Porta locale (app Node.js)</label>
+        <input type="number" id="nginxPort" name="port" value="3000" min="1" max="65535" required
+          class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100" />
+      </div>
+      <div>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="nginxSsl" name="ssl" value="1"
+            class="rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500" />
+          <span class="text-slate-300">Configura SSL con Certbot (richiede che il dominio punti già al server)</span>
+        </label>
+      </div>
+      <button type="submit" id="btnNginxGenerate" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500">
+        Genera e applica
+      </button>
+    </form>
+    <div id="nginxOutput" class="mt-4 p-4 bg-slate-900 rounded-lg font-mono text-sm text-slate-300 hidden"></div>
+  </div>
+
+  <div class="mt-6 p-4 bg-amber-900/30 border border-amber-700/50 rounded-lg text-sm text-amber-200 max-w-xl">
+    <strong>Nota:</strong> Richiede permessi sudo. Aggiungi al file <code class="text-amber-300">/etc/sudoers.d/control-room-nginx</code>:
+    <pre class="mt-2 text-xs overflow-x-auto">ubuntu ALL=(ALL) NOPASSWD: /usr/bin/cp /tmp/controlroom-nginx-*.conf /etc/nginx/sites-available/
+ubuntu ALL=(ALL) NOPASSWD: /usr/bin/ln -sf /etc/nginx/sites-available/* /etc/nginx/sites-enabled/
+ubuntu ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t
+ubuntu ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
+ubuntu ALL=(ALL) NOPASSWD: /usr/bin/certbot certonly --nginx -d *</pre>
+  </div>
+</section>
+
+<script>
+  document.getElementById('nginxForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const domain = document.getElementById('nginxDomain').value.trim();
+    const port = parseInt(document.getElementById('nginxPort').value || '3000', 10);
+    const ssl = document.getElementById('nginxSsl').checked;
+    const output = document.getElementById('nginxOutput');
+    output.classList.remove('hidden');
+    output.textContent = 'Elaborazione in corso...';
+    document.getElementById('btnNginxGenerate').disabled = true;
+    try {
+      const res = await fetch('/api/nginx-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain, port, ssl })
+      });
+      const json = await res.json();
+      output.textContent = (json.output || '') + (json.error ? '\n\nErrore: ' + json.error : '');
+      output.className = 'mt-4 p-4 bg-slate-900 rounded-lg font-mono text-sm ' + (json.ok ? 'text-emerald-300' : 'text-red-400');
+      if (json.ok) {
+        window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Configurazione Nginx applicata', type: 'success' } }));
+      }
+    } catch (err) {
+      output.textContent = 'Errore: ' + err.message;
+      output.className = 'mt-4 p-4 bg-slate-900 rounded-lg font-mono text-sm text-red-400';
+    }
+    document.getElementById('btnNginxGenerate').disabled = false;
+  });
+</script>

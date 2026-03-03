@@ -87,6 +87,31 @@ echo 'ubuntu ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx' | sudo tee /etc/su
 sudo chmod 440 /etc/sudoers.d/control-room
 ```
 
+### Nginx Config Generator
+
+La pagina **Nginx** (menu laterale) permette di generare e applicare configurazioni Nginx per nuovi domini. Per abilitarla, aggiungi le regole sudoers:
+
+```bash
+sudo tee /etc/sudoers.d/control-room-nginx << 'EOF'
+ubuntu ALL=(ALL) NOPASSWD: /usr/bin/cp /tmp/controlroom-nginx-*.conf /etc/nginx/sites-available/
+ubuntu ALL=(ALL) NOPASSWD: /usr/bin/ln -sf /etc/nginx/sites-available/* /etc/nginx/sites-enabled/
+ubuntu ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t
+ubuntu ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
+ubuntu ALL=(ALL) NOPASSWD: /usr/bin/certbot certonly --nginx -d *
+EOF
+sudo chmod 440 /etc/sudoers.d/control-room-nginx
+```
+
+Per Certbot, opzionalmente imposta `CR_CONTACT_EMAIL` nel `.env` (email per Let's Encrypt).
+
+## Funzionalità
+
+- **Editor .env**: Modifica variabili d'ambiente con valori mascherati (Rivela) e backup `.env.bak`
+- **Cron Jobs**: Crea e personalizza job pianificati (PM2 restart, backup DB, comandi)
+- **Notifiche**: Discord, Slack o Telegram su crash/restart dei processi
+- **Firewall IP**: Whitelist e Panic Mode per restringere l'accesso
+- **Nginx Generator**: Form per generare e applicare config per nuovi domini
+
 ## Sicurezza
 
 - Non committare mai il file `.env`

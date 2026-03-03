@@ -2,7 +2,7 @@
   id="envEditorModal"
   class="fixed inset-0 z-50"
   x-data="envEditorModal()"
-  x-on:env-editor-show.window="open = true; processName = $event.detail?.processName ?? ''; content = ''; loading = true; error = ''; loadEnv()"
+  x-on:env-editor-show.window="open = true; processName = $event.detail?.processName ?? ''; variables = []; loading = true; error = ''; loadEnv()"
   x-on:env-editor-hide.window="open = false"
   x-show="open"
   x-cloak
@@ -23,17 +23,42 @@
         <span class="text-xl">&times;</span>
       </button>
     </div>
-    <div class="flex-1 flex flex-col p-4 overflow-hidden">
+    <div class="flex-1 flex flex-col p-4 overflow-auto">
       <p x-show="error" class="text-red-400 text-sm mb-2" x-text="error"></p>
-      <textarea
-        x-model="content"
-        x-show="!loading"
-        class="flex-1 w-full p-4 font-mono text-sm text-slate-200 bg-slate-900 border border-slate-700 rounded-lg resize-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent min-h-[300px]"
-        placeholder="Contenuto .env"
-      ></textarea>
+      <template x-if="!loading">
+        <div class="space-y-2 font-mono text-sm">
+          <template x-for="(row, idx) in variables" :key="idx">
+            <div class="flex items-center gap-2 group" :class="{ 'flex-wrap': row.type === 'var' }">
+              <template x-if="row.type === 'var'">
+                <div class="flex-1 flex items-center gap-2 min-w-0">
+                  <span class="text-slate-400 shrink-0" x-text="row.key + '='"></span>
+                  <input
+                    :type="row.revealed ? 'text' : 'password'"
+                    x-model="row.value"
+                    class="flex-1 min-w-0 px-2 py-1 bg-slate-900 border border-slate-600 rounded text-slate-200 focus:ring-1 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    @click="row.revealed = !row.revealed"
+                    class="shrink-0 px-2 py-1 rounded text-xs text-slate-400 hover:text-emerald-400 hover:bg-slate-700"
+                    x-text="row.revealed ? 'Nascondi' : 'Rivela'"
+                  ></button>
+                </div>
+              </template>
+              <template x-if="row.type === 'comment'">
+                <div class="w-full text-slate-500" x-text="row.raw"></div>
+              </template>
+              <template x-if="row.type === 'empty'">
+                <div class="w-full h-2 text-slate-600">&nbsp;</div>
+              </template>
+            </div>
+          </template>
+          <p x-show="variables.length === 0 && !loading" class="text-slate-500 py-4">Nessuna variabile. Carica un file .env esistente o aggiungi manualmente.</p>
+        </div>
+      </template>
       <p x-show="loading" class="text-slate-400 py-4">Caricamento...</p>
     </div>
-    <div class="flex gap-2 p-4 border-t border-slate-700">
+    <div class="flex gap-2 p-4 border-t border-slate-700 shrink-0">
       <button
         @click="loadEnv()"
         :disabled="loading"
@@ -53,11 +78,42 @@
 </div>
 
 <script>
+  function parseEnvContent(text) {
+    const lines = (text || '').split(/\r?\n/);
+    const result = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.startsWith('#')) {
+        result.push({ type: 'comment', raw: line });
+      } else if (/^\s*$/.test(line)) {
+        result.push({ type: 'empty', raw: line });
+      } else {
+        const eq = line.indexOf('=');
+        if (eq >= 0) {
+          const key = line.substring(0, eq).trim();
+          const value = line.substring(eq + 1);
+          result.push({ type: 'var', key, value, revealed: false });
+        } else {
+          result.push({ type: 'comment', raw: line });
+        }
+      }
+    }
+    return result;
+  }
+
+  function buildEnvContent(variables) {
+    return variables.map(row => {
+      if (row.type === 'var') return row.key + '=' + (row.value ?? '');
+      if (row.type === 'comment' || row.type === 'empty') return row.raw ?? '';
+      return '';
+    }).join('\n');
+  }
+
   function envEditorModal() {
     return {
       open: false,
       processName: '',
-      content: '',
+      variables: [],
       loading: false,
       saving: false,
       error: '',
@@ -69,9 +125,10 @@
         fetch(`/api/env/${encodeURIComponent(name)}`)
           .then(r => r.json())
           .then(d => {
-            this.content = d.content ?? '';
+            const content = d.content ?? '';
+            this.variables = content ? parseEnvContent(content) : [];
             this.loading = false;
-            if (d.exists === false && !d.content) this.content = '';
+            if (d.exists === false && !content) this.variables = [];
           })
           .catch(e => {
             this.error = e.message || 'Errore caricamento';
@@ -81,8 +138,8 @@
       saveEnv() {
         const name = this.processName;
         if (!name) return;
-        const content = (this.content || '').trim();
-        if (!content) {
+        const content = buildEnvContent(this.variables);
+        if (!content.trim()) {
           this.error = 'Il contenuto non può essere vuoto.';
           return;
         }
@@ -97,7 +154,7 @@
           .then(d => {
             this.saving = false;
             if (d.ok) {
-              window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Modifiche salvate', type: 'success' } }));
+              window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Modifiche salvate (backup in .env.bak)', type: 'success' } }));
               this.$dispatch('env-editor-hide');
             } else {
               this.error = d.error || 'Errore salvataggio';

@@ -21,7 +21,10 @@
         </button>
         <div id="disable2FAForm" class="hidden mt-4 p-4 bg-slate-700/50 rounded-lg space-y-2">
           <label for="disablePassword" class="block text-sm text-slate-400">Password attuale</label>
-          <input type="password" id="disablePassword" class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100" placeholder="Conferma password" />
+          <div class="relative" data-password-toggle="3">
+            <input type="password" id="disablePassword" class="w-full px-4 py-2 pr-12 rounded-lg bg-slate-700 border border-slate-600 text-slate-100" placeholder="Conferma password" />
+            <button type="button" data-password-toggle-btn class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-slate-400 hover:text-slate-300 hover:bg-slate-600 transition-colors" aria-label="Mostra password (tieni premuto 3 secondi)"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
+          </div>
           <div class="flex gap-2">
             <button type="button" id="btnConfirmDisable" class="px-3 py-1.5 rounded bg-red-600 hover:bg-red-500 text-sm">Conferma disattivazione</button>
             <button type="button" id="btnCancelDisable" class="px-3 py-1.5 rounded bg-slate-600 hover:bg-slate-500 text-sm">Annulla</button>

@@ -2,27 +2,37 @@
   <h1 id="cron-heading" class="text-2xl font-bold text-slate-200 mb-6">Cron Jobs (Pianificazione)</h1>
   <p class="text-slate-400 mb-6">Pianifica riavvii PM2, backup database o comandi personalizzati. Formato cron: minuto ora giorno mese giorno_settimana (es. <code class="text-emerald-400">0 4 * * *</code> = ogni giorno alle 04:00, <code class="text-emerald-400">0 4 * * 5</code> = ogni venerdì alle 04:00).</p>
 
+  <script>window.cronProcesses = <%- JSON.stringify((processes && processes.length) ? processes.map(p => p.name) : ['padel-tour','roma-buche','control-room']) %>;</script>
   <div class="space-y-4 mb-8" id="cronJobsList">
     <% (cronJobs || []).forEach((job) => { %>
-    <div class="cron-job-card flex flex-wrap items-center gap-4 p-4 rounded-lg border border-slate-700 bg-slate-800"
-      data-id="<%= job.id %>" data-action="<%= job.action || 'pm2-restart' %>" data-target="<%= (job.target || '') %>" data-command="<%= (job.command || '') %>">
-      <div class="flex-1 min-w-0">
+    <div class="cron-job-card flex flex-wrap items-center gap-4 p-4 rounded-lg border border-slate-700 bg-slate-800" data-id="<%= job.id %>">
+      <div class="flex-1 min-w-0 space-y-2">
         <input type="text" class="cron-name w-full bg-transparent border-b border-slate-600 px-0 py-1 text-slate-200 font-medium focus:ring-0 focus:border-emerald-500" value="<%= (job.name || '') %>" placeholder="Nome" />
-        <input type="text" class="cron-schedule block mt-1 w-full bg-transparent border-b border-slate-600 px-0 py-1 text-slate-400 font-mono text-sm focus:ring-0 focus:border-emerald-500" value="<%= (job.schedule || '') %>" placeholder="0 4 * * *" />
-        <div class="text-xs text-slate-500 mt-1">
-          <% if (job.action === 'pm2-restart') { %>Riavvia <%= job.target %>
-          <% } else if (job.action === 'pm2-start') { %>Avvia <%= job.target %>
-          <% } else if (job.action === 'command') { %>Comando: <%= job.command %>
-          <% } else if (job.action === 'db-backup') { %>Backup database
-          <% } else { %><%= job.action %>: <%= job.target || job.command %>
-          <% } %>
+        <input type="text" class="cron-schedule block w-full bg-transparent border-b border-slate-600 px-0 py-1 text-slate-400 font-mono text-sm focus:ring-0 focus:border-emerald-500" value="<%= (job.schedule || '') %>" placeholder="0 4 * * *" />
+        <div class="flex flex-wrap gap-2 items-center mt-2">
+          <select class="cron-action px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-100 text-sm">
+            <option value="pm2-restart" <%= (job.action || 'pm2-restart') === 'pm2-restart' ? 'selected' : '' %>>Riavvia PM2</option>
+            <option value="pm2-start" <%= job.action === 'pm2-start' ? 'selected' : '' %>>Avvia PM2</option>
+            <option value="command" <%= job.action === 'command' ? 'selected' : '' %>>Comando</option>
+            <option value="db-backup" <%= job.action === 'db-backup' ? 'selected' : '' %>>Backup DB</option>
+          </select>
+          <span class="cron-target-wrap" style="<%= (job.action === 'pm2-restart' || job.action === 'pm2-start') ? '' : 'display:none' %>">
+            <select class="cron-target px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-100 text-sm">
+              <% (processes || [{name:'padel-tour'},{name:'roma-buche'},{name:'control-room'}]).forEach((p) => { %>
+              <option value="<%= p.name %>" <%= (job.target || '') === p.name ? 'selected' : '' %>><%= p.name %></option>
+              <% }); %>
+            </select>
+          </span>
+          <span class="cron-command-wrap" style="<%= job.action === 'command' ? '' : 'display:none' %>">
+            <input type="text" class="cron-command px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-100 text-sm font-mono" value="<%= (job.command || '') %>" placeholder="/path/to/script.sh" style="min-width: 200px" />
+          </span>
         </div>
       </div>
-      <label class="flex items-center gap-2">
+      <label class="flex items-center gap-2 shrink-0">
         <input type="checkbox" class="cron-enabled rounded border-slate-600 bg-slate-700" <%= job.enabled !== false ? 'checked' : '' %> />
         <span class="text-sm text-slate-300">Attivo</span>
       </label>
-      <button type="button" class="cron-remove px-2 py-1 rounded text-red-400 hover:text-red-300 text-sm">Rimuovi</button>
+      <button type="button" class="cron-remove px-2 py-1 rounded text-red-400 hover:text-red-300 text-sm shrink-0">Rimuovi</button>
     </div>
     <% }); %>
   </div>
@@ -36,7 +46,17 @@
       </div>
       <div>
         <label class="block text-sm text-slate-400 mb-1">Schedule (cron)</label>
-        <input type="text" id="cronSchedule" placeholder="0 4 * * *  (ogni giorno alle 04:00)" class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 font-mono" />
+        <div class="flex gap-2">
+          <input type="text" id="cronSchedule" placeholder="0 4 * * *  (ogni giorno alle 04:00)" class="flex-1 px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 font-mono" />
+          <select id="cronSchedulePreset" class="px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 text-sm" title="Preset rapidi">
+            <option value="">Preset...</option>
+            <option value="0 4 * * *">Ogni notte 04:00</option>
+            <option value="0 4 * * 5">Ogni venerdì 04:00</option>
+            <option value="0 */2 * * *">Ogni 2 ore</option>
+            <option value="0 * * * *">Ogni ora</option>
+            <option value="*/15 * * * *">Ogni 15 min</option>
+          </select>
+        </div>
       </div>
       <div>
         <label class="block text-sm text-slate-400 mb-1">Azione</label>
@@ -81,27 +101,81 @@
   });
   document.getElementById('cronAction').dispatchEvent(new Event('change'));
 
+  document.getElementById('cronSchedulePreset').addEventListener('change', function() {
+    const val = this.value;
+    if (val) {
+      document.getElementById('cronSchedule').value = val;
+      this.value = '';
+    }
+  });
+
   function collectCronJobs() {
     return Array.from(document.querySelectorAll('.cron-job-card')).map(card => {
-      const action = card.dataset.action || 'pm2-restart';
+      const action = card.querySelector('.cron-action')?.value || 'pm2-restart';
       return {
         id: card.dataset.id,
         name: card.querySelector('.cron-name')?.value?.trim() || '',
         schedule: card.querySelector('.cron-schedule')?.value?.trim() || '',
         enabled: card.querySelector('.cron-enabled')?.checked !== false,
         action,
-        target: action === 'pm2-restart' || action === 'pm2-start' ? (card.dataset.target || '') : '',
-        command: action === 'command' ? (card.dataset.command || '') : ''
+        target: action === 'pm2-restart' || action === 'pm2-start' ? (card.querySelector('.cron-target')?.value || '') : '',
+        command: action === 'command' ? (card.querySelector('.cron-command')?.value?.trim() || '') : ''
       };
     }).filter(j => j.schedule);
   }
 
-  function actionLabel(action, target, command) {
-    if (action === 'pm2-restart') return 'Riavvia ' + target;
-    if (action === 'pm2-start') return 'Avvia ' + target;
-    if (action === 'command') return 'Comando: ' + command;
-    if (action === 'db-backup') return 'Backup database';
-    return action;
+  function bindCronActionToggle(card) {
+    const actionSelect = card.querySelector('.cron-action');
+    const targetWrap = card.querySelector('.cron-target-wrap');
+    const commandWrap = card.querySelector('.cron-command-wrap');
+    if (!actionSelect) return;
+    actionSelect.addEventListener('change', function() {
+      const v = this.value;
+      targetWrap.style.display = (v === 'pm2-restart' || v === 'pm2-start') ? '' : 'none';
+      commandWrap.style.display = v === 'command' ? '' : 'none';
+    });
+  }
+
+  function addCronCard(job) {
+    const processes = window.cronProcesses || ['padel-tour', 'roma-buche', 'control-room'];
+    const targetOpts = processes.map(p => {
+      const name = typeof p === 'string' ? p : p.name;
+      const sel = (job.target || 'padel-tour') === name ? ' selected' : '';
+      return `<option value="${name}"${sel}>${name}</option>`;
+    }).join('');
+    const card = document.createElement('div');
+    card.className = 'cron-job-card flex flex-wrap items-center gap-4 p-4 rounded-lg border border-slate-700 bg-slate-800';
+    card.dataset.id = job.id || 'cron-' + Date.now();
+    const showTarget = job.action === 'pm2-restart' || job.action === 'pm2-start';
+    const showCommand = job.action === 'command';
+    card.innerHTML = `
+      <div class="flex-1 min-w-0 space-y-2">
+        <input type="text" class="cron-name w-full bg-transparent border-b border-slate-600 px-0 py-1 text-slate-200 font-medium" value="${(job.name || '').replace(/"/g, '&quot;')}" placeholder="Nome" />
+        <input type="text" class="cron-schedule block w-full bg-transparent border-b border-slate-600 px-0 py-1 text-slate-400 font-mono text-sm" value="${(job.schedule || '').replace(/"/g, '&quot;')}" placeholder="0 4 * * *" />
+        <div class="flex flex-wrap gap-2 items-center mt-2">
+          <select class="cron-action px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-100 text-sm">
+            <option value="pm2-restart" ${(job.action || 'pm2-restart') === 'pm2-restart' ? 'selected' : ''}>Riavvia PM2</option>
+            <option value="pm2-start" ${job.action === 'pm2-start' ? 'selected' : ''}>Avvia PM2</option>
+            <option value="command" ${job.action === 'command' ? 'selected' : ''}>Comando</option>
+            <option value="db-backup" ${job.action === 'db-backup' ? 'selected' : ''}>Backup DB</option>
+          </select>
+          <span class="cron-target-wrap" style="${showTarget ? '' : 'display:none'}">
+            <select class="cron-target px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-100 text-sm">${targetOpts}</select>
+          </span>
+          <span class="cron-command-wrap" style="${showCommand ? '' : 'display:none'}">
+            <input type="text" class="cron-command px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-100 text-sm font-mono" value="${(job.command || '').replace(/"/g, '&quot;')}" placeholder="/path/to/script.sh" style="min-width: 200px" />
+          </span>
+        </div>
+      </div>
+      <label class="flex items-center gap-2 shrink-0">
+        <input type="checkbox" class="cron-enabled rounded border-slate-600 bg-slate-700" ${job.enabled !== false ? 'checked' : ''} />
+        <span class="text-sm text-slate-300">Attivo</span>
+      </label>
+      <button type="button" class="cron-remove px-2 py-1 rounded text-red-400 hover:text-red-300 text-sm shrink-0">Rimuovi</button>
+    `;
+    card.querySelector('.cron-remove').addEventListener('click', () => card.remove());
+    bindCronActionToggle(card);
+    return card;
   }
 
   document.getElementById('btnAddCron').addEventListener('click', function() {
@@ -114,34 +188,16 @@
       window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Inserisci uno schedule cron', type: 'error' } }));
       return;
     }
-    const id = 'cron-' + Date.now();
-    const card = document.createElement('div');
-    card.className = 'cron-job-card flex flex-wrap items-center gap-4 p-4 rounded-lg border border-slate-700 bg-slate-800';
-    card.dataset.id = id;
-    card.dataset.action = action;
-    card.dataset.target = target;
-    card.dataset.command = command;
-    card.innerHTML = `
-      <div class="flex-1 min-w-0">
-        <input type="text" class="cron-name w-full bg-transparent border-b border-slate-600 px-0 py-1 text-slate-200 font-medium focus:ring-0 focus:border-emerald-500" value="${name}" placeholder="Nome" />
-        <input type="text" class="cron-schedule block mt-1 w-full bg-transparent border-b border-slate-600 px-0 py-1 text-slate-400 font-mono text-sm focus:ring-0 focus:border-emerald-500" value="${schedule}" placeholder="0 4 * * *" />
-        <div class="text-xs text-slate-500 mt-1">${actionLabel(action, target, command)}</div>
-      </div>
-      <label class="flex items-center gap-2">
-        <input type="checkbox" class="cron-enabled rounded border-slate-600 bg-slate-700" checked />
-        <span class="text-sm text-slate-300">Attivo</span>
-      </label>
-      <button type="button" class="cron-remove px-2 py-1 rounded text-red-400 hover:text-red-300 text-sm">Rimuovi</button>
-    `;
-    card.querySelector('.cron-remove').addEventListener('click', () => card.remove());
+    const card = addCronCard({ name, schedule, action, target, command, enabled: true });
     document.getElementById('cronJobsList').appendChild(card);
     document.getElementById('cronName').value = '';
     document.getElementById('cronSchedule').value = '';
     document.getElementById('cronCommand').value = '';
   });
 
-  document.querySelectorAll('.cron-job-card .cron-remove').forEach(btn => {
-    btn.addEventListener('click', () => btn.closest('.cron-job-card')?.remove());
+  document.querySelectorAll('.cron-job-card').forEach(card => {
+    bindCronActionToggle(card);
+    card.querySelector('.cron-remove')?.addEventListener('click', () => card.remove());
   });
 
   document.getElementById('btnSaveCron').addEventListener('click', async function() {
