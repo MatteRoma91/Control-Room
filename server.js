@@ -3,6 +3,12 @@
  * Node.js/Express dashboard per gestire processi PM2, Nginx e manutenzione server
  */
 require('dotenv').config();
+
+// Structured logging per osservabilità e audit (JSON one-liner, parseable)
+function logEvent(event, payload) {
+  const entry = { ts: new Date().toISOString(), event, ...payload };
+  console.log('[CR] ' + JSON.stringify(entry));
+}
 const http = require('http');
 const path = require('path');
 const fs = require('fs').promises;
@@ -156,8 +162,10 @@ app.post('/login', loginLimiter, async (req, res) => {
       return res.redirect('/login/2fa');
     }
     req.session.user = username;
+    logEvent('login', { user: username });
     return res.redirect('/');
   }
+  logEvent('login_fail', { reason: 'invalid_credentials' });
   res.redirect('/login?error=1');
 });
 
@@ -190,14 +198,20 @@ app.post('/login/2fa', login2FALimiter, async (req, res) => {
     req.session.user = username;
     delete req.session.pending2FA;
     delete req.session.pending2FATime;
+    logEvent('login', { user: username, mfa: true });
     return res.redirect('/');
   }
+  logEvent('login_fail', { reason: 'invalid_2fa' });
   res.redirect('/login/2fa?error=1');
 });
 
 // Logout
 app.post('/logout', (req, res) => {
-  req.session.destroy(() => res.redirect('/login'));
+  const user = req.session?.user;
+  req.session.destroy(() => {
+    if (user) logEvent('logout', { user });
+    res.redirect('/login');
+  });
 });
 
 // Dashboard principale
@@ -239,8 +253,10 @@ app.post('/api/process/:action/:name', requireAuth, async (req, res) => {
   }
   try {
     await pm2Action(action, name);
+    logEvent('process_action', { action, process: name, user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
+    logEvent('process_action_error', { action, process: name, user: req.session?.user, error: err.message });
     console.error(`PM2 ${action} error:`, err);
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -251,9 +267,11 @@ app.post('/api/process/flush/:name', requireAuth, (req, res) => {
   const { name } = req.params;
   pm2.flush(name, (err) => {
     if (err) {
+      logEvent('process_flush_error', { process: name, user: req.session?.user, error: err.message });
       console.error('PM2 flush error:', err);
       return res.status(500).json({ ok: false, error: err.message });
     }
+    logEvent('process_flush', { process: name, user: req.session?.user });
     res.json({ ok: true });
   });
 });
@@ -266,8 +284,10 @@ app.post('/api/process/git-pull/:name', requireAuth, async (req, res) => {
     if (!cwd) return res.status(400).json({ ok: false, error: 'Processo non trovato o cwd non disponibile' });
     const output = execSync('git pull 2>&1', { encoding: 'utf8', cwd });
     await pm2Action('restart', name);
+    logEvent('git_pull', { process: name, user: req.session?.user });
     res.json({ ok: true, output });
   } catch (err) {
+    logEvent('git_pull_error', { process: name, user: req.session?.user, error: err.message });
     console.error('Git pull error:', err);
     let output = '';
     if (err.stdout) output += Buffer.isBuffer(err.stdout) ? err.stdout.toString() : err.stdout;
@@ -366,8 +386,10 @@ app.post('/api/process/restart-all', requireAuth, async (req, res) => {
   const apps = ['padel-tour', 'roma-buche'];
   try {
     await Promise.all(apps.map((name) => pm2Action('restart', name)));
+    logEvent('restart_all', { processes: apps, user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
+    logEvent('restart_all_error', { user: req.session?.user, error: err.message });
     console.error('Restart-all error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -386,8 +408,10 @@ app.post('/api/process/restore-all', requireAuth, async (req, res) => {
         await pm2Action('restart', name);
       }
     }
+    logEvent('restore_all', { user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
+    logEvent('restore_all_error', { user: req.session?.user, error: err.message });
     console.error('Restore-all error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -427,8 +451,10 @@ app.get('/api/nginx-status', requireAuth, (req, res) => {
 app.post('/api/nginx-reload', requireAuth, (req, res) => {
   try {
     execSync('sudo /bin/systemctl reload nginx 2>/dev/null', { encoding: 'utf8' });
+    logEvent('nginx_reload', { user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
+    logEvent('nginx_reload_error', { user: req.session?.user, error: err.message });
     console.error('Nginx reload error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -644,6 +670,7 @@ app.post('/api/settings/panic-activate', requireAuth, async (req, res) => {
     current.panicMode = true;
     current.panicModeIp = clientIp;
     await saveSettings(current);
+    logEvent('panic_activate', { user: req.session?.user, ip: clientIp });
     res.json({ ok: true, panicModeIp: clientIp });
   } catch (err) {
     console.error('Panic activate error:', err);
@@ -658,6 +685,7 @@ app.post('/api/settings/panic-disable', requireAuth, async (req, res) => {
     current.panicMode = false;
     current.panicModeIp = '';
     await saveSettings(current);
+    logEvent('panic_disable', { user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
     console.error('Panic disable error:', err);
@@ -873,8 +901,10 @@ app.post('/api/env/:name', requireAuth, async (req, res) => {
       await fs.copyFile(envPath, bakPath);
     } catch (_) {}
     await fs.writeFile(envPath, content, 'utf8');
+    logEvent('env_save', { process: name, user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
+    logEvent('env_save_error', { process: name, user: req.session?.user, error: err.message });
     console.error('Env save error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -1144,6 +1174,7 @@ io.on('connection', (socket) => {
 
 const notifyDebounce = new Map();
 const NOTIFY_DEBOUNCE_MS = 30000;
+const NOTIFY_DEBOUNCE_LOGERR_MS = 60000; // stderr più rumoroso: debounce 60s
 
 async function sendNotification(message) {
   const settings = await loadSettings();
@@ -1160,7 +1191,9 @@ async function sendNotification(message) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      logEvent('notification_sent', { channel: type, preview: text.slice(0, 80) });
     } catch (err) {
+      logEvent('notification_error', { channel: type, error: err.message });
       console.error(`${type} webhook error:`, err);
     }
     return;
@@ -1174,17 +1207,19 @@ async function sendNotification(message) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: settings.telegramChatId, text }),
       });
+      logEvent('notification_sent', { channel: 'telegram', preview: text.slice(0, 80) });
     } catch (err) {
+      logEvent('notification_error', { channel: 'telegram', error: err.message });
       console.error('Telegram send error:', err);
     }
   }
 }
 
-function shouldNotifyProcess(processName, eventType) {
+function shouldNotifyProcess(processName, eventType, debounceMs = NOTIFY_DEBOUNCE_MS) {
   const key = `${processName}:${eventType}`;
   const now = Date.now();
   const last = notifyDebounce.get(key) || 0;
-  if (now - last < NOTIFY_DEBOUNCE_MS) return false;
+  if (now - last < debounceMs) return false;
   notifyDebounce.set(key, now);
   return true;
 }
@@ -1203,6 +1238,7 @@ pm2.connect((err) => {
       const ev = data?.event;
       const name = data?.process?.name || data?.name || 'unknown';
       const restartTime = data?.process?.restart_time ?? 0;
+      logEvent('pm2_event', { event: ev, process: name, restartTime });
       const settings = await loadSettings();
       if (ev === 'exit' && settings.notifyOnCrash !== false && shouldNotifyProcess(name, 'exit')) {
         await sendNotification(`⚠️ Alert: Il processo '${name}' è crashato! (Riavvio automatico in corso...)`);
@@ -1212,25 +1248,28 @@ pm2.connect((err) => {
       }
     });
     bus.on('process:exception', async (data) => {
-      const settings = await loadSettings();
-      if (settings.notifyOnCrash === false) return;
       const name = data?.process?.name || data?.name || 'unknown';
       const msg = (data?.msg || data?.error?.message || 'Errore non gestito').toString().slice(0, 300);
+      logEvent('pm2_exception', { process: name, message: msg.slice(0, 100) });
+      const settings = await loadSettings();
+      if (settings.notifyOnCrash === false) return;
       if (shouldNotifyProcess(name, 'exception')) {
         await sendNotification(`⚠️ Alert: Il processo '${name}' ha emesso un'eccezione: ${msg}`);
       }
     });
     bus.on('log:err', async (data) => {
-      const settings = await loadSettings();
-      if (!settings.notifyOnCrash && !settings.notifyOnRestart) return;
       const name = data?.process?.name || 'unknown';
       const msg = (data?.data || '').toString().slice(0, 500);
-      if (msg && shouldNotifyProcess(name, 'logerr')) {
+      if (msg) logEvent('pm2_log_err', { process: name, preview: msg.slice(0, 80) });
+      const settings = await loadSettings();
+      if (!settings.notifyOnCrash && !settings.notifyOnRestart) return;
+      if (msg && shouldNotifyProcess(name, 'logerr', NOTIFY_DEBOUNCE_LOGERR_MS)) {
         await sendNotification(`⚠️ PM2 stderr [${name}]: ${msg}`);
       }
     });
   });
   httpServer.listen(PORT, () => {
+    logEvent('startup', { port: PORT });
     console.log(`Control Room running on http://localhost:${PORT}`);
   });
 });

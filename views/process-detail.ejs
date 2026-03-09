@@ -11,32 +11,32 @@
   </div>
   <div class="flex flex-wrap gap-2">
     <button
-      onclick="processAction('start')"
-      class="px-3 py-1.5 rounded text-sm bg-emerald-700 hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500"
+      onclick="processAction('start', this)"
+      class="px-3 py-1.5 rounded text-sm bg-emerald-700 hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Start
     </button>
     <button
-      onclick="processAction('stop')"
-      class="px-3 py-1.5 rounded text-sm bg-amber-700 hover:bg-amber-600 focus:ring-2 focus:ring-amber-500"
+      onclick="processAction('stop', this)"
+      class="px-3 py-1.5 rounded text-sm bg-amber-700 hover:bg-amber-600 focus:ring-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Stop
     </button>
     <button
-      onclick="processAction('restart')"
-      class="px-3 py-1.5 rounded text-sm bg-blue-700 hover:bg-blue-600 focus:ring-2 focus:ring-blue-500"
+      onclick="processAction('restart', this)"
+      class="px-3 py-1.5 rounded text-sm bg-blue-700 hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Restart
     </button>
     <button
-      onclick="processFlush()"
-      class="px-3 py-1.5 rounded text-sm bg-slate-600 hover:bg-slate-500 focus:ring-2 focus:ring-slate-500"
+      onclick="processFlush(this)"
+      class="px-3 py-1.5 rounded text-sm bg-slate-600 hover:bg-slate-500 focus:ring-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Flush Logs
     </button>
     <button
-      onclick="gitPull()"
-      class="px-3 py-1.5 rounded text-sm bg-violet-700 hover:bg-violet-600 focus:ring-2 focus:ring-violet-500"
+      onclick="gitPull(this)"
+      class="px-3 py-1.5 rounded text-sm bg-violet-700 hover:bg-violet-600 focus:ring-2 focus:ring-violet-500 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Git Pull & Restart
     </button>
@@ -56,7 +56,8 @@
     window.dispatchEvent(new CustomEvent('toast', { detail: { message, type } }));
   }
 
-  async function processAction(action) {
+  async function processAction(action, btn) {
+    if (btn) btn.disabled = true;
     try {
       const res = await fetch(`/api/process/${action}/${encodeURIComponent(processName)}`, { method: 'POST' });
       const data = await res.json();
@@ -65,13 +66,16 @@
         setTimeout(() => location.reload(), 500);
       } else {
         showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
+        if (btn) btn.disabled = false;
       }
     } catch (e) {
       showToast('Errore: ' + e.message, 'error');
+      if (btn) btn.disabled = false;
     }
   }
 
-  async function processFlush() {
+  async function processFlush(btn) {
+    if (btn) btn.disabled = true;
     try {
       const res = await fetch(`/api/process/flush/${encodeURIComponent(processName)}`, { method: 'POST' });
       const data = await res.json();
@@ -81,24 +85,29 @@
         setTimeout(() => location.reload(), 500);
       } else {
         showToast('Errore: ' + (data.error || 'Flush fallito'), 'error');
+        if (btn) btn.disabled = false;
       }
     } catch (e) {
       showToast('Errore: ' + e.message, 'error');
+      if (btn) btn.disabled = false;
     }
   }
 
-  async function gitPull() {
+  async function gitPull(btn) {
+    if (btn) btn.disabled = true;
     window.dispatchEvent(new CustomEvent('git-pull-show', { detail: { output: '', loading: true } }));
     try {
       const res = await fetch(`/api/process/git-pull/${encodeURIComponent(processName)}`, { method: 'POST' });
       const data = await res.json();
       const output = (data.output || data.error || '').trim() || (data.ok ? 'Git pull e restart completati.' : 'Operazione fallita.');
       window.dispatchEvent(new CustomEvent('git-pull-show', { detail: { output, loading: false } }));
+      if (btn) btn.disabled = false;
       if (data.ok) {
         showToast('Deployment completato', 'success');
         setTimeout(() => location.reload(), 1000);
       }
     } catch (e) {
+      if (btn) btn.disabled = false;
       window.dispatchEvent(new CustomEvent('git-pull-show', { detail: { output: 'Errore: ' + e.message, loading: false } }));
       showToast('Errore: ' + e.message, 'error');
     }

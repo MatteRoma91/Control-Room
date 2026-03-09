@@ -58,14 +58,14 @@
   <h2 id="global-actions-heading" class="text-lg font-semibold text-slate-200 mb-4">Azioni globali</h2>
   <div class="flex flex-wrap gap-4">
     <button
-      onclick="restartAllWebapps()"
-      class="px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+      onclick="restartAllWebapps(this)"
+      class="px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Riavvia tutte le webapp
     </button>
     <button
-      onclick="restoreAll()"
-      class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+      onclick="restoreAll(this)"
+      class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Ripristina tutti i processi
     </button>
@@ -133,11 +133,11 @@
         <span>Restart <%= p.restart_time %></span>
       </div>
       <div class="flex flex-wrap gap-1">
-        <button onclick="processAction('<%= p.name %>', 'start')" class="px-2 py-1.5 rounded text-xs bg-emerald-700 hover:bg-emerald-600 min-h-[36px]">Start</button>
-        <button onclick="processAction('<%= p.name %>', 'stop')" class="px-2 py-1.5 rounded text-xs bg-amber-700 hover:bg-amber-600 min-h-[36px]">Stop</button>
-        <button onclick="processAction('<%= p.name %>', 'restart')" class="px-2 py-1.5 rounded text-xs bg-blue-700 hover:bg-blue-600 min-h-[36px]">Restart</button>
-        <button onclick="processFlush('<%= p.name %>')" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px]">Flush</button>
-        <button onclick="gitPull('<%= p.name %>')" class="px-2 py-1.5 rounded text-xs bg-violet-700 hover:bg-violet-600 min-h-[36px]">Git Pull</button>
+        <button onclick="processAction('<%= p.name %>', 'start', this)" class="px-2 py-1.5 rounded text-xs bg-emerald-700 hover:bg-emerald-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Start</button>
+        <button onclick="processAction('<%= p.name %>', 'stop', this)" class="px-2 py-1.5 rounded text-xs bg-amber-700 hover:bg-amber-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>
+        <button onclick="processAction('<%= p.name %>', 'restart', this)" class="px-2 py-1.5 rounded text-xs bg-blue-700 hover:bg-blue-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>
+        <button onclick="processFlush('<%= p.name %>', this)" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>
+        <button onclick="gitPull('<%= p.name %>', this)" class="px-2 py-1.5 rounded text-xs bg-violet-700 hover:bg-violet-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Git Pull</button>
         <button onclick="window.dispatchEvent(new CustomEvent('env-editor-show', { detail: { processName: '<%= p.name %>' } }))" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px]">Carica .env</button>
       </div>
     </div>
@@ -176,11 +176,11 @@
             <td class="px-4 py-3"><%= p.restart_time %></td>
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-1">
-                <button onclick="processAction('<%= p.name %>', 'start')" class="px-2 py-1 rounded text-xs bg-emerald-700 hover:bg-emerald-600">Start</button>
-                <button onclick="processAction('<%= p.name %>', 'stop')" class="px-2 py-1 rounded text-xs bg-amber-700 hover:bg-amber-600">Stop</button>
-                <button onclick="processAction('<%= p.name %>', 'restart')" class="px-2 py-1 rounded text-xs bg-blue-700 hover:bg-blue-600">Restart</button>
-                <button onclick="processFlush('<%= p.name %>')" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500">Flush</button>
-                <button onclick="gitPull('<%= p.name %>')" class="px-2 py-1 rounded text-xs bg-violet-700 hover:bg-violet-600">Git Pull</button>
+                <button onclick="processAction('<%= p.name %>', 'start', this)" class="px-2 py-1 rounded text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed">Start</button>
+                <button onclick="processAction('<%= p.name %>', 'stop', this)" class="px-2 py-1 rounded text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>
+                <button onclick="processAction('<%= p.name %>', 'restart', this)" class="px-2 py-1 rounded text-xs bg-blue-700 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>
+                <button onclick="processFlush('<%= p.name %>', this)" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>
+                <button onclick="gitPull('<%= p.name %>', this)" class="px-2 py-1 rounded text-xs bg-violet-700 hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed">Git Pull</button>
                 <button onclick="window.dispatchEvent(new CustomEvent('env-editor-show', { detail: { processName: '<%= p.name %>' } }))" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500">Carica .env</button>
               </div>
             </td>
@@ -201,7 +201,8 @@
     window.dispatchEvent(new CustomEvent('toast', { detail: { message, type } }));
   }
 
-  async function processAction(name, action) {
+  async function processAction(name, action, btn) {
+    if (btn) btn.disabled = true;
     try {
       const res = await fetch(`/api/process/${action}/${encodeURIComponent(name)}`, { method: 'POST' });
       const data = await res.json();
@@ -210,13 +211,16 @@
         setTimeout(() => location.reload(), 500);
       } else {
         showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
+        if (btn) btn.disabled = false;
       }
     } catch (e) {
       showToast('Errore: ' + e.message, 'error');
+      if (btn) btn.disabled = false;
     }
   }
 
-  async function processFlush(name) {
+  async function processFlush(name, btn) {
+    if (btn) btn.disabled = true;
     try {
       const res = await fetch(`/api/process/flush/${encodeURIComponent(name)}`, { method: 'POST' });
       const data = await res.json();
@@ -225,24 +229,29 @@
         setTimeout(() => location.reload(), 500);
       } else {
         showToast('Errore: ' + (data.error || 'Flush fallito'), 'error');
+        if (btn) btn.disabled = false;
       }
     } catch (e) {
       showToast('Errore: ' + e.message, 'error');
+      if (btn) btn.disabled = false;
     }
   }
 
-  async function gitPull(name) {
+  async function gitPull(name, btn) {
+    if (btn) btn.disabled = true;
     window.dispatchEvent(new CustomEvent('git-pull-show', { detail: { output: '', loading: true } }));
     try {
       const res = await fetch(`/api/process/git-pull/${encodeURIComponent(name)}`, { method: 'POST' });
       const data = await res.json();
       const output = (data.output || data.error || '').trim() || (data.ok ? 'Git pull e restart completati.' : 'Operazione fallita.');
       window.dispatchEvent(new CustomEvent('git-pull-show', { detail: { output, loading: false } }));
+      if (btn) btn.disabled = false;
       if (data.ok) {
         showToast('Deployment completato', 'success');
         setTimeout(() => location.reload(), 1000);
       }
     } catch (e) {
+      if (btn) btn.disabled = false;
       window.dispatchEvent(new CustomEvent('git-pull-show', { detail: { output: 'Errore: ' + e.message, loading: false } }));
       showToast('Errore: ' + e.message, 'error');
     }
@@ -265,7 +274,8 @@
     }
   }
 
-  async function restartAllWebapps() {
+  async function restartAllWebapps(btn) {
+    if (btn) btn.disabled = true;
     try {
       const res = await fetch('/api/process/restart-all', { method: 'POST' });
       const data = await res.json();
@@ -274,13 +284,16 @@
         setTimeout(() => location.reload(), 500);
       } else {
         showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
+        if (btn) btn.disabled = false;
       }
     } catch (e) {
       showToast('Errore: ' + e.message, 'error');
+      if (btn) btn.disabled = false;
     }
   }
 
-  async function restoreAll() {
+  async function restoreAll(btn) {
+    if (btn) btn.disabled = true;
     try {
       const res = await fetch('/api/process/restore-all', { method: 'POST' });
       const data = await res.json();
@@ -289,9 +302,11 @@
         setTimeout(() => location.reload(), 500);
       } else {
         showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
+        if (btn) btn.disabled = false;
       }
     } catch (e) {
       showToast('Errore: ' + e.message, 'error');
+      if (btn) btn.disabled = false;
     }
   }
 
