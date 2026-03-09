@@ -1262,10 +1262,9 @@ pm2.connect((err) => {
       const msg = (data?.data || '').toString().slice(0, 500);
       if (msg) logEvent('pm2_log_err', { process: name, preview: msg.slice(0, 80) });
       const settings = await loadSettings();
-      if (!settings.notifyOnCrash && !settings.notifyOnRestart) return;
-      if (msg && shouldNotifyProcess(name, 'logerr', NOTIFY_DEBOUNCE_LOGERR_MS)) {
-        await sendNotification(`⚠️ PM2 stderr [${name}]: ${msg}`);
-      }
+      const sendStderr = settings.notifyOnLogErr === true || (settings.notifyOnLogErr !== false && (settings.notifyOnCrash || settings.notifyOnRestart));
+      if (!sendStderr || !msg || !shouldNotifyProcess(name, 'logerr', NOTIFY_DEBOUNCE_LOGERR_MS)) return;
+      await sendNotification(`⚠️ PM2 stderr [${name}]: ${msg}`);
     });
   });
   httpServer.listen(PORT, () => {

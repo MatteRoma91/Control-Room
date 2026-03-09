@@ -131,6 +131,9 @@
         <span><%= p.memory %> MB</span>
         <span>Uptime <%= p.uptime %></span>
         <span>Restart <%= p.restart_time %></span>
+        <% if (p.restart_time >= 3) { %>
+          <span class="px-2 py-0.5 rounded text-xs font-medium bg-red-900/60 text-red-300">Crash loop?</span>
+        <% } %>
       </div>
       <div class="flex flex-wrap gap-1">
         <button onclick="processAction('<%= p.name %>', 'start', this)" class="px-2 py-1.5 rounded text-xs bg-emerald-700 hover:bg-emerald-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Start</button>
@@ -173,7 +176,12 @@
             <td class="px-4 py-3"><%= p.cpu %>%</td>
             <td class="px-4 py-3"><%= p.memory %> MB</td>
             <td class="px-4 py-3"><%= p.uptime %></td>
-            <td class="px-4 py-3"><%= p.restart_time %></td>
+            <td class="px-4 py-3">
+              <%= p.restart_time %>
+              <% if (p.restart_time >= 3) { %>
+                <span class="ml-2 px-2 py-0.5 rounded text-[11px] font-medium bg-red-900/60 text-red-300 whitespace-nowrap">Crash loop?</span>
+              <% } %>
+            </td>
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-1">
                 <button onclick="processAction('<%= p.name %>', 'start', this)" class="px-2 py-1 rounded text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed">Start</button>
