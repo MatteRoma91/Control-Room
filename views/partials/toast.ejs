@@ -1,6 +1,6 @@
 <div
-  x-data="{ toasts: [] }"
-  x-on:toast.window="const t = { id: Date.now(), message: $event.detail.message, type: $event.detail.type || 'info' }; toasts.push(t); setTimeout(() => { toasts = toasts.filter(x => x.id !== t.id) }, 4000)"
+  x-data="{ toasts: [], lastToast: { message: null, type: null, ts: 0 } }"
+  x-on:toast.window="(() => { const now = Date.now(); const msg = $event.detail.message; const type = $event.detail.type || 'info'; if (lastToast.message === msg && lastToast.type === type && now - lastToast.ts < 1500) return; const t = { id: now, message: msg, type }; lastToast = { message: msg, type, ts: now }; toasts.push(t); setTimeout(() => { toasts = toasts.filter(x => x.id !== t.id) }, 4000); })()"
   class="fixed top-20 right-4 z-50 space-y-2"
   aria-live="polite"
 >
