@@ -44,7 +44,7 @@
     <span id="nginxStatus" class="text-sm text-slate-400">Nginx: -</span>
     <button
       id="btnNginxReload"
-      onclick="nginxReload()"
+      onclick="nginxReload(this)"
       class="px-3 py-1.5 rounded text-sm bg-slate-700 hover:bg-slate-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
       aria-label="Ricarica configurazione Nginx"
     >
@@ -201,8 +201,20 @@
     window.dispatchEvent(new CustomEvent('toast', { detail: { message, type } }));
   }
 
+  function setBtnLoading(btn, loading) {
+    if (!btn) return;
+    if (loading) {
+      btn._originalText = btn.textContent;
+      btn.textContent = 'In corso...';
+      btn.disabled = true;
+    } else {
+      btn.textContent = btn._originalText || btn.textContent;
+      btn.disabled = false;
+    }
+  }
+
   async function processAction(name, action, btn) {
-    if (btn) btn.disabled = true;
+    setBtnLoading(btn, true);
     try {
       const res = await fetch(`/api/process/${action}/${encodeURIComponent(name)}`, { method: 'POST' });
       const data = await res.json();
@@ -211,16 +223,16 @@
         setTimeout(() => location.reload(), 500);
       } else {
         showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
-        if (btn) btn.disabled = false;
+        setBtnLoading(btn, false);
       }
     } catch (e) {
       showToast('Errore: ' + e.message, 'error');
-      if (btn) btn.disabled = false;
+      setBtnLoading(btn, false);
     }
   }
 
   async function processFlush(name, btn) {
-    if (btn) btn.disabled = true;
+    setBtnLoading(btn, true);
     try {
       const res = await fetch(`/api/process/flush/${encodeURIComponent(name)}`, { method: 'POST' });
       const data = await res.json();
@@ -229,29 +241,29 @@
         setTimeout(() => location.reload(), 500);
       } else {
         showToast('Errore: ' + (data.error || 'Flush fallito'), 'error');
-        if (btn) btn.disabled = false;
+        setBtnLoading(btn, false);
       }
     } catch (e) {
       showToast('Errore: ' + e.message, 'error');
-      if (btn) btn.disabled = false;
+      setBtnLoading(btn, false);
     }
   }
 
   async function gitPull(name, btn) {
-    if (btn) btn.disabled = true;
+    setBtnLoading(btn, true);
     window.dispatchEvent(new CustomEvent('git-pull-show', { detail: { output: '', loading: true } }));
     try {
       const res = await fetch(`/api/process/git-pull/${encodeURIComponent(name)}`, { method: 'POST' });
       const data = await res.json();
       const output = (data.output || data.error || '').trim() || (data.ok ? 'Git pull e restart completati.' : 'Operazione fallita.');
       window.dispatchEvent(new CustomEvent('git-pull-show', { detail: { output, loading: false } }));
-      if (btn) btn.disabled = false;
+      setBtnLoading(btn, false);
       if (data.ok) {
         showToast('Deployment completato', 'success');
         setTimeout(() => location.reload(), 1000);
       }
     } catch (e) {
-      if (btn) btn.disabled = false;
+      setBtnLoading(btn, false);
       window.dispatchEvent(new CustomEvent('git-pull-show', { detail: { output: 'Errore: ' + e.message, loading: false } }));
       showToast('Errore: ' + e.message, 'error');
     }
@@ -275,7 +287,7 @@
   }
 
   async function restartAllWebapps(btn) {
-    if (btn) btn.disabled = true;
+    setBtnLoading(btn, true);
     try {
       const res = await fetch('/api/process/restart-all', { method: 'POST' });
       const data = await res.json();
@@ -284,16 +296,16 @@
         setTimeout(() => location.reload(), 500);
       } else {
         showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
-        if (btn) btn.disabled = false;
+        setBtnLoading(btn, false);
       }
     } catch (e) {
       showToast('Errore: ' + e.message, 'error');
-      if (btn) btn.disabled = false;
+      setBtnLoading(btn, false);
     }
   }
 
   async function restoreAll(btn) {
-    if (btn) btn.disabled = true;
+    setBtnLoading(btn, true);
     try {
       const res = await fetch('/api/process/restore-all', { method: 'POST' });
       const data = await res.json();
@@ -302,11 +314,11 @@
         setTimeout(() => location.reload(), 500);
       } else {
         showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
-        if (btn) btn.disabled = false;
+        setBtnLoading(btn, false);
       }
     } catch (e) {
       showToast('Errore: ' + e.message, 'error');
-      if (btn) btn.disabled = false;
+      setBtnLoading(btn, false);
     }
   }
 
@@ -337,7 +349,8 @@
     }
   }
 
-  async function nginxReload() {
+  async function nginxReload(btn) {
+    setBtnLoading(btn, true);
     try {
       const res = await fetch('/api/nginx-reload', { method: 'POST' });
       const data = await res.json();
@@ -347,8 +360,10 @@
       } else {
         showToast('Errore: ' + (data.error || 'Reload fallito'), 'error');
       }
+      setBtnLoading(btn, false);
     } catch (e) {
       showToast('Errore: ' + e.message, 'error');
+      setBtnLoading(btn, false);
     }
   }
 
