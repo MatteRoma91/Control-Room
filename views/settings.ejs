@@ -86,24 +86,43 @@
               class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 font-mono text-sm" />
           </div>
         </div>
-        <div class="flex flex-wrap gap-4">
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" name="notifyOnCrash" value="1" <%= settings.notifyOnCrash !== false ? 'checked' : '' %>
-              class="rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500" />
-            <span class="text-slate-300">Notifica su crash</span>
-          </label>
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" name="notifyOnRestart" value="1" <%= settings.notifyOnRestart !== false ? 'checked' : '' %>
-              class="rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500" />
-            <span class="text-slate-300">Notifica su restart</span>
-          </label>
-          <label class="flex items-center gap-2 cursor-pointer" title="Stderr può essere rumoroso; disabilita per ridurre alert">
-            <input type="checkbox" name="notifyOnLogErr" value="1" <%= settings.notifyOnLogErr === true || (settings.notifyOnLogErr !== false && (settings.notifyOnCrash || settings.notifyOnRestart)) ? 'checked' : '' %>
-              class="rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500" />
-            <span class="text-slate-300">Notifica su stderr</span>
-          </label>
+        <div class="border-t border-slate-600 pt-4 mt-4">
+          <h3 class="text-sm font-medium text-slate-300 mb-3">Tipi di notifica (seleziona quali ricevere)</h3>
+          <ul class="space-y-3">
+            <li class="flex items-start gap-3">
+              <label class="flex items-center gap-2 cursor-pointer shrink-0 mt-0.5">
+                <input type="checkbox" name="notifyOnCrash" value="1" <%= settings.notifyOnCrash !== false ? 'checked' : '' %>
+                  class="rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500" />
+                <span class="text-slate-300">Crash processo</span>
+              </label>
+              <span class="text-xs text-slate-500">Quando un processo PM2 termina in modo anomalo (exit).</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <label class="flex items-center gap-2 cursor-pointer shrink-0 mt-0.5">
+                <input type="checkbox" name="notifyOnRestart" value="1" <%= settings.notifyOnRestart !== false ? 'checked' : '' %>
+                  class="rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500" />
+                <span class="text-slate-300">Crash loop</span>
+              </label>
+              <span class="text-xs text-slate-500">Quando un processo viene riavviato più volte in breve tempo (≥3 restart).</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <label class="flex items-center gap-2 cursor-pointer shrink-0 mt-0.5">
+                <input type="checkbox" name="notifyOnException" value="1" <%= settings.notifyOnException === true || (settings.notifyOnException !== false && settings.notifyOnCrash !== false) ? 'checked' : '' %>
+                  class="rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500" />
+                <span class="text-slate-300">Eccezioni non gestite</span>
+              </label>
+              <span class="text-xs text-slate-500">Quando un processo lancia un'eccezione non catturata (uncaught exception).</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <label class="flex items-center gap-2 cursor-pointer shrink-0 mt-0.5">
+                <input type="checkbox" name="notifyOnLogErr" value="1" <%= settings.notifyOnLogErr === true ? 'checked' : '' %>
+                  class="rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500" />
+                <span class="text-slate-300">Stderr (log di errore)</span>
+              </label>
+              <span class="text-xs text-slate-500">Messaggi scritti su stderr dai processi. Può essere molto rumoroso.</span>
+            </li>
+          </ul>
         </div>
-        <p class="text-xs text-slate-500 mt-2">Stderr: messaggi di errore nei log. Disabilita per ridurre il rumore se i processi scrivono spesso su stderr.</p>
       </div>
     </div>
 
@@ -248,8 +267,9 @@
       webhookUrl: form.webhookUrl?.value || '',
       telegramBotToken: form.telegramBotToken?.value || '',
       telegramChatId: form.telegramChatId?.value || '',
-      notifyOnCrash: form.notifyOnCrash?.checked !== false,
-      notifyOnRestart: form.notifyOnRestart?.checked !== false,
+      notifyOnCrash: form.notifyOnCrash?.checked === true,
+      notifyOnRestart: form.notifyOnRestart?.checked === true,
+      notifyOnException: form.notifyOnException?.checked === true,
       notifyOnLogErr: form.notifyOnLogErr?.checked === true,
       sshProfiles: collectSshProfiles()
     };

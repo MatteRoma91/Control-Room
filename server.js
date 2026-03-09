@@ -1252,17 +1252,16 @@ pm2.connect((err) => {
       const msg = (data?.msg || data?.error?.message || 'Errore non gestito').toString().slice(0, 300);
       logEvent('pm2_exception', { process: name, message: msg.slice(0, 100) });
       const settings = await loadSettings();
-      if (settings.notifyOnCrash === false) return;
-      if (shouldNotifyProcess(name, 'exception')) {
-        await sendNotification(`⚠️ Alert: Il processo '${name}' ha emesso un'eccezione: ${msg}`);
-      }
+      const sendException = settings.notifyOnException === true || (settings.notifyOnException !== false && settings.notifyOnCrash !== false);
+      if (!sendException || !shouldNotifyProcess(name, 'exception')) return;
+      await sendNotification(`⚠️ Alert: Il processo '${name}' ha emesso un'eccezione: ${msg}`);
     });
     bus.on('log:err', async (data) => {
       const name = data?.process?.name || 'unknown';
       const msg = (data?.data || '').toString().slice(0, 500);
       if (msg) logEvent('pm2_log_err', { process: name, preview: msg.slice(0, 80) });
       const settings = await loadSettings();
-      const sendStderr = settings.notifyOnLogErr === true || (settings.notifyOnLogErr !== false && (settings.notifyOnCrash || settings.notifyOnRestart));
+      const sendStderr = settings.notifyOnLogErr === true;
       if (!sendStderr || !msg || !shouldNotifyProcess(name, 'logerr', NOTIFY_DEBOUNCE_LOGERR_MS)) return;
       await sendNotification(`⚠️ PM2 stderr [${name}]: ${msg}`);
     });
