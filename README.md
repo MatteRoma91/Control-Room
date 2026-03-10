@@ -71,12 +71,14 @@ Poi modifica `/etc/nginx/sites-available/matteroma.duckdns.conf`:
 1. Accedi a `https://matteroma.duckdns.org` (o `http://` se SSL non è ancora configurato)
 2. Login con **Matt91** / **MattCONTROL1!** (o le credenziali impostate in `.env`)
 3. Dalla dashboard puoi:
+   - **Grafici real-time**: CPU e RAM con scala 0–100%, aggiornati ogni 3 secondi
+   - **Aggiorna tutto**: pulsante per refresh di Overview, Processi PM2, Health check e Processi di sistema
    - **Overview server**: uptime, load, RAM, disco, stato Nginx
    - **Azioni globali**: riavvia tutte le webapp, ripristina tutti i processi
    - **Health check**: verifica che Banana Padel Tour e Roma-Buche rispondano
    - **Link rapidi** alle webapp
    - **Processi PM2**: aggiornamento live ogni 3s, start, stop, restart singoli, visualizzazione log
-   - **Processi di sistema**: top 25 per CPU (nginx, node, systemd, ecc.)
+   - **Processi di sistema**: top 25 per CPU (nginx, node, systemd, ecc.), tabella ordinabile cliccando sulle colonne (PID, Nome, CPU %, RAM, Utente)
    - **Reload Nginx** (richiede sudoers configurato)
 
 ### Permesso Nginx reload
@@ -107,6 +109,8 @@ Per Certbot, opzionalmente imposta `CR_CONTACT_EMAIL` nel `.env` (email per Let'
 
 ## Funzionalità
 
+- **Monitoraggio live**: Grafici CPU/RAM (scala 0–100%), tabelle PM2 e processi di sistema con refresh manuale o "Aggiorna tutto"
+- **Processi di sistema**: Top 25 per CPU, ordinamento cliccando sulle intestazioni di colonna
 - **Editor .env**: Modifica variabili d'ambiente con valori mascherati (Rivela) e backup `.env.bak`
 - **Cron Jobs**: Crea e personalizza job pianificati (PM2 restart, backup DB, comandi)
 - **Notifiche**: Discord, Slack o Telegram su crash/restart dei processi
