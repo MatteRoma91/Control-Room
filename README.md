@@ -31,8 +31,17 @@ openssl rand -hex 32
 
 ### 3. Avvia con PM2
 
+Control Room è incluso nella **configurazione PM2 centralizzata** `~/ecosystem.config.js` (porta 3005, max_memory 256M). Per avviare tutte le app del server:
+
 ```bash
-pm2 start ecosystem.config.js
+pm2 start ~/ecosystem.config.js
+pm2 save
+```
+
+Oppure solo Control Room (se le altre app sono già in esecuzione):
+
+```bash
+pm2 start control-room
 pm2 save
 ```
 
@@ -47,6 +56,8 @@ pm2 save
 ```
 
 ### 4. Configura Nginx
+
+La config Nginx usa upstream `control_room_backend` con keepalive. Rate limiting attivo su `/api/`:
 
 ```bash
 sudo cp /home/ubuntu/control-room/nginx/matteroma.duckdns.conf /etc/nginx/sites-available/
