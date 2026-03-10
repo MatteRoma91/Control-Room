@@ -4,16 +4,29 @@
   </div>
 <% } %>
 
-<!-- Grafici CPU e RAM -->
+<!-- Grafici CPU e RAM (scala 0-100%) -->
 <section class="mb-8" aria-labelledby="charts-heading">
-  <h2 id="charts-heading" class="text-lg font-semibold text-slate-200 mb-4">Risorse Server (Real-time)</h2>
+  <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+    <h2 id="charts-heading" class="text-lg font-semibold text-slate-200">Risorse Server (Real-time)</h2>
+    <button
+      id="btnRefreshAll"
+      onclick="refreshAllTables(this)"
+      class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900 flex items-center gap-2"
+      aria-label="Aggiorna tutte le tabelle"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+      Aggiorna tutto
+    </button>
+  </div>
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
-      <h3 class="text-sm text-slate-400 mb-2">CPU %</h3>
+      <h3 class="text-sm text-slate-400 mb-2">CPU % (0–100)</h3>
       <canvas id="chartCpu" height="120"></canvas>
     </div>
     <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
-      <h3 class="text-sm text-slate-400 mb-2">RAM (MB)</h3>
+      <h3 class="text-sm text-slate-400 mb-2">RAM % (0–100)</h3>
       <canvas id="chartRam" height="120"></canvas>
     </div>
   </div>
@@ -118,10 +131,16 @@
   </div>
 </section>
 
-<!-- Processi PM2 -->
+<!-- Processi PM2 (aggiornamento live ogni 3s) -->
 <section class="mb-8" aria-labelledby="processes-heading">
-  <h2 id="processes-heading" class="text-lg font-semibold text-slate-200 mb-4">Processi PM2</h2>
-  <div class="md:hidden space-y-3">
+  <h2 id="processes-heading" class="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
+    Processi PM2
+    <span id="pm2LiveIndicator" class="inline-flex items-center gap-1 text-xs font-normal text-slate-500">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true"></span>
+      <span>live</span>
+    </span>
+  </h2>
+  <div id="processCardsMobile" class="md:hidden space-y-3">
     <% (processes || []).forEach((p) => { %>
     <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
       <a href="/process/<%= p.name %>" class="text-emerald-400 hover:underline font-mono font-medium block mb-2"><%= p.name %></a>
@@ -162,7 +181,7 @@
           <th class="text-left px-4 py-3 text-slate-300 font-medium">Azioni</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="processTableBody">
         <% (processes || []).forEach((p) => { %>
           <tr class="border-t border-slate-700 hover:bg-slate-700/30">
             <td class="px-4 py-3 font-mono">
@@ -201,6 +220,38 @@
         <% } %>
       </tbody>
     </table>
+  </div>
+</section>
+
+<!-- Processi di sistema (top 25 per CPU) -->
+<section class="mb-8" aria-labelledby="sysprocesses-heading">
+  <div class="flex flex-wrap items-center gap-4 mb-4">
+    <div>
+      <h2 id="sysprocesses-heading" class="text-lg font-semibold text-slate-200">Processi di sistema</h2>
+      <p class="text-sm text-slate-400 mt-1">Top 25 processi per utilizzo CPU (nginx, node, systemd, ecc.)</p>
+    </div>
+    <button
+      onclick="loadSystemProcesses(this)"
+      class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+    >
+      Aggiorna processi sistema
+    </button>
+  </div>
+  <div id="sysProcessesContainer" class="hidden">
+    <div class="rounded-lg border border-slate-700 bg-slate-800 overflow-x-auto">
+      <table class="w-full min-w-[500px]">
+        <thead class="bg-slate-700/50">
+          <tr>
+            <th class="text-left px-4 py-3 text-slate-300 font-medium">PID</th>
+            <th class="text-left px-4 py-3 text-slate-300 font-medium">Nome</th>
+            <th class="text-left px-4 py-3 text-slate-300 font-medium">CPU %</th>
+            <th class="text-left px-4 py-3 text-slate-300 font-medium">RAM (MB)</th>
+            <th class="text-left px-4 py-3 text-slate-300 font-medium">Utente</th>
+          </tr>
+        </thead>
+        <tbody id="sysProcessesBody"></tbody>
+      </table>
+    </div>
   </div>
 </section>
 
@@ -375,7 +426,13 @@
     }
   }
 
-  // Chart.js - CPU e RAM
+  // Chart.js - CPU e RAM (scala fissa 0-100%)
+  const chartScale100 = {
+    min: 0,
+    max: 100,
+    grid: { color: 'rgba(148, 163, 184, 0.2)' },
+    ticks: { color: '#94a3b8', stepSize: 25 }
+  };
   const chartConfig = {
     type: 'line',
     options: {
@@ -387,16 +444,13 @@
           grid: { color: 'rgba(148, 163, 184, 0.2)' },
           ticks: { color: '#94a3b8', maxTicksLimit: 8 }
         },
-        y: {
-          grid: { color: 'rgba(148, 163, 184, 0.2)' },
-          ticks: { color: '#94a3b8' }
-        }
+        y: chartScale100
       }
     }
   };
 
   const cpuData = { labels: [], datasets: [{ label: 'CPU %', data: [], borderColor: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.1)', fill: true }] };
-  const ramData = { labels: [], datasets: [{ label: 'RAM MB', data: [], borderColor: '#60a5fa', backgroundColor: 'rgba(96, 165, 250, 0.1)', fill: true }] };
+  const ramData = { labels: [], datasets: [{ label: 'RAM %', data: [], borderColor: '#60a5fa', backgroundColor: 'rgba(96, 165, 250, 0.1)', fill: true }] };
 
   const chartCpu = new Chart(document.getElementById('chartCpu'), {
     ...chartConfig,
@@ -429,22 +483,184 @@
       const res = await fetch('/api/system/stats');
       const data = await res.json();
       if (data.cpuPercent === undefined) return;
+      const ramVal = data.memoryPercent ?? (data.memoryTotalMB ? (data.memoryUsedMB / data.memoryTotalMB) * 100 : 0);
       const now = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       if (data.history && data.history.labels && data.history.labels.length > 0) {
         setChartFromHistory(chartCpu, data.history.labels, data.history.cpu);
         setChartFromHistory(chartRam, data.history.labels, data.history.ram);
         if (data.history.labels[data.history.labels.length - 1] !== now) {
           appendChartPoint(chartCpu, now, data.cpuPercent);
-          appendChartPoint(chartRam, now, data.memoryUsedMB);
+          appendChartPoint(chartRam, now, ramVal);
         }
       } else {
         appendChartPoint(chartCpu, now, data.cpuPercent);
-        appendChartPoint(chartRam, now, data.memoryUsedMB);
+        appendChartPoint(chartRam, now, ramVal);
       }
     } catch (_) {}
   }
 
+  async function refreshAllTables(btn) {
+    setBtnLoading(btn, true);
+    try {
+      await Promise.all([
+        loadSystem(),
+        loadProcessesLive(),
+        (async () => {
+          const res = await fetch('/api/health');
+          const data = await res.json();
+          const tbody = document.getElementById('healthBody');
+          const cardsContainer = document.getElementById('healthCards');
+          const container = document.getElementById('healthResults');
+          if (!tbody || !container) return;
+          tbody.innerHTML = '';
+          cardsContainer.innerHTML = '';
+          (data.results || []).forEach(function (r) {
+            const statusCls = r.ok ? 'text-emerald-300' : 'text-red-400';
+            const statusText = r.ok ? r.status + ' OK' : (r.error || 'Errore');
+            const tr = document.createElement('tr');
+            tr.className = 'border-t border-slate-700';
+            tr.innerHTML = '<td class="px-4 py-3">' + (r.name || '') + '</td><td class="px-4 py-3 font-mono text-sm">' + (r.url || '') + '</td><td class="px-4 py-3 ' + statusCls + '">' + statusText + '</td><td class="px-4 py-3">' + (r.elapsed || '-') + '</td>';
+            tbody.appendChild(tr);
+            const card = document.createElement('div');
+            card.className = 'rounded-lg border border-slate-700 bg-slate-800 p-4';
+            card.innerHTML = '<div class="font-medium text-slate-200 mb-1">' + (r.name || '') + '</div><div class="font-mono text-sm text-slate-400 mb-2 break-all">' + (r.url || '') + '</div><div class="flex flex-wrap gap-2"><span class="' + statusCls + ' text-sm">' + statusText + '</span><span class="text-slate-400 text-sm">' + (r.elapsed || '-') + ' ms</span></div>';
+            cardsContainer.appendChild(card);
+          });
+          container.classList.remove('hidden');
+        })(),
+        (async () => {
+          const res = await fetch('/api/system/processes');
+          const data = await res.json();
+          const tbody = document.getElementById('sysProcessesBody');
+          const container = document.getElementById('sysProcessesContainer');
+          if (!tbody || !container) return;
+          if (data.error || !data.processes || data.processes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">' + (data.error || 'Nessun dato') + '</td></tr>';
+          } else {
+            tbody.innerHTML = data.processes.map(function (p) {
+              return '<tr class="border-t border-slate-700 hover:bg-slate-700/30">' +
+                '<td class="px-4 py-2 font-mono text-sm">' + escapeHtml(p.pid) + '</td>' +
+                '<td class="px-4 py-2 font-mono text-sm">' + escapeHtml(p.name) + '</td>' +
+                '<td class="px-4 py-2">' + escapeHtml(p.cpu) + '%</td>' +
+                '<td class="px-4 py-2">' + escapeHtml(p.memRss) + ' MB</td>' +
+                '<td class="px-4 py-2 text-slate-400">' + escapeHtml(p.user) + '</td></tr>';
+            }).join('');
+          }
+          container.classList.remove('hidden');
+        })()
+      ]);
+      fetchStats();
+      showToast('Tutte le tabelle aggiornate', 'success');
+    } catch (e) {
+      showToast('Errore: ' + e.message, 'error');
+    }
+    setBtnLoading(btn, false);
+  }
+
+  function statusClass(status) {
+    if (status === 'online') return 'bg-emerald-900/60 text-emerald-300';
+    if (status === 'stopped') return 'bg-amber-900/60 text-amber-300';
+    return 'bg-red-900/60 text-red-300';
+  }
+
+  function renderProcessRow(p) {
+    const crashBadge = p.restart_time >= 3 ? '<span class="ml-2 px-2 py-0.5 rounded text-[11px] font-medium bg-red-900/60 text-red-300 whitespace-nowrap">Crash loop?</span>' : '';
+    return '<tr class="border-t border-slate-700 hover:bg-slate-700/30">' +
+      '<td class="px-4 py-3 font-mono"><a href="/process/' + encodeURIComponent(p.name) + '" class="text-emerald-400 hover:underline">' + escapeHtml(p.name) + '</a></td>' +
+      '<td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs font-medium ' + statusClass(p.status) + '">' + escapeHtml(p.status) + '</span></td>' +
+      '<td class="px-4 py-3">' + escapeHtml(String(p.cpu)) + '%</td>' +
+      '<td class="px-4 py-3">' + escapeHtml(String(p.memory)) + ' MB</td>' +
+      '<td class="px-4 py-3">' + escapeHtml(p.uptime || '-') + '</td>' +
+      '<td class="px-4 py-3">' + escapeHtml(String(p.restart_time)) + crashBadge + '</td>' +
+      '<td class="px-4 py-3"><div class="flex flex-wrap gap-1">' +
+      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'start\', this)" class="px-2 py-1 rounded text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed">Start</button>' +
+      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'stop\', this)" class="px-2 py-1 rounded text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>' +
+      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'restart\', this)" class="px-2 py-1 rounded text-xs bg-blue-700 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>' +
+      '<button onclick="processFlush(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>' +
+      '<button onclick="gitPull(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1 rounded text-xs bg-violet-700 hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed">Git Pull</button>' +
+      '<button onclick="window.dispatchEvent(new CustomEvent(\'env-editor-show\', { detail: { processName: \'' + escapeHtml(p.name) + '\' } }))" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500">Carica .env</button>' +
+      '</div></td></tr>';
+  }
+
+  function renderProcessCard(p) {
+    const crashBadge = p.restart_time >= 3 ? '<span class="px-2 py-0.5 rounded text-xs font-medium bg-red-900/60 text-red-300">Crash loop?</span>' : '';
+    return '<div class="rounded-lg border border-slate-700 bg-slate-800 p-4">' +
+      '<a href="/process/' + encodeURIComponent(p.name) + '" class="text-emerald-400 hover:underline font-mono font-medium block mb-2">' + escapeHtml(p.name) + '</a>' +
+      '<div class="flex flex-wrap gap-2 text-sm text-slate-400 mb-3">' +
+      '<span class="px-2 py-0.5 rounded text-xs font-medium ' + statusClass(p.status) + '">' + escapeHtml(p.status) + '</span>' +
+      '<span>CPU ' + escapeHtml(String(p.cpu)) + '%</span>' +
+      '<span>' + escapeHtml(String(p.memory)) + ' MB</span>' +
+      '<span>Uptime ' + escapeHtml(p.uptime || '-') + '</span>' +
+      '<span>Restart ' + escapeHtml(String(p.restart_time)) + '</span>' + crashBadge +
+      '</div>' +
+      '<div class="flex flex-wrap gap-1">' +
+      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'start\', this)" class="px-2 py-1.5 rounded text-xs bg-emerald-700 hover:bg-emerald-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Start</button>' +
+      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'stop\', this)" class="px-2 py-1.5 rounded text-xs bg-amber-700 hover:bg-amber-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>' +
+      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'restart\', this)" class="px-2 py-1.5 rounded text-xs bg-blue-700 hover:bg-blue-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>' +
+      '<button onclick="processFlush(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>' +
+      '<button onclick="gitPull(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1.5 rounded text-xs bg-violet-700 hover:bg-violet-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Git Pull</button>' +
+      '<button onclick="window.dispatchEvent(new CustomEvent(\'env-editor-show\', { detail: { processName: \'' + escapeHtml(p.name) + '\' } }))" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px]">Carica .env</button>' +
+      '</div></div>';
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+  }
+
+  async function updateProcessTable(processes) {
+    const tbody = document.getElementById('processTableBody');
+    const cards = document.getElementById('processCardsMobile');
+    if (!tbody || !cards) return;
+    if (!processes || processes.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">Nessun processo PM2</td></tr>';
+      cards.innerHTML = '<p class="text-slate-500 text-center py-8">Nessun processo PM2</p>';
+      return;
+    }
+    tbody.innerHTML = processes.map(renderProcessRow).join('');
+    cards.innerHTML = processes.map(renderProcessCard).join('');
+  }
+
+  async function loadProcessesLive() {
+    try {
+      const res = await fetch('/api/processes');
+      const data = await res.json();
+      if (data.processes) updateProcessTable(data.processes);
+    } catch (_) {}
+  }
+
+  async function loadSystemProcesses(btn) {
+    setBtnLoading(btn, true);
+    try {
+      const res = await fetch('/api/system/processes');
+      const data = await res.json();
+      const tbody = document.getElementById('sysProcessesBody');
+      const container = document.getElementById('sysProcessesContainer');
+      if (!tbody || !container) return;
+      if (data.error || !data.processes || data.processes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">' + (data.error || 'Nessun dato') + '</td></tr>';
+      } else {
+        tbody.innerHTML = data.processes.map(function (p) {
+          return '<tr class="border-t border-slate-700 hover:bg-slate-700/30">' +
+            '<td class="px-4 py-2 font-mono text-sm">' + escapeHtml(p.pid) + '</td>' +
+            '<td class="px-4 py-2 font-mono text-sm">' + escapeHtml(p.name) + '</td>' +
+            '<td class="px-4 py-2">' + escapeHtml(p.cpu) + '%</td>' +
+            '<td class="px-4 py-2">' + escapeHtml(p.memRss) + ' MB</td>' +
+            '<td class="px-4 py-2 text-slate-400">' + escapeHtml(p.user) + '</td></tr>';
+        }).join('');
+      }
+      container.classList.remove('hidden');
+    } catch (e) {
+      showToast('Errore: ' + e.message, 'error');
+    }
+    setBtnLoading(btn, false);
+  }
+
   loadSystem();
   fetchStats();
+  loadProcessesLive();
   setInterval(fetchStats, 3000);
+  setInterval(loadProcessesLive, 3000);
 </script>

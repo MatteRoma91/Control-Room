@@ -4,7 +4,7 @@ Dashboard Node.js/Express per gestire i processi PM2 senza accesso SSH.
 
 ## Requisiti
 
-- Node.js 18+
+- Node.js 18+ (22 LTS consigliato per coerenza con le altre webapp)
 - PM2 installato e in esecuzione
 - Nginx (per reverse proxy e SSL)
 
@@ -75,7 +75,8 @@ Poi modifica `/etc/nginx/sites-available/matteroma.duckdns.conf`:
    - **Azioni globali**: riavvia tutte le webapp, ripristina tutti i processi
    - **Health check**: verifica che Banana Padel Tour e Roma-Buche rispondano
    - **Link rapidi** alle webapp
-   - **Processi PM2**: start, stop, restart singoli, visualizzazione log
+   - **Processi PM2**: aggiornamento live ogni 3s, start, stop, restart singoli, visualizzazione log
+   - **Processi di sistema**: top 25 per CPU (nginx, node, systemd, ecc.)
    - **Reload Nginx** (richiede sudoers configurato)
 
 ### Permesso Nginx reload

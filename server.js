@@ -308,6 +308,39 @@ app.get('/api/logs/:name', requireAuth, async (req, res) => {
   }
 });
 
+// API: lista processi PM2 (per polling live)
+app.get('/api/processes', requireAuth, async (req, res) => {
+  try {
+    const list = await pm2List();
+    res.json({ processes: list });
+  } catch (err) {
+    console.error('PM2 processes error:', err);
+    res.status(500).json({ ok: false, error: err.message, processes: [] });
+  }
+});
+
+// API: processi di sistema (top 25 per CPU, per monitoraggio generale)
+app.get('/api/system/processes', requireAuth, async (req, res) => {
+  try {
+    const data = await si.processes();
+    const list = (data.list || [])
+      .filter((p) => p.pid && (p.cpu > 0 || (p.memRss || 0) > 0))
+      .sort((a, b) => (b.cpu || 0) - (a.cpu || 0))
+      .slice(0, 25)
+      .map((p) => ({
+        pid: p.pid,
+        name: p.name || '(unknown)',
+        cpu: (p.cpu || 0).toFixed(1),
+        memRss: Math.round((p.memRss || 0) / 1024), // memRss in KB → MB
+        user: p.user || '-',
+      }));
+    res.json({ processes: list });
+  } catch (err) {
+    console.error('System processes error:', err);
+    res.status(500).json({ ok: false, error: err.message, processes: [] });
+  }
+});
+
 // API: system info (completo, per overview)
 app.get('/api/system', requireAuth, async (req, res) => {
   try {
@@ -345,12 +378,12 @@ const STATS_INTERVAL_MS = 3000;
 async function collectStatsPoint() {
   try {
     const [load, mem] = await Promise.all([si.currentLoad(), si.mem()]);
-    const usedMemMB = Math.round((mem.total - mem.free) / 1024 / 1024);
+    const ramPercent = mem.total ? 100 * (mem.total - mem.free) / mem.total : 0;
     const now = new Date();
     statsHistory.push({
       label: now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       cpu: load.currentLoad ?? 0,
-      ram: usedMemMB,
+      ram: ramPercent,
     });
     if (statsHistory.length > STATS_HISTORY_MAX) statsHistory.shift();
   } catch (_) {}
@@ -358,11 +391,12 @@ async function collectStatsPoint() {
 setInterval(collectStatsPoint, STATS_INTERVAL_MS);
 collectStatsPoint();
 
-// API: system stats per Chart.js (CPU %, RAM MB) + history dall'avvio
+// API: system stats per Chart.js (CPU %, RAM %) + history dall'avvio
 app.get('/api/system/stats', requireAuth, async (req, res) => {
   try {
     const [load, mem] = await Promise.all([si.currentLoad(), si.mem()]);
     const usedMemMB = Math.round((mem.total - mem.free) / 1024 / 1024);
+    const memoryPercent = mem.total ? 100 * (mem.total - mem.free) / mem.total : 0;
     const history = {
       labels: statsHistory.map((p) => p.label),
       cpu: statsHistory.map((p) => p.cpu),
@@ -370,6 +404,7 @@ app.get('/api/system/stats', requireAuth, async (req, res) => {
     };
     res.json({
       cpuPercent: load.currentLoad ?? 0,
+      memoryPercent,
       memoryUsedMB: usedMemMB,
       memoryTotalMB: Math.round(mem.total / 1024 / 1024),
       timestamp: new Date().toISOString(),
