@@ -242,11 +242,11 @@
       <table class="w-full min-w-[500px]">
         <thead class="bg-slate-700/50">
           <tr>
-            <th class="text-left px-4 py-3 text-slate-300 font-medium">PID</th>
-            <th class="text-left px-4 py-3 text-slate-300 font-medium">Nome</th>
-            <th class="text-left px-4 py-3 text-slate-300 font-medium">CPU %</th>
-            <th class="text-left px-4 py-3 text-slate-300 font-medium">RAM (MB)</th>
-            <th class="text-left px-4 py-3 text-slate-300 font-medium">Utente</th>
+            <th data-sort="pid" onclick="sortSysProcessesBy('pid')" class="text-left px-4 py-3 text-slate-300 font-medium cursor-pointer select-none hover:text-slate-100 hover:bg-slate-700 transition-colors">PID <span class="sort-indicator"></span></th>
+            <th data-sort="name" onclick="sortSysProcessesBy('name')" class="text-left px-4 py-3 text-slate-300 font-medium cursor-pointer select-none hover:text-slate-100 hover:bg-slate-700 transition-colors">Nome <span class="sort-indicator"></span></th>
+            <th data-sort="cpu" onclick="sortSysProcessesBy('cpu')" class="text-left px-4 py-3 text-slate-300 font-medium cursor-pointer select-none hover:text-slate-100 hover:bg-slate-700 transition-colors">CPU % <span class="sort-indicator"></span></th>
+            <th data-sort="memRss" onclick="sortSysProcessesBy('memRss')" class="text-left px-4 py-3 text-slate-300 font-medium cursor-pointer select-none hover:text-slate-100 hover:bg-slate-700 transition-colors">RAM (MB) <span class="sort-indicator"></span></th>
+            <th data-sort="user" onclick="sortSysProcessesBy('user')" class="text-left px-4 py-3 text-slate-300 font-medium cursor-pointer select-none hover:text-slate-100 hover:bg-slate-700 transition-colors">Utente <span class="sort-indicator"></span></th>
           </tr>
         </thead>
         <tbody id="sysProcessesBody"></tbody>
@@ -531,20 +531,15 @@
         (async () => {
           const res = await fetch('/api/system/processes');
           const data = await res.json();
-          const tbody = document.getElementById('sysProcessesBody');
           const container = document.getElementById('sysProcessesContainer');
-          if (!tbody || !container) return;
+          if (!container) return;
           if (data.error || !data.processes || data.processes.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">' + (data.error || 'Nessun dato') + '</td></tr>';
+            sysProcessesData = [];
+            renderSysProcessesTable([], data.error || 'Nessun dato');
           } else {
-            tbody.innerHTML = data.processes.map(function (p) {
-              return '<tr class="border-t border-slate-700 hover:bg-slate-700/30">' +
-                '<td class="px-4 py-2 font-mono text-sm">' + escapeHtml(p.pid) + '</td>' +
-                '<td class="px-4 py-2 font-mono text-sm">' + escapeHtml(p.name) + '</td>' +
-                '<td class="px-4 py-2">' + escapeHtml(p.cpu) + '%</td>' +
-                '<td class="px-4 py-2">' + escapeHtml(p.memRss) + ' MB</td>' +
-                '<td class="px-4 py-2 text-slate-400">' + escapeHtml(p.user) + '</td></tr>';
-            }).join('');
+            sysProcessesData = data.processes;
+            sysProcessesSort = { col: 'cpu', dir: -1 };
+            renderSysProcessesTable(sysProcessesData);
           }
           container.classList.remove('hidden');
         })()
@@ -610,6 +605,67 @@
     return d.innerHTML;
   }
 
+  // Processi di sistema: dati e ordinamento
+  let sysProcessesData = [];
+  let sysProcessesSort = { col: null, dir: 1 };
+
+  function renderSysProcessesRow(p) {
+    return '<tr class="border-t border-slate-700 hover:bg-slate-700/30">' +
+      '<td class="px-4 py-2 font-mono text-sm">' + escapeHtml(p.pid) + '</td>' +
+      '<td class="px-4 py-2 font-mono text-sm">' + escapeHtml(p.name) + '</td>' +
+      '<td class="px-4 py-2">' + escapeHtml(p.cpu) + '%</td>' +
+      '<td class="px-4 py-2">' + escapeHtml(p.memRss) + ' MB</td>' +
+      '<td class="px-4 py-2 text-slate-400">' + escapeHtml(p.user) + '</td></tr>';
+  }
+
+  function renderSysProcessesTable(processes, emptyMsg) {
+    const tbody = document.getElementById('sysProcessesBody');
+    if (!tbody) return;
+    if (!processes || processes.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">' + escapeHtml(emptyMsg || 'Nessun dato') + '</td></tr>';
+      document.querySelectorAll('#sysProcessesContainer th[data-sort] .sort-indicator').forEach(function (s) { s.textContent = ''; s.className = 'sort-indicator'; });
+      return;
+    }
+    const sorted = [...processes].sort(function (a, b) {
+      const col = sysProcessesSort.col || 'cpu';
+      const dir = sysProcessesSort.dir;
+      let va, vb;
+      switch (col) {
+        case 'pid': va = Number(a.pid); vb = Number(b.pid); break;
+        case 'cpu': va = parseFloat(String(a.cpu)) || 0; vb = parseFloat(String(b.cpu)) || 0; break;
+        case 'memRss': va = Number(a.memRss) || 0; vb = Number(b.memRss) || 0; break;
+        case 'name': va = (a.name || '').toLowerCase(); vb = (b.name || '').toLowerCase(); break;
+        case 'user': va = (a.user || '').toLowerCase(); vb = (b.user || '').toLowerCase(); break;
+        default: return 0;
+      }
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return 0;
+    });
+    tbody.innerHTML = sorted.map(renderSysProcessesRow).join('');
+    document.querySelectorAll('#sysProcessesContainer th[data-sort]').forEach(function (th) {
+      const span = th.querySelector('.sort-indicator');
+      if (!span) return;
+      if (th.dataset.sort === sysProcessesSort.col) {
+        span.textContent = sysProcessesSort.dir === 1 ? ' ▲' : ' ▼';
+        span.className = 'sort-indicator text-emerald-400';
+      } else {
+        span.textContent = '';
+        span.className = 'sort-indicator';
+      }
+    });
+  }
+
+  function sortSysProcessesBy(col) {
+    if (sysProcessesSort.col === col) {
+      sysProcessesSort.dir = sysProcessesSort.dir === 1 ? -1 : 1;
+    } else {
+      sysProcessesSort.col = col;
+      sysProcessesSort.dir = 1;
+    }
+    renderSysProcessesTable(sysProcessesData);
+  }
+
   async function updateProcessTable(processes) {
     const tbody = document.getElementById('processTableBody');
     const cards = document.getElementById('processCardsMobile');
@@ -636,20 +692,15 @@
     try {
       const res = await fetch('/api/system/processes');
       const data = await res.json();
-      const tbody = document.getElementById('sysProcessesBody');
       const container = document.getElementById('sysProcessesContainer');
-      if (!tbody || !container) return;
+      if (!container) return;
       if (data.error || !data.processes || data.processes.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">' + (data.error || 'Nessun dato') + '</td></tr>';
+        sysProcessesData = [];
+        renderSysProcessesTable([], data.error || 'Nessun dato');
       } else {
-        tbody.innerHTML = data.processes.map(function (p) {
-          return '<tr class="border-t border-slate-700 hover:bg-slate-700/30">' +
-            '<td class="px-4 py-2 font-mono text-sm">' + escapeHtml(p.pid) + '</td>' +
-            '<td class="px-4 py-2 font-mono text-sm">' + escapeHtml(p.name) + '</td>' +
-            '<td class="px-4 py-2">' + escapeHtml(p.cpu) + '%</td>' +
-            '<td class="px-4 py-2">' + escapeHtml(p.memRss) + ' MB</td>' +
-            '<td class="px-4 py-2 text-slate-400">' + escapeHtml(p.user) + '</td></tr>';
-        }).join('');
+        sysProcessesData = data.processes;
+        sysProcessesSort = { col: 'cpu', dir: -1 };
+        renderSysProcessesTable(sysProcessesData);
       }
       container.classList.remove('hidden');
     } catch (e) {
