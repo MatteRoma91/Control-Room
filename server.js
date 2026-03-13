@@ -13,7 +13,7 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs').promises;
 const os = require('os');
-const { execSync, spawn } = require('child_process');
+const { execSync, execFileSync, spawn } = require('child_process');
 
 const express = require('express');
 const session = require('express-session');
@@ -244,23 +244,7 @@ app.get('/process/:name', requireAuth, async (req, res) => {
 });
 
 // ============ API ROUTES ============
-
-// API: process action (restart, stop, start)
-app.post('/api/process/:action/:name', requireAuth, async (req, res) => {
-  const { action, name } = req.params;
-  if (!['restart', 'stop', 'start'].includes(action)) {
-    return res.status(400).json({ ok: false, error: 'Invalid action' });
-  }
-  try {
-    await pm2Action(action, name);
-    logEvent('process_action', { action, process: name, user: req.session?.user });
-    res.json({ ok: true });
-  } catch (err) {
-    logEvent('process_action_error', { action, process: name, user: req.session?.user, error: err.message });
-    console.error(`PM2 ${action} error:`, err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
+// Route specifiche prima della generica :action/:name (altrimenti "reset" viene interpretato come action)
 
 // API: flush logs
 app.post('/api/process/flush/:name', requireAuth, (req, res) => {
@@ -279,8 +263,11 @@ app.post('/api/process/flush/:name', requireAuth, (req, res) => {
 // API: reset restart counter
 app.post('/api/process/reset/:name', requireAuth, (req, res) => {
   const { name } = req.params;
+  if (!/^[a-zA-Z0-9_.-]+$/.test(name)) {
+    return res.status(400).json({ ok: false, error: 'Nome processo non valido' });
+  }
   try {
-    execSync('pm2', ['reset', name], { encoding: 'utf8' });
+    execFileSync('pm2', ['reset', name], { encoding: 'utf8' });
     logEvent('process_reset', { process: name, user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
@@ -308,6 +295,23 @@ app.post('/api/process/git-pull/:name', requireAuth, async (req, res) => {
     if (err.stderr) output += (Buffer.isBuffer(err.stderr) ? err.stderr.toString() : err.stderr) || '';
     if (!output) output = err.message || String(err);
     res.status(500).json({ ok: false, error: err.message, output });
+  }
+});
+
+// API: process action (restart, stop, start) - deve essere DOPO le route specifiche flush/reset/git-pull
+app.post('/api/process/:action/:name', requireAuth, async (req, res) => {
+  const { action, name } = req.params;
+  if (!['restart', 'stop', 'start'].includes(action)) {
+    return res.status(400).json({ ok: false, error: 'Invalid action' });
+  }
+  try {
+    await pm2Action(action, name);
+    logEvent('process_action', { action, process: name, user: req.session?.user });
+    res.json({ ok: true });
+  } catch (err) {
+    logEvent('process_action_error', { action, process: name, user: req.session?.user, error: err.message });
+    console.error(`PM2 ${action} error:`, err);
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
