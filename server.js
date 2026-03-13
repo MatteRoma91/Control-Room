@@ -276,6 +276,20 @@ app.post('/api/process/flush/:name', requireAuth, (req, res) => {
   });
 });
 
+// API: reset restart counter
+app.post('/api/process/reset/:name', requireAuth, (req, res) => {
+  const { name } = req.params;
+  try {
+    execSync('pm2', ['reset', name], { encoding: 'utf8' });
+    logEvent('process_reset', { process: name, user: req.session?.user });
+    res.json({ ok: true });
+  } catch (err) {
+    logEvent('process_reset_error', { process: name, user: req.session?.user, error: err.message });
+    console.error('PM2 reset error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // API: git pull & restart
 app.post('/api/process/git-pull/:name', requireAuth, async (req, res) => {
   const { name } = req.params;
@@ -997,6 +1011,8 @@ function pm2List() {
       const processes = list.map((p) => {
         const env = p.pm2_env || {};
         const monit = p.monit || {};
+        const cwd = env.pm_cwd || env.exec_cwd || '';
+        const isModule = !!(env.pmx_module || cwd.includes('.pm2/modules'));
         return {
           name: env.name || p.name,
           status: env.status,
@@ -1004,6 +1020,7 @@ function pm2List() {
           memory: Math.round((monit.memory || 0) / 1024 / 1024),
           uptime: env.pm_uptime ? formatUptime(Date.now() - env.pm_uptime) : '-',
           restart_time: env.restart_time ?? 0,
+          isModule,
         };
       });
       resolve(processes);

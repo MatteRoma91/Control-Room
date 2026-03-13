@@ -158,9 +158,8 @@
         <button onclick="processAction('<%= p.name %>', 'start', this)" class="px-2 py-1.5 rounded text-xs bg-emerald-700 hover:bg-emerald-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Start</button>
         <button onclick="processAction('<%= p.name %>', 'stop', this)" class="px-2 py-1.5 rounded text-xs bg-amber-700 hover:bg-amber-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>
         <button onclick="processAction('<%= p.name %>', 'restart', this)" class="px-2 py-1.5 rounded text-xs bg-blue-700 hover:bg-blue-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>
-        <button onclick="processFlush('<%= p.name %>', this)" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>
-        <button onclick="gitPull('<%= p.name %>', this)" class="px-2 py-1.5 rounded text-xs bg-violet-700 hover:bg-violet-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Git Pull</button>
-        <button onclick="window.dispatchEvent(new CustomEvent('env-editor-show', { detail: { processName: '<%= p.name %>' } }))" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px]">Carica .env</button>
+        <% if (!p.isModule) { %><button onclick="processFlush('<%= p.name %>', this)" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Flush</button><% } %>
+        <button onclick="resetRestartCount('<%= p.name %>', this)" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>
       </div>
     </div>
     <% }); %>
@@ -206,9 +205,8 @@
                 <button onclick="processAction('<%= p.name %>', 'start', this)" class="px-2 py-1 rounded text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed">Start</button>
                 <button onclick="processAction('<%= p.name %>', 'stop', this)" class="px-2 py-1 rounded text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>
                 <button onclick="processAction('<%= p.name %>', 'restart', this)" class="px-2 py-1 rounded text-xs bg-blue-700 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>
-                <button onclick="processFlush('<%= p.name %>', this)" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>
-                <button onclick="gitPull('<%= p.name %>', this)" class="px-2 py-1 rounded text-xs bg-violet-700 hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed">Git Pull</button>
-                <button onclick="window.dispatchEvent(new CustomEvent('env-editor-show', { detail: { processName: '<%= p.name %>' } }))" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500">Carica .env</button>
+                <% if (!p.isModule) { %><button onclick="processFlush('<%= p.name %>', this)" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed">Flush</button><% } %>
+                <button onclick="resetRestartCount('<%= p.name %>', this)" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>
               </div>
             </td>
           </tr>
@@ -326,6 +324,24 @@
       setBtnLoading(btn, false);
       window.dispatchEvent(new CustomEvent('git-pull-show', { detail: { output: 'Errore: ' + e.message, loading: false } }));
       showToast('Errore: ' + e.message, 'error');
+    }
+  }
+
+  async function resetRestartCount(name, btn) {
+    setBtnLoading(btn, true);
+    try {
+      const res = await fetch(`/api/process/reset/${encodeURIComponent(name)}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('Contatore restart azzerato', 'success');
+        setTimeout(() => location.reload(), 500);
+      } else {
+        showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
+        setBtnLoading(btn, false);
+      }
+    } catch (e) {
+      showToast('Errore: ' + e.message, 'error');
+      setBtnLoading(btn, false);
     }
   }
 
@@ -561,6 +577,7 @@
 
   function renderProcessRow(p) {
     const crashBadge = p.restart_time >= 3 ? '<span class="ml-2 px-2 py-0.5 rounded text-[11px] font-medium bg-red-900/60 text-red-300 whitespace-nowrap">Crash loop?</span>' : '';
+    const flushBtn = p.isModule ? '' : '<button onclick="processFlush(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>';
     return '<tr class="border-t border-slate-700 hover:bg-slate-700/30">' +
       '<td class="px-4 py-3 font-mono"><a href="/process/' + encodeURIComponent(p.name) + '" class="text-emerald-400 hover:underline">' + escapeHtml(p.name) + '</a></td>' +
       '<td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs font-medium ' + statusClass(p.status) + '">' + escapeHtml(p.status) + '</span></td>' +
@@ -572,14 +589,14 @@
       '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'start\', this)" class="px-2 py-1 rounded text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed">Start</button>' +
       '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'stop\', this)" class="px-2 py-1 rounded text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>' +
       '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'restart\', this)" class="px-2 py-1 rounded text-xs bg-blue-700 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>' +
-      '<button onclick="processFlush(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>' +
-      '<button onclick="gitPull(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1 rounded text-xs bg-violet-700 hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed">Git Pull</button>' +
-      '<button onclick="window.dispatchEvent(new CustomEvent(\'env-editor-show\', { detail: { processName: \'' + escapeHtml(p.name) + '\' } }))" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500">Carica .env</button>' +
+      flushBtn +
+      '<button onclick="resetRestartCount(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>' +
       '</div></td></tr>';
   }
 
   function renderProcessCard(p) {
     const crashBadge = p.restart_time >= 3 ? '<span class="px-2 py-0.5 rounded text-xs font-medium bg-red-900/60 text-red-300">Crash loop?</span>' : '';
+    const flushBtn = p.isModule ? '' : '<button onclick="processFlush(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>';
     return '<div class="rounded-lg border border-slate-700 bg-slate-800 p-4">' +
       '<a href="/process/' + encodeURIComponent(p.name) + '" class="text-emerald-400 hover:underline font-mono font-medium block mb-2">' + escapeHtml(p.name) + '</a>' +
       '<div class="flex flex-wrap gap-2 text-sm text-slate-400 mb-3">' +
@@ -593,9 +610,8 @@
       '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'start\', this)" class="px-2 py-1.5 rounded text-xs bg-emerald-700 hover:bg-emerald-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Start</button>' +
       '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'stop\', this)" class="px-2 py-1.5 rounded text-xs bg-amber-700 hover:bg-amber-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>' +
       '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'restart\', this)" class="px-2 py-1.5 rounded text-xs bg-blue-700 hover:bg-blue-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>' +
-      '<button onclick="processFlush(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>' +
-      '<button onclick="gitPull(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1.5 rounded text-xs bg-violet-700 hover:bg-violet-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Git Pull</button>' +
-      '<button onclick="window.dispatchEvent(new CustomEvent(\'env-editor-show\', { detail: { processName: \'' + escapeHtml(p.name) + '\' } }))" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px]">Carica .env</button>' +
+      flushBtn +
+      '<button onclick="resetRestartCount(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>' +
       '</div></div>';
   }
 
