@@ -319,21 +319,60 @@ app.get('/api/processes', requireAuth, async (req, res) => {
   }
 });
 
+/** Estrae un'etichetta descrittiva da nome processo + parametri (per evitare "node" generico) */
+function getProcessDetail(name, params) {
+  const p = (params || '').trim();
+  const n = (name || '').toLowerCase();
+  if (!p && n !== 'node') return null;
+
+  // next-server → Next.js (Roma-Buche)
+  if (n === 'next-server') return 'Next.js (Roma-Buche)';
+
+  // PM2, nginx, tsserver hanno già nomi chiari
+  if (n === 'pm2') return 'Process Manager';
+  if (n === 'nginx') return p.includes('worker') ? 'Worker' : 'Master';
+  if (n.includes('tsserver')) return 'TypeScript Language Server';
+
+  // node: estrai dettagli dai params
+  if (n === 'node') {
+    if (p.includes('control-room')) return 'Control Room';
+    if (p.includes('Sito-Padel')) return 'Sito Padel';
+    if (p.includes('Roma-Buche')) return 'Roma-Buche';
+    if (p.includes('pm2-logrotate')) return 'PM2 Log Rotate';
+    if (p.includes('extensionHost') || p.includes('--type=extensionHost')) return 'Cursor Extension Host';
+    if (p.includes('fileWatcher') || p.includes('--type=fileWatcher')) return 'Cursor File Watcher';
+    if (p.includes('server-main')) return 'Cursor Server';
+    if (p.includes('ptyHost') || p.includes('--type=ptyHost')) return 'Cursor Terminal';
+    if (p.includes('jsonServerMain')) return 'Cursor JSON Server';
+    if (p.includes('markdown-language-features')) return 'Cursor Markdown Server';
+    if (p.includes('typingsInstaller')) return 'TypeScript Typings';
+    if (p.includes('multiplex-server')) return 'Cursor Multiplex';
+    // path script: /home/ubuntu/xxx/server.js → xxx
+    const scriptMatch = p.match(/\/home\/[^/]+\/([^/]+)\/(?:server\.js|\.cursor-server)/);
+    if (scriptMatch) return scriptMatch[1];
+  }
+  return null;
+}
+
 // API: processi di sistema (top 25 per CPU, per monitoraggio generale)
 app.get('/api/system/processes', requireAuth, async (req, res) => {
   try {
     const data = await si.processes();
     const list = (data.list || [])
       .filter((p) => p.pid && (p.cpu > 0 || (p.memRss || 0) > 0))
-      .sort((a, b) => (b.cpu || 0) - (a.cpu || 0))
+      .sort((a, b) => (b.memRss || 0) - (a.memRss || 0))
       .slice(0, 25)
-      .map((p) => ({
-        pid: p.pid,
-        name: p.name || '(unknown)',
-        cpu: (p.cpu || 0).toFixed(1),
-        memRss: Math.round((p.memRss || 0) / 1024), // memRss in KB → MB
-        user: p.user || '-',
-      }));
+      .map((p) => {
+        const detail = getProcessDetail(p.name, p.params);
+        return {
+          pid: p.pid,
+          name: p.name || '(unknown)',
+          detail: detail || p.params?.slice(0, 80) || null,
+          cpu: (p.cpu || 0).toFixed(1),
+          memRss: Math.round((p.memRss || 0) / 1024),
+          user: p.user || '-',
+        };
+      });
     res.json({ processes: list });
   } catch (err) {
     console.error('System processes error:', err);
