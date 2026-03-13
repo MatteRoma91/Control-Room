@@ -351,18 +351,20 @@ app.get('/api/system', requireAuth, async (req, res) => {
     ]);
     const diskInfo = Array.isArray(disk) ? disk[0] : disk;
     const uptimeSec = os.uptime();
+    // Usa MemAvailable: memoria realmente usata (esclude cache disco recuperabile)
+    const memUsedBytes = mem.available != null ? mem.total - mem.available : mem.total - mem.free;
     res.json({
       uptime: formatUptime(uptimeSec * 1000),
       uptimeSec,
       loadAvg1: load.currentLoad != null ? load.currentLoad.toFixed(2) : '-',
-      memoryUsedMB: Math.round((mem.total - mem.free) / 1024 / 1024),
+      memoryUsedMB: Math.round(memUsedBytes / 1024 / 1024),
       memoryTotalMB: Math.round(mem.total / 1024 / 1024),
-      memoryPercent: mem.total ? Math.round(100 * (mem.total - mem.free) / mem.total) : 0,
+      memoryPercent: mem.total ? Math.round(100 * memUsedBytes / mem.total) : 0,
       diskUsedGB: diskInfo?.used ? (diskInfo.used / 1024 / 1024 / 1024).toFixed(2) : '0',
       diskTotalGB: diskInfo?.size ? (diskInfo.size / 1024 / 1024 / 1024).toFixed(2) : '0',
       diskPercent: diskInfo?.use || 0,
       cpuPercent: load.currentLoad ?? 0,
-      memUsedMB: Math.round((mem.total - mem.free) / 1024 / 1024),
+      memUsedMB: Math.round(memUsedBytes / 1024 / 1024),
     });
   } catch (err) {
     console.error('System info error:', err);
@@ -378,7 +380,8 @@ const STATS_INTERVAL_MS = 3000;
 async function collectStatsPoint() {
   try {
     const [load, mem] = await Promise.all([si.currentLoad(), si.mem()]);
-    const ramPercent = mem.total ? 100 * (mem.total - mem.free) / mem.total : 0;
+    const memUsedBytes = mem.available != null ? mem.total - mem.available : mem.total - mem.free;
+    const ramPercent = mem.total ? 100 * memUsedBytes / mem.total : 0;
     const now = new Date();
     statsHistory.push({
       label: now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -395,8 +398,9 @@ collectStatsPoint();
 app.get('/api/system/stats', requireAuth, async (req, res) => {
   try {
     const [load, mem] = await Promise.all([si.currentLoad(), si.mem()]);
-    const usedMemMB = Math.round((mem.total - mem.free) / 1024 / 1024);
-    const memoryPercent = mem.total ? 100 * (mem.total - mem.free) / mem.total : 0;
+    const memUsedBytes = mem.available != null ? mem.total - mem.available : mem.total - mem.free;
+    const usedMemMB = Math.round(memUsedBytes / 1024 / 1024);
+    const memoryPercent = mem.total ? 100 * memUsedBytes / mem.total : 0;
     const history = {
       labels: statsHistory.map((p) => p.label),
       cpu: statsHistory.map((p) => p.cpu),
