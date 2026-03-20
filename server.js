@@ -30,8 +30,44 @@ const schedule = require('node-schedule');
 const ECOSYSTEMS = [
   { path: '/home/ubuntu/Sito-Padel/ecosystem.config.js', name: 'padel-tour' },
   { path: '/home/ubuntu/Roma-Buche/ecosystem.config.js', name: 'roma-buche' },
+  { path: '/home/ubuntu/Gestione-Veicoli/ecosystem.config.js', name: 'gestione-veicoli' },
   { path: '/home/ubuntu/control-room/ecosystem.config.js', name: 'control-room' },
 ];
+
+/** Siti noti: URL pubblico, porta in ascolto (backend Node o Nginx), PM2 se applicabile */
+const WEB_SITES = [
+  { name: 'Banana Padel Tour', url: 'https://bananapadeltour.duckdns.org', port: 3000, pm2: 'padel-tour', kind: 'app' },
+  { name: 'Roma-Buche', url: 'https://ibuche.duckdns.org', port: 3001, pm2: 'roma-buche', kind: 'app' },
+  { name: 'Gestione Veicoli', url: 'https://gestione-veicoli.duckdns.org', port: 3002, pm2: 'gestione-veicoli', kind: 'app' },
+  { name: 'Control Room', url: 'https://matteroma.duckdns.org', port: 3005, pm2: 'control-room', kind: 'app' },
+  { name: 'Nginx HTTP', url: '', port: 80, pm2: null, kind: 'proxy' },
+  { name: 'Nginx HTTPS', url: '', port: 443, pm2: null, kind: 'proxy' },
+];
+
+/** Parser output `ss -tlnp`: socket TCP in ascolto */
+function parseSsTcpListen() {
+  try {
+    const out = execFileSync('ss', ['-H', '-tlnp'], { encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 });
+    const listeners = [];
+    for (const line of out.split('\n')) {
+      const t = line.trim();
+      if (!t.startsWith('LISTEN')) continue;
+      const parts = t.split(/\s+/);
+      if (parts.length < 5) continue;
+      const local = parts[3];
+      const colon = local.lastIndexOf(':');
+      if (colon <= 0) continue;
+      const addr = local.slice(0, colon);
+      const port = parseInt(local.slice(colon + 1), 10);
+      if (!Number.isFinite(port)) continue;
+      const um = t.match(/users:\(\("([^"]+)"/);
+      listeners.push({ address: addr, port, process: um ? um[1] : null });
+    }
+    return { ok: true, listeners };
+  } catch (err) {
+    return { ok: false, listeners: [], error: err.message };
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 3005;
@@ -356,6 +392,7 @@ function getProcessDetail(name, params) {
     if (p.includes('control-room')) return 'Control Room';
     if (p.includes('Sito-Padel')) return 'Sito Padel';
     if (p.includes('Roma-Buche')) return 'Roma-Buche';
+    if (p.includes('Gestione-Veicoli')) return 'Gestione Veicoli';
     if (p.includes('pm2-logrotate')) return 'PM2 Log Rotate';
     if (p.includes('extensionHost') || p.includes('--type=extensionHost')) return 'Cursor Extension Host';
     if (p.includes('fileWatcher') || p.includes('--type=fileWatcher')) return 'Cursor File Watcher';
@@ -479,7 +516,7 @@ app.get('/api/system/stats', requireAuth, async (req, res) => {
 
 // API: restart all webapps
 app.post('/api/process/restart-all', requireAuth, async (req, res) => {
-  const apps = ['padel-tour', 'roma-buche'];
+  const apps = ['padel-tour', 'roma-buche', 'gestione-veicoli'];
   try {
     await Promise.all(apps.map((name) => pm2Action('restart', name)));
     logEvent('restart_all', { processes: apps, user: req.session?.user });
@@ -515,22 +552,46 @@ app.post('/api/process/restore-all', requireAuth, async (req, res) => {
 
 // API: health check
 app.get('/api/health', requireAuth, async (req, res) => {
-  const urls = [
-    { url: 'https://bananapadeltour.duckdns.org', name: 'Banana Padel Tour' },
-    { url: 'https://ibuche.duckdns.org', name: 'Roma-Buche' },
-  ];
   const results = [];
-  for (const { url, name } of urls) {
+  for (const site of WEB_SITES) {
+    if (!site.url) continue;
     const start = Date.now();
     try {
-      const resp = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(10000) });
+      const resp = await fetch(site.url, { method: 'GET', signal: AbortSignal.timeout(10000) });
       const elapsed = Date.now() - start;
-      results.push({ url, name, status: resp.status, elapsed, ok: resp.ok });
+      results.push({ url: site.url, name: site.name, status: resp.status, elapsed, ok: resp.ok });
     } catch (err) {
-      results.push({ url, name, status: 0, elapsed: Date.now() - start, ok: false, error: err.message });
+      results.push({ url: site.url, name: site.name, status: 0, elapsed: Date.now() - start, ok: false, error: err.message });
     }
   }
   res.json({ results });
+});
+
+// API: porte siti (config + verifica `ss` sul server)
+app.get('/api/site-ports', requireAuth, (req, res) => {
+  const ss = parseSsTcpListen();
+  const byPort = new Map();
+  for (const l of ss.listeners) {
+    if (!byPort.has(l.port)) byPort.set(l.port, []);
+    byPort.get(l.port).push(l);
+  }
+  const sites = WEB_SITES.map((s) => {
+    const found = byPort.get(s.port) || [];
+    const listening = ss.ok ? found.length > 0 : null;
+    const bindAddresses = [...new Set(found.map((x) => x.address))];
+    const processHints = [...new Set(found.map((x) => x.process).filter(Boolean))];
+    return {
+      name: s.name,
+      url: s.url || null,
+      port: s.port,
+      pm2: s.pm2,
+      kind: s.kind,
+      listening,
+      bindAddresses,
+      processHints,
+    };
+  });
+  res.json({ sites, ssOk: ss.ok, ssError: ss.error || null });
 });
 
 // API: nginx status

@@ -85,6 +85,44 @@
   </div>
 </section>
 
+<!-- Porte siti -->
+<section class="mb-8" aria-labelledby="ports-heading">
+  <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+    <div>
+      <h2 id="ports-heading" class="text-lg font-semibold text-slate-200">Porte in ascolto</h2>
+      <p class="text-sm text-slate-400 mt-1">Webapp (backend Node) e Nginx 80/443; stato rilevato con <span class="font-mono text-slate-300">ss</span> sul server.</p>
+    </div>
+    <button
+      type="button"
+      onclick="loadSitePorts(this)"
+      class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+    >
+      Aggiorna porte
+    </button>
+  </div>
+  <p id="sitePortsSsWarn" class="hidden mb-3 text-sm text-amber-400"></p>
+  <div id="sitePortsMobile" class="md:hidden space-y-3"></div>
+  <div class="hidden md:block rounded-lg border border-slate-700 bg-slate-800 overflow-x-auto">
+    <table class="w-full min-w-[640px]">
+      <thead class="bg-slate-700/50">
+        <tr>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">Sito / servizio</th>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">URL pubblico</th>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">Porta</th>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">PM2</th>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">In ascolto</th>
+          <th class="text-left px-4 py-3 text-slate-300 font-medium">Indirizzo</th>
+        </tr>
+      </thead>
+      <tbody id="sitePortsBody">
+        <tr>
+          <td colspan="6" class="px-4 py-6 text-center text-slate-500">Caricamento…</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
 <!-- Database Backup -->
 <% if (dbConfigured) { %>
 <section class="mb-8" aria-labelledby="db-heading">
@@ -362,6 +400,82 @@
     }
   }
 
+  function formatBindAddresses(addrs) {
+    if (!addrs || addrs.length === 0) return '—';
+    const short = addrs.map(function (a) {
+      if (a === '0.0.0.0' || a === '*' || a === '[::]') return 'tutte le interfacce';
+      if (a === '127.0.0.1' || a === '[::1]') return 'solo localhost';
+      return a;
+    });
+    return [...new Set(short)].join(', ');
+  }
+
+  function renderSitePorts(data) {
+    const tbody = document.getElementById('sitePortsBody');
+    const mobile = document.getElementById('sitePortsMobile');
+    const warn = document.getElementById('sitePortsSsWarn');
+    if (warn) {
+      if (data.ssOk === false && data.ssError) {
+        warn.textContent = 'Impossibile eseguire ss: ' + data.ssError + '. Lo stato "in ascolto" non è disponibile.';
+        warn.classList.remove('hidden');
+      } else {
+        warn.classList.add('hidden');
+      }
+    }
+    const rows = data.sites || [];
+    function listenBadge(listening) {
+      if (listening === true) return '<span class="px-2 py-0.5 rounded text-xs font-medium bg-emerald-900/60 text-emerald-300">Sì</span>';
+      if (listening === false) return '<span class="px-2 py-0.5 rounded text-xs font-medium bg-red-900/60 text-red-300">No</span>';
+      return '<span class="text-slate-500">n/d</span>';
+    }
+    function kindLabel(kind) {
+      return kind === 'proxy' ? '<span class="text-slate-500 text-xs ml-1">(proxy)</span>' : '';
+    }
+    if (tbody) {
+      tbody.innerHTML = rows.map(function (s) {
+        const urlCell = s.url ? '<a href="' + escapeHtml(s.url) + '" class="text-emerald-400 hover:underline break-all text-sm" target="_blank" rel="noopener">' + escapeHtml(s.url) + '</a>' : '<span class="text-slate-500">—</span>';
+        const pm2Cell = s.pm2 ? '<span class="font-mono text-sm">' + escapeHtml(s.pm2) + '</span>' : '<span class="text-slate-500">—</span>';
+        const procHint = (s.processHints && s.processHints.length) ? '<div class="text-xs text-slate-500 mt-1 truncate max-w-[200px]" title="' + escapeHtml(s.processHints.join(', ')) + '">' + escapeHtml(s.processHints.join(', ')) + '</div>' : '';
+        return '<tr class="border-t border-slate-700 hover:bg-slate-700/30">' +
+          '<td class="px-4 py-3 text-slate-200">' + escapeHtml(s.name) + kindLabel(s.kind) + '</td>' +
+          '<td class="px-4 py-3">' + urlCell + '</td>' +
+          '<td class="px-4 py-3 font-mono text-emerald-300">' + escapeHtml(String(s.port)) + '</td>' +
+          '<td class="px-4 py-3">' + pm2Cell + '</td>' +
+          '<td class="px-4 py-3">' + listenBadge(s.listening) + procHint + '</td>' +
+          '<td class="px-4 py-3 text-sm text-slate-400">' + escapeHtml(formatBindAddresses(s.bindAddresses)) + '</td></tr>';
+      }).join('');
+    }
+    if (mobile) {
+      mobile.innerHTML = rows.map(function (s) {
+        const urlLine = s.url ? '<a href="' + escapeHtml(s.url) + '" class="text-emerald-400 hover:underline break-all text-sm" target="_blank" rel="noopener">' + escapeHtml(s.url) + '</a>' : '<span class="text-slate-500 text-sm">—</span>';
+        return '<div class="rounded-lg border border-slate-700 bg-slate-800 p-4">' +
+          '<div class="font-medium text-slate-200 mb-2">' + escapeHtml(s.name) + (s.kind === 'proxy' ? ' <span class="text-slate-500 text-xs">(proxy)</span>' : '') + '</div>' +
+          '<div class="space-y-1 text-sm text-slate-400"><div>Porta <span class="font-mono text-emerald-300">' + escapeHtml(String(s.port)) + '</span></div>' +
+          '<div>' + urlLine + '</div>' +
+          (s.pm2 ? '<div>PM2 <span class="font-mono">' + escapeHtml(s.pm2) + '</span></div>' : '') +
+          '<div class="pt-2">' + (s.listening === true ? '<span class="text-emerald-300">In ascolto</span>' : s.listening === false ? '<span class="text-red-400">Non in ascolto</span>' : '<span class="text-slate-500">Stato n/d</span>') + '</div>' +
+          '<div class="text-xs">' + escapeHtml(formatBindAddresses(s.bindAddresses)) + '</div></div></div>';
+      }).join('');
+    }
+  }
+
+  async function loadSitePorts(btn) {
+    if (btn) setBtnLoading(btn, true);
+    try {
+      const res = await fetch('/api/site-ports');
+      const data = await res.json();
+      renderSitePorts(data);
+      if (data.ssOk === false && data.ssError) {
+        showToast('ss non disponibile: ' + data.ssError, 'error');
+      }
+    } catch (e) {
+      showToast('Errore porte: ' + e.message, 'error');
+      const tbody = document.getElementById('sitePortsBody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-red-400">Errore caricamento</td></tr>';
+    }
+    if (btn) setBtnLoading(btn, false);
+  }
+
   async function restartAllWebapps(btn) {
     setBtnLoading(btn, true);
     try {
@@ -521,6 +635,7 @@
     try {
       await Promise.all([
         loadSystem(),
+        loadSitePorts(),
         loadProcessesLive(),
         (async () => {
           const res = await fetch('/api/health');
@@ -730,6 +845,7 @@
   }
 
   loadSystem();
+  loadSitePorts();
   fetchStats();
   loadProcessesLive();
   setInterval(fetchStats, 3000);
