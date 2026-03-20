@@ -44,6 +44,10 @@ const WEB_SITES = [
   { name: 'Nginx HTTPS', url: '', port: 443, pm2: null, kind: 'proxy' },
 ];
 
+const DAILY_CHECK_SITES = WEB_SITES.filter((s) => s.kind === 'app' && s.pm2 && s.url);
+const DAILY_CHECK_STATE_PATH = path.join(__dirname, 'data', 'daily-check-state.json');
+const DAILY_CHECK_HISTORY_PATH = path.join(__dirname, 'logs', 'daily-check-history.log');
+
 /** Parser output `ss -tlnp`: socket TCP in ascolto */
 function parseSsTcpListen() {
   try {
@@ -787,6 +791,27 @@ async function saveSettings(obj) {
   } catch (_) {}
 }
 
+function normalizeDailyCheckConfig(settings) {
+  const raw = settings?.dailyCheck || {};
+  const enabled = raw.enabled !== false;
+  const time = typeof raw.time === 'string' && /^\d{2}:\d{2}$/.test(raw.time) ? raw.time : '00:00';
+  return { enabled, time };
+}
+
+async function readDailyCheckState() {
+  try {
+    const data = await fs.readFile(DAILY_CHECK_STATE_PATH, 'utf8');
+    return JSON.parse(data);
+  } catch (_) {
+    return {};
+  }
+}
+
+async function writeDailyCheckState(state) {
+  await fs.mkdir(path.dirname(DAILY_CHECK_STATE_PATH), { recursive: true });
+  await fs.writeFile(DAILY_CHECK_STATE_PATH, JSON.stringify(state, null, 2), 'utf8');
+}
+
 // Pagina Settings
 app.get('/settings', requireAuth, async (req, res) => {
   const settings = await loadSettings();
@@ -808,6 +833,7 @@ app.post('/api/settings', requireAuth, async (req, res) => {
     body.totpEnabled = current.totpEnabled;
     body.panicMode = current.panicMode;
     body.panicModeIp = current.panicModeIp;
+    body.dailyCheck = current.dailyCheck;
     if (!Array.isArray(body.sshProfiles)) body.sshProfiles = current.sshProfiles || [];
     if (!Array.isArray(body.cronJobs)) body.cronJobs = current.cronJobs || [];
     if (!Array.isArray(body.ipWhitelist)) body.ipWhitelist = current.ipWhitelist || [];
@@ -925,6 +951,153 @@ app.post('/api/2fa/disable', requireAuth, async (req, res) => {
 // ============ CRON JOBS ============
 
 const cronJobHandles = new Map(); // id -> schedule.Job
+let dailyCheckHandle = null;
+let dailyCheckRunning = false;
+
+function parseCheckResponseOk(status) {
+  return Number.isFinite(status) && status >= 200 && status < 400;
+}
+
+async function fetchStatusCode(url, timeoutMs = 10000) {
+  try {
+    const resp = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(timeoutMs) });
+    return resp.status;
+  } catch (_) {
+    return 0;
+  }
+}
+
+async function runDailyAppCheck(trigger = 'manual') {
+  if (dailyCheckRunning) {
+    return { ok: false, message: 'Check già in esecuzione' };
+  }
+  dailyCheckRunning = true;
+  const startedAt = new Date();
+  const report = {
+    startedAt: startedAt.toISOString(),
+    finishedAt: null,
+    trigger,
+    overall: 'ok',
+    repairedCount: 0,
+    failedCount: 0,
+    entries: [],
+  };
+
+  try {
+    for (const site of DAILY_CHECK_SITES) {
+      const entry = {
+        name: site.name,
+        process: site.pm2,
+        localUrl: `http://127.0.0.1:${site.port}/`,
+        publicUrl: site.url,
+        pm2Before: 'unknown',
+        pm2After: 'unknown',
+        localStatusBefore: 0,
+        publicStatusBefore: 0,
+        localStatusAfter: 0,
+        publicStatusAfter: 0,
+        actions: [],
+        status: 'ok',
+      };
+
+      const list = await pm2ListRaw();
+      const proc = list.find((p) => (p.pm2_env || p).name === site.pm2);
+      entry.pm2Before = proc?.pm2_env?.status || 'not_found';
+      entry.localStatusBefore = await fetchStatusCode(entry.localUrl, 8000);
+      entry.publicStatusBefore = await fetchStatusCode(entry.publicUrl, 10000);
+
+      const localOkBefore = parseCheckResponseOk(entry.localStatusBefore);
+      const publicOkBefore = parseCheckResponseOk(entry.publicStatusBefore);
+
+      if (entry.pm2Before === 'stopped' || entry.pm2Before === 'not_found' || entry.pm2Before === 'errored') {
+        try {
+          await pm2Action('start', site.pm2);
+          entry.actions.push(`pm2 start ${site.pm2}`);
+        } catch (err) {
+          entry.actions.push(`pm2 start failed: ${err.message}`);
+        }
+      } else if (!localOkBefore) {
+        try {
+          await pm2Action('restart', site.pm2);
+          entry.actions.push(`pm2 restart ${site.pm2}`);
+        } catch (err) {
+          entry.actions.push(`pm2 restart failed: ${err.message}`);
+        }
+      }
+
+      if (localOkBefore && !publicOkBefore) {
+        try {
+          execSync('sudo /bin/systemctl reload nginx 2>/dev/null', { encoding: 'utf8' });
+          entry.actions.push('nginx reload');
+        } catch (err) {
+          entry.actions.push(`nginx reload failed: ${err.message}`);
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const listAfter = await pm2ListRaw();
+      const procAfter = listAfter.find((p) => (p.pm2_env || p).name === site.pm2);
+      entry.pm2After = procAfter?.pm2_env?.status || 'not_found';
+      entry.localStatusAfter = await fetchStatusCode(entry.localUrl, 8000);
+      entry.publicStatusAfter = await fetchStatusCode(entry.publicUrl, 10000);
+
+      const localOkAfter = parseCheckResponseOk(entry.localStatusAfter);
+      const publicOkAfter = parseCheckResponseOk(entry.publicStatusAfter);
+      const healthyAfter = entry.pm2After === 'online' && localOkAfter && publicOkAfter;
+
+      if (!healthyAfter) {
+        entry.status = 'failed';
+        report.failedCount += 1;
+      } else if (entry.actions.length > 0) {
+        entry.status = 'repaired';
+        report.repairedCount += 1;
+      }
+
+      report.entries.push(entry);
+    }
+
+    if (report.failedCount > 0) report.overall = 'failed';
+    else if (report.repairedCount > 0) report.overall = 'repaired';
+
+    report.finishedAt = new Date().toISOString();
+    await writeDailyCheckState({ lastRun: report });
+    await fs.mkdir(path.dirname(DAILY_CHECK_HISTORY_PATH), { recursive: true });
+    await fs.appendFile(DAILY_CHECK_HISTORY_PATH, JSON.stringify(report) + '\n', 'utf8');
+
+    if (report.overall !== 'ok') {
+      const failedNames = report.entries.filter((e) => e.status === 'failed').map((e) => e.process);
+      const repairedNames = report.entries.filter((e) => e.status === 'repaired').map((e) => e.process);
+      await sendNotification(`🩺 Daily check ${report.overall.toUpperCase()}: repaired=${repairedNames.join(', ') || '-'} failed=${failedNames.join(', ') || '-'}`);
+    }
+    return { ok: true, report };
+  } finally {
+    dailyCheckRunning = false;
+  }
+}
+
+function scheduleDailyCheckJob(time) {
+  if (dailyCheckHandle) {
+    dailyCheckHandle.cancel();
+    dailyCheckHandle = null;
+  }
+  const [hour, minute] = time.split(':').map((x) => parseInt(x, 10));
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return;
+  dailyCheckHandle = schedule.scheduleJob({ hour, minute, tz: 'Europe/Rome' }, () => {
+    runDailyAppCheck('scheduled').catch((err) => {
+      logEvent('daily_check_error', { error: err.message });
+    });
+  });
+}
+
+async function registerDailyCheckFromSettings() {
+  const settings = await loadSettings();
+  const cfg = normalizeDailyCheckConfig(settings);
+  if (cfg.enabled) scheduleDailyCheckJob(cfg.time);
+  else if (dailyCheckHandle) {
+    dailyCheckHandle.cancel();
+    dailyCheckHandle = null;
+  }
+}
 
 async function executeCronJob(job) {
   try {
@@ -984,7 +1157,16 @@ function registerCronJobs() {
 app.get('/cron', requireAuth, async (req, res) => {
   const settings = await loadSettings();
   const list = await pm2List();
-  res.render('layout', { contentPartial: 'cron', cronJobs: settings.cronJobs || [], processes: list });
+  const dailyCheck = normalizeDailyCheckConfig(settings);
+  const dailyState = await readDailyCheckState();
+  res.render('layout', {
+    contentPartial: 'cron',
+    cronJobs: settings.cronJobs || [],
+    processes: list,
+    dailyCheck,
+    dailyCheckLastRun: dailyState.lastRun || null,
+    dailyCheckRunning,
+  });
 });
 
 // API: GET cron jobs
@@ -1004,6 +1186,55 @@ app.post('/api/cron-jobs', requireAuth, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('Cron jobs save error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/daily-check/status', requireAuth, async (req, res) => {
+  try {
+    const settings = await loadSettings();
+    const dailyCheck = normalizeDailyCheckConfig(settings);
+    const dailyState = await readDailyCheckState();
+    res.json({
+      ok: true,
+      config: dailyCheck,
+      running: dailyCheckRunning,
+      lastRun: dailyState.lastRun || null,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/daily-check/config', requireAuth, async (req, res) => {
+  try {
+    const enabled = req.body?.enabled !== false;
+    const time = String(req.body?.time || '00:00').trim();
+    if (!/^\d{2}:\d{2}$/.test(time)) {
+      return res.status(400).json({ ok: false, error: 'Formato orario non valido (HH:MM)' });
+    }
+    const [hh, mm] = time.split(':').map((x) => parseInt(x, 10));
+    if (hh < 0 || hh > 23 || mm < 0 || mm > 59) {
+      return res.status(400).json({ ok: false, error: 'Orario non valido' });
+    }
+    const settings = await loadSettings();
+    settings.dailyCheck = { enabled, time };
+    await saveSettings(settings);
+    await registerDailyCheckFromSettings();
+    logEvent('daily_check_config_updated', { user: req.session?.user, enabled, time });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/daily-check/run', requireAuth, async (req, res) => {
+  try {
+    const result = await runDailyAppCheck('manual');
+    if (!result.ok) return res.status(409).json(result);
+    logEvent('daily_check_run_manual', { user: req.session?.user, overall: result.report?.overall });
+    res.json(result);
+  } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
@@ -1392,6 +1623,9 @@ pm2.connect((err) => {
     process.exit(1);
   }
   registerCronJobs();
+  registerDailyCheckFromSettings().catch((e) => {
+    logEvent('daily_check_schedule_error', { error: e.message });
+  });
   pm2.launchBus((errBus, bus) => {
     if (errBus) return;
     bus.on('process:event', async (data) => {

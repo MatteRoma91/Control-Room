@@ -2,6 +2,25 @@
   <h1 id="cron-heading" class="text-2xl font-bold text-slate-200 mb-6">Cron Jobs (Pianificazione)</h1>
   <p class="text-slate-400 mb-6">Pianifica riavvii PM2, backup database o comandi personalizzati. Formato cron: minuto ora giorno mese giorno_settimana (es. <code class="text-emerald-400">0 4 * * *</code> = ogni giorno alle 04:00, <code class="text-emerald-400">0 4 * * 5</code> = ogni venerdì alle 04:00).</p>
 
+  <div class="rounded-lg border border-slate-700 bg-slate-800 p-6 mb-8">
+    <h2 class="text-lg font-semibold text-slate-200 mb-2">Daily App Check (auto-ripristino)</h2>
+    <p class="text-slate-400 text-sm mb-4">Controllo automatico giornaliero di tutte le webapp (locale + internet) con tentativo di ripristino automatico in caso di problemi.</p>
+    <div class="flex flex-wrap gap-3 items-center mb-4">
+      <label class="flex items-center gap-2 text-sm text-slate-300">
+        <input type="checkbox" id="dailyCheckEnabled" class="rounded border-slate-600 bg-slate-700" <%= (dailyCheck && dailyCheck.enabled !== false) ? 'checked' : '' %> />
+        Attivo
+      </label>
+      <label class="text-sm text-slate-300">
+        Orario
+        <input type="time" id="dailyCheckTime" value="<%= (dailyCheck && dailyCheck.time) ? dailyCheck.time : '00:00' %>" class="ml-2 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-100" />
+      </label>
+      <button type="button" id="btnSaveDailyCheck" class="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm">Salva orario</button>
+      <button type="button" id="btnRunDailyCheck" class="px-3 py-1.5 rounded bg-blue-700 hover:bg-blue-600 text-sm" <%= dailyCheckRunning ? 'disabled' : '' %>>Esegui ora</button>
+    </div>
+    <div class="text-sm text-slate-400 mb-2">Ultimo check: <span id="dailyCheckLastMeta" class="text-slate-300">caricamento...</span></div>
+    <pre id="dailyCheckLastReport" class="whitespace-pre-wrap text-xs bg-slate-900/60 border border-slate-700 rounded p-3 text-slate-300 min-h-[80px]"></pre>
+  </div>
+
   <script>window.cronProcesses = <%- JSON.stringify((processes && processes.length) ? processes.map(p => p.name) : ['padel-tour','roma-buche','gestione-veicoli','control-room']) %>;</script>
   <div class="space-y-4 mb-8" id="cronJobsList">
     <% (cronJobs || []).forEach((job) => { %>
@@ -218,4 +237,77 @@
       window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Errore: ' + err.message, type: 'error' } }));
     }
   });
+
+  function renderDailyCheckStatus(payload) {
+    const meta = document.getElementById('dailyCheckLastMeta');
+    const report = document.getElementById('dailyCheckLastReport');
+    const runBtn = document.getElementById('btnRunDailyCheck');
+    if (!payload) {
+      meta.textContent = 'nessun dato';
+      report.textContent = 'Nessun check eseguito.';
+      return;
+    }
+    if (payload.running) runBtn.setAttribute('disabled', 'disabled');
+    else runBtn.removeAttribute('disabled');
+    if (!payload.lastRun) {
+      meta.textContent = 'mai eseguito';
+      report.textContent = 'Nessun check eseguito.';
+      return;
+    }
+    const lr = payload.lastRun;
+    meta.textContent = `${new Date(lr.startedAt).toLocaleString('it-IT')} | esito: ${lr.overall}`;
+    const lines = (lr.entries || []).map(function(e) {
+      return `${e.name} [${e.process}] -> ${e.status} | PM2 ${e.pm2Before}=>${e.pm2After} | local ${e.localStatusBefore}=>${e.localStatusAfter} | public ${e.publicStatusBefore}=>${e.publicStatusAfter} | azioni: ${(e.actions || []).join(', ') || '-'}`;
+    });
+    report.textContent = lines.length ? lines.join('\n') : 'Nessun dettaglio disponibile.';
+  }
+
+  async function loadDailyCheckStatus() {
+    try {
+      const res = await fetch('/api/daily-check/status');
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'Errore caricamento');
+      const cfg = json.config || {};
+      document.getElementById('dailyCheckEnabled').checked = cfg.enabled !== false;
+      document.getElementById('dailyCheckTime').value = cfg.time || '00:00';
+      renderDailyCheckStatus(json);
+    } catch (err) {
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Errore daily check: ' + err.message, type: 'error' } }));
+    }
+  }
+
+  document.getElementById('btnSaveDailyCheck').addEventListener('click', async function() {
+    const enabled = document.getElementById('dailyCheckEnabled').checked;
+    const time = document.getElementById('dailyCheckTime').value || '00:00';
+    try {
+      const res = await fetch('/api/daily-check/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled, time }),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'Salvataggio fallito');
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Configurazione daily check salvata', type: 'success' } }));
+      await loadDailyCheckStatus();
+    } catch (err) {
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Errore: ' + err.message, type: 'error' } }));
+    }
+  });
+
+  document.getElementById('btnRunDailyCheck').addEventListener('click', async function() {
+    this.setAttribute('disabled', 'disabled');
+    try {
+      const res = await fetch('/api/daily-check/run', { method: 'POST' });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.message || json.error || 'Esecuzione fallita');
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Daily check completato: ' + json.report.overall, type: json.report.overall === 'failed' ? 'error' : 'success' } }));
+      await loadDailyCheckStatus();
+    } catch (err) {
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Errore: ' + err.message, type: 'error' } }));
+    } finally {
+      this.removeAttribute('disabled');
+    }
+  });
+
+  loadDailyCheckStatus();
 </script>
