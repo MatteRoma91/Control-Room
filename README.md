@@ -22,7 +22,7 @@ npm install
 
 ### 2. Configura .env
 
-Il file `.env.example` contiene già le credenziali predefinite (Matt91 / MattCONTROL1!). Modifica almeno `SESSION_SECRET` con un valore casuale:
+Il file `.env.example` contiene valori di esempio. In produzione imposta credenziali amministrative forti e un `SESSION_SECRET` casuale:
 
 ```bash
 openssl rand -hex 32
@@ -80,7 +80,7 @@ Poi modifica `/etc/nginx/sites-available/matteroma.duckdns.conf`:
 ## Utilizzo
 
 1. Accedi a `https://matteroma.duckdns.org` (o `http://` se SSL non è ancora configurato)
-2. Login con **Matt91** / **MattCONTROL1!** (o le credenziali impostate in `.env`)
+2. Login con le credenziali amministrative definite nel tuo `.env`
 3. Dalla dashboard puoi:
    - **Grafici real-time**: CPU e RAM con scala 0–100%, aggiornati ogni 3 secondi
    - **Aggiorna tutto**: pulsante per refresh di Overview, Processi PM2, Health check e Processi di sistema
@@ -132,5 +132,5 @@ Per Certbot, opzionalmente imposta `CR_CONTACT_EMAIL` nel `.env` (email per Let'
 ## Sicurezza
 
 - Non committare mai il file `.env`
-- Modifica le credenziali di default prima dell'uso in produzione
+- Non usare credenziali di esempio in produzione
 - SSL obbligatorio in produzione
