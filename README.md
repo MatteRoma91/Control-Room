@@ -110,6 +110,19 @@ Poi modifica `/etc/nginx/sites-available/matteroma.duckdns.conf`:
    - **Processi PM2**: griglia di **card mini-dashboard** (desktop e mobile) con metriche (CPU, RAM, uptime, restart), stato crash loop, badge modulo, azioni Start/Stop/Restart/Flush/Azzera restart; aggiornamento live ogni 3s; link al dettaglio processo e log
    - **Processi di sistema**: top 25 per CPU (nginx, node, systemd, ecc.), tabella ordinabile cliccando sulle colonne (PID, Nome, CPU %, RAM, Utente)
    - **Reload Nginx** (richiede sudoers configurato)
+   - **Azioni rapide** (in cima alla dashboard): scorciatoie verso aggiornamento globale, incidenti, impostazioni, Nginx, health check e porte — pensate per l’uso da telefono oltre al menu laterale
+
+### UX log e dettaglio processo
+
+Nella pagina **dettaglio processo** (log PM2 in tempo reale):
+
+- Barra strumenti sopra al terminale: **pausa / riprendi** auto-scroll, **pulisci vista** (solo buffer visivo, non il file log), **copia selezione**, toggle **solo stderr**, **schermo intero** sul riquadro terminale.
+- Altezza contenitore ridotta su viewport strette; in fullscreen il terminale occupa l’area utile per leggere meglio da mobile.
+
+### Impostazioni e pagine operative
+
+- **Impostazioni**: in alto, indice **«Vai a»** con link alle sezioni (Redis, notifiche, 2FA, firewall, webhook/PM2, SSH) tramite ancore sulla pagina.
+- **Incident Center, Automation, Maintenance, Analytics**: stessa struttura titolo + breve intro; quando non ci sono dati, empty state con suggerimento del passo successivo (es. crea incidente, esegui runbook, carica log).
 
 ### Permesso Nginx reload
 
@@ -144,7 +157,7 @@ Per Certbot, opzionalmente imposta `CR_CONTACT_EMAIL` nel `.env` (email per Let'
 - **Editor .env**: Modifica variabili d'ambiente con valori mascherati (Rivela) e backup `.env.bak`
 - **Cron Jobs**: Crea e personalizza job pianificati (PM2 restart, backup DB, comandi)
 - **Notifiche**: Discord, Slack o Telegram; master globali (crash, loop restart, eccezioni, stderr, runbook, incidenti, security) e **filtri per processo PM2** in Impostazioni (ambito «tutte le app» vs «solo app selezionate», matrice per disattivare tipi per singola app, sincronizzazione elenco da PM2). Con ambito ristretto, anche le notifiche runbook «recover» per singola app rispettano l’elenco. Persistenza in `settings.json` (non committare URL/token in repo)
-- **Feedback UI**: toast con icone e durate differenziate; stati **In corso…** / **Salvato ✓** su salvataggio impostazioni e pulsanti di verifica dove applicabile
+- **Feedback UI**: toast con icone e durate differenziate; stati **In corso…** / **Salvato ✓** su salvataggio impostazioni e pulsanti di verifica dove applicabile; dashboard e layout con `aria-busy` su azioni lunghe dove previsto
 - **Firewall IP**: Whitelist e Panic Mode per restringere l'accesso
 - **Nginx Generator**: Form per generare e applicare config per nuovi domini
 - **Incident Center**: Gestione incidenti con stato open/ack/resolved e timeline operativa

@@ -1,11 +1,15 @@
 <section class="space-y-6" aria-labelledby="incidents-heading">
   <div class="flex flex-wrap items-center justify-between gap-3">
-    <h1 id="incidents-heading" class="text-2xl font-bold text-cr-text">Incident Center</h1>
-    <button id="btnRefreshIncidents" class="px-3 py-1.5 rounded bg-cr-surface2 hover:bg-cr-navHover text-sm">Aggiorna</button>
+    <div>
+      <h1 id="incidents-heading" class="text-2xl font-bold text-cr-text">Incident Center</h1>
+      <p class="text-sm text-cr-muted mt-1 max-w-2xl">Traccia outage e lavoro operativo. Da qui crei ticket, passi ad ACK e Resolved quando chiudi.</p>
+    </div>
+    <button type="button" id="btnRefreshIncidents" class="min-h-[44px] px-3 py-2 rounded-lg bg-cr-surface2 hover:bg-cr-navHover text-sm font-medium">Aggiorna</button>
   </div>
 
   <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
-    <h2 class="text-lg font-semibold mb-3">Nuovo incidente</h2>
+    <h2 class="text-lg font-semibold text-cr-text mb-1">Nuovo incidente</h2>
+    <p class="text-xs text-cr-muted mb-3">Titolo chiaro (es. «502 su padel-tour») e gravità coerente con l’impatto.</p>
     <form id="incidentCreateForm" class="grid grid-cols-1 md:grid-cols-4 gap-3">
       <input id="incidentTitle" class="md:col-span-2 rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2" placeholder="Titolo incidente" />
       <select id="incidentSeverity" class="rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2">
@@ -29,7 +33,7 @@
       const data = await res.json();
       const incidents = data.incidents || [];
       if (!incidents.length) {
-        root.innerHTML = '<div class="text-cr-muted">Nessun incidente registrato.</div>';
+        root.innerHTML = '<div class="rounded-xl border border-dashed border-cr-border bg-cr-surface2/50 p-8 text-center"><p class="text-cr-text font-medium mb-1">Nessun incidente aperto in elenco</p><p class="text-sm text-cr-muted">Crea il primo con il modulo sopra oppure collega notifiche da <a href="/settings#settings-notifications" class="text-cr-accent hover:underline">Impostazioni → Notifiche</a>.</p></div>';
         return;
       }
       root.innerHTML = incidents.map((i) => `

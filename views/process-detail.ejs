@@ -12,25 +12,25 @@
   <div class="flex flex-wrap gap-2">
     <button
       onclick="processAction('start', this)"
-      class="px-3 py-1.5 rounded text-sm bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-cr-accent disabled:opacity-50 disabled:cursor-not-allowed"
+      class="min-h-[44px] px-3 py-2 rounded-lg text-sm bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-cr-accent disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Start
     </button>
     <button
       onclick="processAction('stop', this)"
-      class="px-3 py-1.5 rounded text-sm bg-cr-warning hover:opacity-90 text-white dark:text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-cr-warning disabled:opacity-50 disabled:cursor-not-allowed"
+      class="min-h-[44px] px-3 py-2 rounded-lg text-sm bg-cr-warning hover:opacity-90 text-white dark:text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-cr-warning disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Stop
     </button>
     <button
       onclick="processAction('restart', this)"
-      class="px-3 py-1.5 rounded text-sm bg-cr-info hover:opacity-90 focus:ring-2 focus:ring-cr-info disabled:opacity-50 disabled:cursor-not-allowed"
+      class="min-h-[44px] px-3 py-2 rounded-lg text-sm bg-cr-info hover:opacity-90 focus:ring-2 focus:ring-cr-info disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Restart
     </button>
     <button
       onclick="processFlush(this)"
-      class="px-3 py-1.5 rounded text-sm bg-cr-surface2 hover:bg-cr-navHover focus:ring-2 focus:ring-cr-border disabled:opacity-50 disabled:cursor-not-allowed"
+      class="min-h-[44px] px-3 py-2 rounded-lg text-sm bg-cr-surface2 hover:bg-cr-navHover focus:ring-2 focus:ring-cr-border disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Flush Logs
     </button>
@@ -38,8 +38,22 @@
 </section>
 
 <section aria-labelledby="logs-heading">
-  <h2 id="logs-heading" class="text-lg font-semibold text-cr-text mb-2">Log Real-time</h2>
-  <div id="terminal" class="rounded-lg border border-cr-border bg-zinc-950 p-2 shadow-inner" style="min-height: 400px;"></div>
+  <h2 id="logs-heading" class="text-lg font-semibold text-cr-text mb-1">Log in tempo reale</h2>
+  <p class="text-xs text-cr-muted mb-3">Stream da PM2. Pausa accumula in memoria fino a Riprendi. «Solo stderr» nasconde l’output standard. Copia usa la selezione nel terminale.</p>
+  <div class="flex flex-wrap gap-2 mb-3" role="toolbar" aria-label="Controlli log">
+    <button type="button" id="btnLogPause" class="min-h-[40px] px-3 py-2 rounded-lg text-xs font-medium bg-cr-surface2 border border-cr-border hover:bg-cr-navHover">Pausa</button>
+    <button type="button" id="btnLogResume" class="min-h-[40px] px-3 py-2 rounded-lg text-xs font-medium bg-cr-surface2 border border-cr-border hover:bg-cr-navHover opacity-50" disabled>Riprendi</button>
+    <button type="button" id="btnLogClear" class="min-h-[40px] px-3 py-2 rounded-lg text-xs font-medium bg-cr-surface2 border border-cr-border hover:bg-cr-navHover">Pulisci vista</button>
+    <button type="button" id="btnLogCopy" class="min-h-[40px] px-3 py-2 rounded-lg text-xs font-medium bg-cr-surface2 border border-cr-border hover:bg-cr-navHover">Copia selezione</button>
+    <label class="inline-flex items-center gap-2 min-h-[40px] px-2 rounded-lg border border-cr-border bg-cr-surface2 cursor-pointer text-xs">
+      <input type="checkbox" id="chkLogStderrOnly" class="rounded border-cr-inputBorder" />
+      Solo stderr
+    </label>
+    <button type="button" id="btnLogFullscreen" class="min-h-[40px] px-3 py-2 rounded-lg text-xs font-medium bg-cr-accent text-white dark:text-slate-900 hover:opacity-90">Schermo intero</button>
+  </div>
+  <div id="terminalWrap" class="rounded-lg border border-cr-border bg-zinc-950 shadow-inner overflow-hidden min-h-[240px] md:min-h-[400px]">
+    <div id="terminal" class="p-2" style="min-height: 220px;"></div>
+  </div>
 </section>
 
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
@@ -151,8 +165,98 @@
   term.open(document.getElementById('terminal'));
   term.writeln('\x1b[32mConnessione ai log di ' + processName + '...\x1b[0m');
 
+  let logPaused = false;
+  let pauseQueue = [];
+  let stderrOnly = false;
+  const terminalWrap = document.getElementById('terminalWrap');
+  const btnLogPause = document.getElementById('btnLogPause');
+  const btnLogResume = document.getElementById('btnLogResume');
+  const btnLogClear = document.getElementById('btnLogClear');
+  const btnLogCopy = document.getElementById('btnLogCopy');
+  const chkLogStderrOnly = document.getElementById('chkLogStderrOnly');
+  const btnLogFullscreen = document.getElementById('btnLogFullscreen');
+
+  function syncLogToolbar() {
+    btnLogPause.disabled = logPaused;
+    btnLogResume.disabled = !logPaused;
+    btnLogPause.classList.toggle('opacity-50', logPaused);
+    btnLogResume.classList.toggle('opacity-50', !logPaused);
+  }
+
+  function rawLogWrite(chunk, isErr) {
+    if (stderrOnly && !isErr) return;
+    if (isErr) term.write('\x1b[31m' + chunk + '\x1b[0m');
+    else term.write(chunk);
+  }
+
+  function receiveLogChunk(chunk, isErr) {
+    if (logPaused) {
+      pauseQueue.push({ chunk, isErr });
+      return;
+    }
+    rawLogWrite(chunk, isErr);
+  }
+
   const socket = io();
-  socket.on('log-out', (chunk) => term.write(chunk));
-  socket.on('log-err', (chunk) => term.write('\x1b[31m' + chunk + '\x1b[0m'));
+  socket.on('log-out', (chunk) => receiveLogChunk(chunk, false));
+  socket.on('log-err', (chunk) => receiveLogChunk(chunk, true));
   socket.emit('join-logs', processName);
+
+  btnLogPause.addEventListener('click', function () {
+    logPaused = true;
+    syncLogToolbar();
+    showToast('Log in pausa: le nuove righe si accodano.', 'info', 3500);
+  });
+  btnLogResume.addEventListener('click', function () {
+    logPaused = false;
+    pauseQueue.forEach(function (q) { rawLogWrite(q.chunk, q.isErr); });
+    pauseQueue = [];
+    syncLogToolbar();
+  });
+  btnLogClear.addEventListener('click', function () {
+    term.clear();
+    pauseQueue = [];
+    term.writeln('\x1b[33mVista log azzerata (lo stream continua).\x1b[0m');
+  });
+  btnLogCopy.addEventListener('click', async function () {
+    var sel = term.getSelection();
+    if (!sel || !sel.trim()) {
+      showToast('Seleziona del testo nel terminale, poi Copia selezione.', 'info', 4500);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(sel);
+      showToast('Selezione copiata negli appunti.', 'success', 3000);
+    } catch (e) {
+      showToast('Copia non disponibile: ' + e.message, 'error');
+    }
+  });
+  chkLogStderrOnly.addEventListener('change', function () {
+    stderrOnly = chkLogStderrOnly.checked;
+    term.writeln(stderrOnly ? '\x1b[33mFiltro attivo: solo stderr (rosso).\x1b[0m' : '\x1b[33mFiltro disattivo: stdout + stderr.\x1b[0m');
+  });
+  var logFsOn = false;
+  btnLogFullscreen.addEventListener('click', function () {
+    logFsOn = !logFsOn;
+    if (logFsOn) {
+      terminalWrap.classList.add('fixed', 'inset-0', 'z-[70]', 'p-3', 'md:p-4', 'bg-cr-canvas', 'flex', 'flex-col', 'min-h-0');
+      document.body.classList.add('overflow-hidden');
+      document.getElementById('terminal').style.flex = '1';
+      document.getElementById('terminal').style.minHeight = '0';
+      btnLogFullscreen.textContent = 'Esci schermo intero';
+      try { term.focus(); } catch (e) {}
+    } else {
+      terminalWrap.classList.remove('fixed', 'inset-0', 'z-[70]', 'p-3', 'md:p-4', 'bg-cr-canvas', 'flex', 'flex-col', 'min-h-0');
+      document.body.classList.remove('overflow-hidden');
+      document.getElementById('terminal').style.flex = '';
+      document.getElementById('terminal').style.minHeight = '220px';
+      btnLogFullscreen.textContent = 'Schermo intero';
+    }
+    setTimeout(function () {
+      try {
+        term.refresh(0, term.rows - 1);
+      } catch (e) {}
+    }, 50);
+  });
+  syncLogToolbar();
 </script>

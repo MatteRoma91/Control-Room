@@ -1,7 +1,10 @@
 <section class="space-y-6" aria-labelledby="analytics-heading">
-  <div class="flex items-center justify-between">
-    <h1 id="analytics-heading" class="text-2xl font-bold text-cr-text">Analytics & Capacity</h1>
-    <button id="btnRefreshAnalytics" class="px-3 py-1.5 rounded bg-cr-surface2 hover:bg-cr-navHover text-sm">Aggiorna</button>
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 id="analytics-heading" class="text-2xl font-bold text-cr-text">Analytics & Capacity</h1>
+      <p class="text-sm text-cr-muted mt-1 max-w-2xl">KPI sintetici da runbook, incidenti e metriche server. Aggiorna se i numeri sembrano stale.</p>
+    </div>
+    <button type="button" id="btnRefreshAnalytics" class="min-h-[44px] px-3 py-2 rounded-lg bg-cr-surface2 hover:bg-cr-navHover text-sm font-medium">Aggiorna</button>
   </div>
   <div id="analyticsCards" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
 </section>
@@ -23,7 +26,7 @@
         <div class="rounded-lg border border-cr-border bg-cr-surface p-4"><p class="text-sm text-cr-muted">Runbook totali</p><p class="text-xl font-bold">${a.runbooksTotal}</p></div>
       `;
     } catch (err) {
-      root.innerHTML = `<div class="text-cr-danger">Errore: ${err.message}</div>`;
+      root.innerHTML = `<div class="rounded-lg border border-cr-danger/40 bg-[var(--cr-danger-bg)] p-4 text-cr-danger text-sm"><p class="font-medium mb-1">Impossibile caricare gli indicatori</p><p>${err.message}</p><p class="mt-2 text-xs opacity-90">Riprova con «Aggiorna» o verifica di essere autenticato.</p></div>`;
     }
   }
 

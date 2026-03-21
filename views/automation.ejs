@@ -1,8 +1,12 @@
 <section class="space-y-6" aria-labelledby="automation-heading">
-  <h1 id="automation-heading" class="text-2xl font-bold text-cr-text">Automation Suite</h1>
+  <div>
+    <h1 id="automation-heading" class="text-2xl font-bold text-cr-text">Automation Suite</h1>
+    <p class="text-sm text-cr-muted mt-1 max-w-3xl">Runbook multi-app, storico esecuzioni e remediation pianificate (cron). Le azioni possono richiedere conferma a seconda dell’API.</p>
+  </div>
 
   <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
-    <h2 class="text-lg font-semibold mb-3">Runbook batch</h2>
+    <h2 class="text-lg font-semibold text-cr-text mb-1">Runbook batch</h2>
+    <p class="text-xs text-cr-muted mb-3">Seleziona le app, modalità e opzionalmente dry-run prima di eseguire in produzione.</p>
     <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
       <select id="batchMode" class="rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2">
         <option value="soft_recover">soft_recover</option>
@@ -17,12 +21,14 @@
   </div>
 
   <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
-    <h2 class="text-lg font-semibold mb-3">Storico runbook</h2>
-    <div id="runbookHistory" class="text-sm text-cr-text"></div>
+    <h2 class="text-lg font-semibold text-cr-text mb-1">Storico runbook</h2>
+    <p class="text-xs text-cr-muted mb-3">Ultime esecuzioni registrate. Lista vuota finché non lanci batch o runbook dalla dashboard.</p>
+    <div id="runbookHistory" class="text-sm text-cr-text min-h-[2rem]"></div>
   </div>
 
   <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
-    <h2 class="text-lg font-semibold mb-3">Scheduled remediation</h2>
+    <h2 class="text-lg font-semibold text-cr-text mb-1">Scheduled remediation</h2>
+    <p class="text-xs text-cr-muted mb-3">Regole cron per rieseguire un runbook su un processo. Salva in <span class="font-mono text-cr-text">settings.json</span>.</p>
     <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
       <input id="autoName" class="rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2" placeholder="nome regola" />
       <input id="autoProcess" class="rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2" placeholder="process (es. padel-tour)" />
@@ -89,7 +95,7 @@
         <span class="${r.ok ? 'text-cr-accent' : 'text-cr-danger'}">${r.ok ? 'OK' : 'FAIL'}</span>
         · ${r.process} · ${r.mode} · ${r.durationMs}ms · ${r.finishedAt || '-'}
       </div>
-    `).join('') : '<span class="text-cr-muted">Nessuno storico disponibile.</span>';
+    `).join('') : '<span class="text-cr-muted">Nessuno storico ancora. Esegui un runbook dalla <a href="/" class="text-cr-accent hover:underline">Dashboard</a> o un batch qui sopra.</span>';
   }
 
   document.getElementById('btnRunBatch').addEventListener('click', runBatch);
@@ -109,7 +115,7 @@
         <span>${r.name} · ${r.process} · ${r.schedule} · ${r.mode}</span>
         <button class="px-2 py-1 rounded bg-cr-danger hover:opacity-90 text-white text-xs font-medium" onclick="removeAutoRule('${r.id}')">Rimuovi</button>
       </div>
-    `).join('') : '<span class="text-cr-muted">Nessuna regola.</span>';
+    `).join('') : '<span class="text-cr-muted">Nessuna regola. Compila nome, processo PM2, espressione cron e modalità, poi «Aggiungi regola».</span>';
   }
 
   async function persistAutoRules() {

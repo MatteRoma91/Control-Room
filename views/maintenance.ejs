@@ -1,8 +1,12 @@
 <section class="space-y-6" aria-labelledby="maintenance-heading">
-  <h1 id="maintenance-heading" class="text-2xl font-bold text-cr-text">Maintenance & Security</h1>
+  <div>
+    <h1 id="maintenance-heading" class="text-2xl font-bold text-cr-text">Maintenance & Security</h1>
+    <p class="text-sm text-cr-muted mt-1 max-w-3xl">Sessioni Redis, log su disco da PM2 e diagnostica sintetica. Azioni di revoca sono irreversibili per le sessioni colpite.</p>
+  </div>
 
   <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
-    <h2 class="text-lg font-semibold mb-3">Sessioni attive</h2>
+    <h2 class="text-lg font-semibold text-cr-text mb-1">Sessioni attive</h2>
+    <p class="text-xs text-cr-muted mb-3">Elenco sessioni store: revoca singola o tutte (logout forzato utenti).</p>
     <div class="flex gap-2 mb-3">
       <button id="btnRefreshSessions" class="px-3 py-1.5 rounded bg-cr-surface2 hover:bg-cr-navHover text-sm">Aggiorna sessioni</button>
       <button id="btnRevokeAllSessions" class="px-3 py-1.5 rounded bg-cr-danger hover:opacity-90 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-cr-danger focus:ring-offset-2 focus:ring-offset-cr-canvas">Revoca tutte</button>
@@ -11,20 +15,22 @@
   </div>
 
   <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
-    <h2 class="text-lg font-semibold mb-3">Log Explorer</h2>
+    <h2 class="text-lg font-semibold text-cr-text mb-1">Log Explorer</h2>
+    <p class="text-xs text-cr-muted mb-3">Legge file log PM2 sul server. Usa il filtro testo per restringere.</p>
     <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
       <input id="logProcess" class="rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2" placeholder="process (es. control-room)" value="control-room" />
       <select id="logSource" class="rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2"><option value="out">out</option><option value="error">error</option></select>
       <input id="logQuery" class="rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2" placeholder="filtro testo" />
       <button id="btnLoadLogs" class="rounded bg-cr-surface2 hover:bg-cr-navHover px-3 py-2">Carica log</button>
     </div>
-    <pre id="logOutput" class="text-xs bg-cr-code border border-cr-border rounded p-3 max-h-80 overflow-auto"></pre>
+    <pre id="logOutput" class="text-xs bg-cr-code border border-cr-border rounded p-3 max-h-80 overflow-auto text-cr-muted">— Premi «Carica log» per visualizzare le righe —</pre>
   </div>
 
   <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
-    <h2 class="text-lg font-semibold mb-3">Diagnostica guidata</h2>
+    <h2 class="text-lg font-semibold text-cr-text mb-1">Diagnostica guidata</h2>
+    <p class="text-xs text-cr-muted mb-3">Snapshot JSON di servizi e percorsi utili al troubleshooting.</p>
     <button id="btnDiagnostics" class="px-3 py-1.5 rounded bg-cr-accent hover:bg-cr-accent text-sm">Esegui diagnostica</button>
-    <pre id="diagOutput" class="mt-3 text-xs bg-cr-code border border-cr-border rounded p-3 max-h-80 overflow-auto"></pre>
+    <pre id="diagOutput" class="mt-3 text-xs bg-cr-code border border-cr-border rounded p-3 max-h-80 overflow-auto text-cr-muted">— Esegui la diagnostica per popolare —</pre>
   </div>
 </section>
 
@@ -39,7 +45,7 @@
         <span>${s.user || 'anon'} · ${s.key} · last=${s.lastAccess || '-'}</span>
         <button class="px-2 py-1 rounded bg-cr-danger hover:opacity-90 text-white text-xs font-medium" onclick="revokeSession('${s.key}')">Revoke</button>
       </div>
-    `).join('') : '<span class="text-cr-muted">Nessuna sessione disponibile.</span>';
+    `).join('') : '<span class="text-cr-muted">Nessuna sessione in elenco (store vuoto o non ancora caricato). Tocca «Aggiorna sessioni».</span>';
   }
 
   async function revokeSession(key) {
@@ -60,7 +66,11 @@
     const url = `/api/maintenance/logs?process=${encodeURIComponent(process)}&source=${encodeURIComponent(source)}&q=${encodeURIComponent(q)}`;
     const res = await fetch(url);
     const data = await res.json();
-    document.getElementById('logOutput').textContent = (data.lines || []).join('\n');
+    const lines = data.lines || [];
+    const out = document.getElementById('logOutput');
+    out.textContent = lines.length ? lines.join('\n') : '(Nessuna riga con i filtri attuali.)';
+    out.classList.toggle('text-cr-muted', !lines.length);
+    out.classList.toggle('text-cr-text', !!lines.length);
   }
 
   async function runDiagnostics() {

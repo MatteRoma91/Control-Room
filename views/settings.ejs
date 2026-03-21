@@ -1,20 +1,32 @@
 <section class="mb-8" aria-labelledby="settings-heading">
-  <h1 id="settings-heading" class="text-2xl font-bold text-cr-text mb-6">Impostazioni</h1>
+  <h1 id="settings-heading" class="text-2xl font-bold text-cr-text mb-4">Impostazioni</h1>
+  <p class="text-sm text-cr-muted mb-4 max-w-2xl">Salvataggio in <span class="font-mono text-cr-text">settings.json</span> sul server. Usa l’indice per saltare alle sezioni.</p>
+  <nav class="mb-8 max-w-2xl rounded-lg border border-cr-border bg-cr-surface2/80 p-3" aria-label="Indice sezioni impostazioni">
+    <p class="text-xs font-medium text-cr-muted mb-2 uppercase tracking-wide">Vai a</p>
+    <div class="flex flex-wrap gap-x-3 gap-y-2 text-sm">
+      <a href="#settings-redis" class="text-cr-accent hover:underline min-h-[44px] inline-flex items-center">Redis</a>
+      <a href="#settings-notify-health" class="text-cr-accent hover:underline min-h-[44px] inline-flex items-center">Notifiche (health)</a>
+      <a href="#settings-2fa" class="text-cr-accent hover:underline min-h-[44px] inline-flex items-center">2FA</a>
+      <a href="#settings-firewall" class="text-cr-accent hover:underline min-h-[44px] inline-flex items-center">Firewall</a>
+      <a href="#settings-notifications" class="text-cr-accent hover:underline min-h-[44px] inline-flex items-center">Webhook e PM2</a>
+      <a href="#settings-ssh" class="text-cr-accent hover:underline min-h-[44px] inline-flex items-center">SSH</a>
+    </div>
+  </nav>
 
-  <div class="rounded-lg border border-cr-border bg-cr-surface p-6 mb-8 max-w-2xl">
+  <div id="settings-redis" class="rounded-lg border border-cr-border bg-cr-surface p-6 mb-8 max-w-2xl scroll-mt-24">
     <h2 class="text-lg font-semibold text-cr-text mb-2">Session Store Redis</h2>
     <p id="redisHealthText" class="text-sm text-cr-text mb-3">Verifica stato Redis...</p>
     <button type="button" id="btnCheckRedisHealth" class="px-3 py-1.5 rounded-lg bg-cr-surface2 hover:bg-cr-navHover text-sm">Controlla stato Redis</button>
   </div>
 
-  <div class="rounded-lg border border-cr-border bg-cr-surface p-6 mb-8 max-w-2xl">
+  <div id="settings-notify-health" class="rounded-lg border border-cr-border bg-cr-surface p-6 mb-8 max-w-2xl scroll-mt-24">
     <h2 class="text-lg font-semibold text-cr-text mb-2">Health Notifiche</h2>
     <p id="notifyHealthText" class="text-sm text-cr-text mb-3">Verifica stato notifiche...</p>
     <button type="button" id="btnCheckNotifyHealth" class="px-3 py-1.5 rounded-lg bg-cr-surface2 hover:bg-cr-navHover text-sm">Controlla stato notifiche</button>
   </div>
 
   <!-- Autenticazione a due fattori -->
-  <div class="rounded-lg border border-cr-border bg-cr-surface p-6 mb-8 max-w-2xl">
+  <div id="settings-2fa" class="rounded-lg border border-cr-border bg-cr-surface p-6 mb-8 max-w-2xl scroll-mt-24">
     <h2 class="text-lg font-semibold text-cr-text mb-4">Autenticazione a due fattori</h2>
     <p class="text-cr-text mb-4">Proteggi l'accesso con Google Authenticator. Ogni login richiederà un codice a 6 cifre generato dall'app.</p>
     <a
@@ -36,7 +48,7 @@
 
   <form id="settingsForm" class="space-y-8 max-w-2xl">
     <!-- Firewall IP Whitelist -->
-    <div class="rounded-lg border border-cr-border bg-cr-surface p-6">
+    <div id="settings-firewall" class="rounded-lg border border-cr-border bg-cr-surface p-6 scroll-mt-24">
       <h2 class="text-lg font-semibold text-cr-text mb-4">Firewall - IP Whitelist</h2>
       <p class="text-sm text-cr-muted mb-4">Blocca l'accesso alla Control Room da IP non autorizzati. Se abilitato, solo gli IP nella lista possono accedere (anche prima del login).</p>
       <label class="flex items-center gap-2 cursor-pointer mb-4">
@@ -69,7 +81,7 @@
     </div>
 
     <!-- Notifiche Webhook -->
-    <div class="rounded-lg border border-cr-border bg-cr-surface p-6">
+    <div id="settings-notifications" class="rounded-lg border border-cr-border bg-cr-surface p-6 scroll-mt-24">
       <h2 class="text-lg font-semibold text-cr-text mb-4">Notifiche (Discord / Slack / Telegram)</h2>
       <div class="space-y-4">
         <div>
@@ -282,7 +294,7 @@
     </div>
 
     <!-- Configurazioni SSH -->
-    <div class="rounded-lg border border-cr-border bg-cr-surface p-6" id="sshProfilesSection">
+    <div id="settings-ssh" class="rounded-lg border border-cr-border bg-cr-surface p-6 scroll-mt-24">
       <h2 class="text-lg font-semibold text-cr-text mb-2">Configurazioni SSH</h2>
       <p class="text-sm text-cr-muted mb-4">Salva host e username per diverse connessioni. La password va inserita al momento della connessione e non viene mai salvata.</p>
       <div id="sshProfilesList" class="space-y-4 mb-4">
