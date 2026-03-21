@@ -35,18 +35,7 @@
         window.visualViewport.addEventListener('resize', crSyncDrawerDesktop, { passive: true });
       }
 
-      document.addEventListener('DOMContentLoaded', function () {
-        var c = document.getElementById('cr-drawer-toggle');
-        crSyncDrawerDesktop();
-        // #region agent log
-        if (typeof fetch === 'function' && c) {
-          fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:init',message:'drawer dom ready',data:{iw:window.innerWidth,drawerOpen:c.checked},timestamp:Date.now(),runId:'checkbox-drawer',hypothesisId:'H1'})}).catch(function(){});
-          c.addEventListener('change', function () {
-            fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:drawer-checkbox',message:'drawer checkbox',data:{open:c.checked,iw:window.innerWidth},timestamp:Date.now(),runId:'checkbox-drawer',hypothesisId:'H2'})}).catch(function(){});
-          });
-        }
-        // #endregion
-      });
+      document.addEventListener('DOMContentLoaded', crSyncDrawerDesktop);
     })();
   </script>
   <%- include('partials/head-common') %>
