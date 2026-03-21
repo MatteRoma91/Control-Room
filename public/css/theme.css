@@ -103,3 +103,30 @@ html.dark .cr-card {
 html.dark .cr-thead {
   background: color-mix(in srgb, var(--cr-surface-2) 85%, var(--cr-canvas));
 }
+
+/*
+ * Drawer mobile: chiuso di default anche prima dell’idratazione Alpine (niente transform = pannello visibile).
+ * Stato aperto solo con .cr-drawer-open (Alpine). Desktop ≥768px: sidebar sempre visibile.
+ */
+@media (max-width: 767.98px) {
+  #cr-sidebar {
+    transform: translateX(-100%);
+    transition: transform 200ms ease-out;
+  }
+  #cr-sidebar.cr-drawer-open {
+    transform: translateX(0);
+  }
+  /*
+   * Il figlio con pointer-events-auto riceve comunque hit-test; con transform su WebKit
+   * può restare una zona “invisibile” sopra l’header. Chiudi gli eventi finché il drawer è chiuso.
+   */
+  #cr-sidebar:not(.cr-drawer-open) .cr-sidebar-inner {
+    pointer-events: none !important;
+  }
+}
+
+@media (min-width: 768px) {
+  #cr-sidebar {
+    transform: translateX(0) !important;
+  }
+}

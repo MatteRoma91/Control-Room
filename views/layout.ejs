@@ -12,6 +12,58 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
   <link rel="manifest" href="/manifest.json">
+  <script>
+    /** Drawer: posizione da CSS (theme.css) + classe cr-drawer-open; niente mdUp / x-bind:style. */
+    function crSidebarShell() {
+      return {
+        sidebarOpen: false,
+        toggleSidebar() {
+          this.sidebarOpen = !this.sidebarOpen;
+          // #region agent log
+          if (typeof fetch === 'function') {
+            fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:toggleSidebar',message:'hamburger toggle',data:{sidebarOpen:this.sidebarOpen,iw:typeof window!=='undefined'&&typeof window.innerWidth==='number'?window.innerWidth:null,vvW:typeof window!=='undefined'&&window.visualViewport?window.visualViewport.width:null},timestamp:Date.now(),runId:'tap-fix',hypothesisId:'H2'})}).catch(function(){});
+          }
+          // #endregion
+        },
+        init() {
+          var self = this;
+          function closeDrawerIfDesktop() {
+            if (typeof window !== 'undefined' && typeof window.innerWidth === 'number' && window.innerWidth >= 768) {
+              self.sidebarOpen = false;
+            }
+          }
+          closeDrawerIfDesktop();
+          // #region agent log
+          if (typeof fetch === 'function' && typeof window !== 'undefined' && typeof window.innerWidth === 'number') {
+            fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:init',message:'alpine init',data:{iw:window.innerWidth,vvW:window.visualViewport?window.visualViewport.width:null,sidebarOpen:self.sidebarOpen},timestamp:Date.now(),runId:'tap-fix',hypothesisId:'H1'})}).catch(function(){});
+          }
+          // #endregion
+          window.addEventListener('resize', closeDrawerIfDesktop, { passive: true });
+          if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', closeDrawerIfDesktop, { passive: true });
+          }
+          // Menu: pointerup (touch/pen/mouse) + click solo se non già gestito (tastiera / click sintetico)
+          var bindMenu = function () {
+            var menuBtn = document.getElementById('cr-nav-menu-btn');
+            if (!menuBtn || menuBtn.getAttribute('data-cr-nav-bound') === '1') return;
+            menuBtn.setAttribute('data-cr-nav-bound', '1');
+            var lastPointerToggle = 0;
+            menuBtn.addEventListener('pointerup', function (e) {
+              if (e.pointerType === 'mouse' && e.button !== 0) return;
+              lastPointerToggle = Date.now();
+              self.toggleSidebar();
+            });
+            menuBtn.addEventListener('click', function () {
+              if (Date.now() - lastPointerToggle < 500) return;
+              self.toggleSidebar();
+            });
+          };
+          if (typeof self.$nextTick === 'function') self.$nextTick(bindMenu);
+          else queueMicrotask(bindMenu);
+        },
+      };
+    }
+  </script>
   <%- include('partials/head-common') %>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
@@ -19,13 +71,13 @@
   <script defer src="/js/cr-theme.js"></script>
   <%- typeof headExtra !== 'undefined' ? headExtra : '' %>
 </head>
-<body class="min-h-screen bg-cr-canvas text-cr-text font-sans antialiased" x-data="{ sidebarOpen: false }">
-  <nav class="fixed top-0 left-0 right-0 z-40 bg-cr-nav border-b border-cr-border px-3 md:px-4 py-2.5 flex justify-between items-center gap-2 shadow-sm">
+<body class="min-h-screen bg-cr-canvas text-cr-text font-sans antialiased" x-data="crSidebarShell()">
+  <nav class="fixed top-0 left-0 right-0 z-50 bg-cr-nav border-b border-cr-border px-3 md:px-4 py-2.5 flex justify-between items-center gap-2 shadow-sm isolate">
     <div class="flex items-center gap-2 md:gap-3 min-w-0">
       <button
         type="button"
-        @click="sidebarOpen = !sidebarOpen"
-        class="md:hidden p-2 rounded-lg hover:bg-cr-navHover text-cr-text focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+        id="cr-nav-menu-btn"
+        class="md:hidden touch-manipulation cursor-pointer p-2 rounded-lg hover:bg-cr-navHover text-cr-text focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center relative z-10"
         aria-label="Apri o chiudi menu"
       >
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -83,11 +135,14 @@
     aria-hidden="true"
   ></div>
   <aside
-    class="fixed inset-y-0 left-0 z-30 w-[17rem] bg-cr-nav border-r border-cr-border pt-14 md:pt-16 transition-transform duration-200 ease-out -translate-x-full md:translate-x-0 shadow-lg md:shadow-none"
-    :class="{ 'translate-x-0': sidebarOpen }"
+    id="cr-sidebar"
+    class="fixed inset-y-0 left-0 z-30 w-[17rem] pointer-events-none md:pointer-events-auto bg-cr-nav border-r border-cr-border shadow-lg md:shadow-none"
+    :class="sidebarOpen ? 'cr-drawer-open' : ''"
     aria-label="Navigazione principale"
   >
-    <%- include('partials/sidebar') %>
+    <div class="cr-sidebar-inner pointer-events-auto flex min-h-0 flex-col mt-14 h-[calc(100%-3.5rem)] md:mt-0 md:h-full md:pt-16">
+      <%- include('partials/sidebar') %>
+    </div>
   </aside>
 
   <main class="pt-14 md:pt-16 md:pl-[17rem] min-h-screen overflow-x-hidden">

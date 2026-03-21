@@ -4,7 +4,7 @@
   if (isActive) return base + 'border-cr-accent bg-cr-surface2 text-cr-accent font-semibold';
   return base + 'border-transparent text-cr-muted hover:bg-cr-navHover hover:text-cr-text';
 } %>
-<div class="py-3 flex flex-col h-[calc(100vh-4rem)] overflow-y-auto">
+<div class="py-3 flex flex-col flex-1 min-h-0 overflow-y-auto">
   <p class="px-4 pb-1 text-[10px] font-semibold uppercase tracking-wider text-cr-muted">Operazioni</p>
   <a href="/" class="<%= navItem('/', p === '/' || p.indexOf('/process/') === 0) %>">
     Dashboard
