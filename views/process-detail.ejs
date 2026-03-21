@@ -46,19 +46,21 @@
 <script>
   const processName = '<%= process.name %>';
 
-  function showToast(message, type) {
-    window.dispatchEvent(new CustomEvent('toast', { detail: { message, type } }));
+  function showToast(message, type, duration) {
+    window.dispatchEvent(new CustomEvent('toast', { detail: { message, type, duration } }));
   }
 
   function setBtnLoading(btn, loading) {
     if (!btn) return;
     if (loading) {
       btn._originalText = btn.textContent;
-      btn.textContent = 'In corso...';
+      btn.textContent = 'In corso…';
       btn.disabled = true;
+      btn.setAttribute('aria-busy', 'true');
     } else {
       btn.textContent = btn._originalText || btn.textContent;
       btn.disabled = false;
+      btn.removeAttribute('aria-busy');
     }
   }
 
@@ -83,7 +85,8 @@
       });
       const data = await res.json();
       if (data.ok) {
-        showToast('Operazione completata', 'success');
+        var doneVerb = action === 'start' ? 'avviato' : action === 'stop' ? 'fermato' : action === 'restart' ? 'riavviato' : 'eseguito';
+        showToast('Processo «' + processName + '»: ' + doneVerb + ' con successo.', 'success', 5600);
         setTimeout(() => location.reload(), 500);
       } else {
         showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
@@ -101,7 +104,7 @@
       const res = await fetch(`/api/process/flush/${encodeURIComponent(processName)}`, { method: 'POST' });
       const data = await res.json();
       if (data.ok) {
-        showToast('Log svuotati', 'success');
+        showToast('Log svuotati per «' + processName + '».', 'success', 5200);
         term.clear();
         setTimeout(() => location.reload(), 500);
       } else {
@@ -124,7 +127,7 @@
       window.dispatchEvent(new CustomEvent('git-pull-show', { detail: { output, loading: false } }));
       setBtnLoading(btn, false);
       if (data.ok) {
-        showToast('Deployment completato', 'success');
+        showToast('Deployment completato per «' + processName + '».', 'success', 5800);
         setTimeout(() => location.reload(), 1000);
       }
     } catch (e) {

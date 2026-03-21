@@ -1,22 +1,39 @@
 <div
-  x-data="{ toasts: [], lastToast: { message: null, type: null, ts: 0 } }"
-  x-on:toast.window="(() => { const now = Date.now(); const msg = $event.detail.message; const type = $event.detail.type || 'info'; if (lastToast.message === msg && lastToast.type === type && now - lastToast.ts < 1500) return; const t = { id: now, message: msg, type }; lastToast = { message: msg, type, ts: now }; toasts.push(t); setTimeout(() => { toasts = toasts.filter(x => x.id !== t.id) }, 4000); })()"
-  class="fixed top-20 right-4 z-50 space-y-2 max-w-sm"
+  x-data="crToastStack()"
+  @toast.window="onToast($event.detail)"
+  class="fixed top-20 right-4 z-[60] space-y-2 w-[min(22rem,calc(100vw-2rem))] pointer-events-none"
   aria-live="polite"
+  aria-relevant="additions text"
+  aria-atomic="false"
 >
   <template x-for="t in toasts" :key="t.id">
     <div
-      x-show="true"
+      class="pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl border shadow-xl text-sm text-cr-text"
       x-transition:enter="transition ease-out duration-200"
-      x-transition:enter-start="opacity-0 translate-x-8"
-      x-transition:enter-end="opacity-100 translate-x-0"
+      x-transition:enter-start="opacity-0 translate-x-6 scale-95"
+      x-transition:enter-end="opacity-100 translate-x-0 scale-100"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-start="opacity-100"
+      x-transition:leave-end="opacity-0 translate-x-4"
       :class="{
-        'border-cr-success bg-[var(--cr-success-bg)]': t.type === 'success',
-        'border-cr-danger bg-[var(--cr-danger-bg)]': t.type === 'error',
-        'border-cr-border bg-cr-surface2': t.type === 'info'
+        'border-cr-success/50 bg-[var(--cr-success-bg)] ring-1 ring-cr-success/20': t.type === 'success',
+        'border-cr-danger/50 bg-[var(--cr-danger-bg)] ring-1 ring-cr-danger/25': t.type === 'error',
+        'border-cr-border bg-cr-surface ring-1 ring-cr-border/60': t.type === 'info'
       }"
-      class="px-4 py-3 rounded-lg border shadow-lg text-sm text-cr-text"
-      x-text="t.message"
-    ></div>
+      :role="t.type === 'error' ? 'alert' : 'status'"
+    >
+      <span class="shrink-0 mt-0.5" aria-hidden="true">
+        <svg x-show="t.type === 'success'" class="w-5 h-5 text-cr-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <svg x-show="t.type === 'error'" class="w-5 h-5 text-cr-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <svg x-show="t.type === 'info'" class="w-5 h-5 text-cr-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </span>
+      <p class="flex-1 min-w-0 font-medium leading-snug break-words" x-text="t.message"></p>
+    </div>
   </template>
 </div>

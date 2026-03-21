@@ -155,6 +155,50 @@ function isIpAllowedByEntries(ip, entries) {
   return false;
 }
 
+const MAX_PM2_NOTIFY_PER_APP_KEYS = 64;
+const MAX_PM2_PROCESS_NAME_LEN = 200;
+
+function sanitizePm2ProcessName(s) {
+  const t = String(s || '')
+    .trim()
+    .slice(0, MAX_PM2_PROCESS_NAME_LEN);
+  return t || null;
+}
+
+function sanitizeNotifyPm2OnlyApps(arr) {
+  if (!Array.isArray(arr)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const x of arr) {
+    const n = sanitizePm2ProcessName(x);
+    if (n && !seen.has(n)) {
+      seen.add(n);
+      out.push(n);
+    }
+    if (out.length >= MAX_PM2_NOTIFY_PER_APP_KEYS) break;
+  }
+  return out;
+}
+
+function sanitizeNotifyPm2PerApp(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
+  const out = {};
+  for (const k of Object.keys(obj)) {
+    if (Object.keys(out).length >= MAX_PM2_NOTIFY_PER_APP_KEYS) break;
+    const name = sanitizePm2ProcessName(k);
+    if (!name) continue;
+    const v = obj[k];
+    if (!v || typeof v !== 'object') continue;
+    const row = {};
+    if (v.crash === false) row.crash = false;
+    if (v.restartLoop === false) row.restartLoop = false;
+    if (v.exception === false) row.exception = false;
+    if (v.stderr === false) row.stderr = false;
+    if (Object.keys(row).length) out[name] = row;
+  }
+  return out;
+}
+
 function sanitizeSettings(raw) {
   const source = raw && typeof raw === 'object' ? raw : {};
   const dailyRaw = source.dailyCheck || {};
@@ -182,6 +226,9 @@ function sanitizeSettings(raw) {
     notifyOnRunbook: source.notifyOnRunbook === true,
     notifyOnIncident: source.notifyOnIncident !== false,
     notifyOnSecurity: source.notifyOnSecurity === true,
+    notifyPm2Scope: source.notifyPm2Scope === 'onlyListed' ? 'onlyListed' : 'all',
+    notifyPm2OnlyApps: sanitizeNotifyPm2OnlyApps(source.notifyPm2OnlyApps),
+    notifyPm2PerApp: sanitizeNotifyPm2PerApp(source.notifyPm2PerApp),
     sshProfiles: Array.isArray(source.sshProfiles) ? source.sshProfiles : [],
     totpSecret: String(source.totpSecret || ''),
     totpEnabled: source.totpEnabled === true,
@@ -1639,7 +1686,13 @@ async function writeDailyCheckState(state) {
 // Pagina Settings
 app.get('/settings', requireAuth, async (req, res) => {
   const settings = await loadSettings();
-  res.render('layout', { contentPartial: 'settings', settings });
+  let pm2Processes = [];
+  try {
+    pm2Processes = await pm2List();
+  } catch (e) {
+    logEvent('settings_pm2_list_error', { error: e.message });
+  }
+  res.render('layout', { contentPartial: 'settings', settings, pm2Processes });
 });
 
 // API: GET settings
@@ -2583,6 +2636,13 @@ async function sendNotificationEvent(eventType, payload = {}) {
   if (eventType.startsWith('incident_') && settings.notifyOnIncident === false) return;
   if (eventType.startsWith('runbook_') && settings.notifyOnRunbook !== true) return;
   if (eventType.startsWith('session_') && settings.notifyOnSecurity !== true) return;
+  if (eventType === 'runbook_recover_app' && payload.process) {
+    const proc = String(payload.process || '').trim();
+    if (settings.notifyPm2Scope === 'onlyListed') {
+      const list = settings.notifyPm2OnlyApps || [];
+      if (list.length === 0 || !list.includes(proc)) return;
+    }
+  }
   const channel = payload.channel || 'ops';
   const dedupKey = `${eventType}:${payload.process || ''}:${payload.note || ''}`.slice(0, 160);
   if (!dedupNotificationKey(dedupKey)) return;
@@ -2652,6 +2712,20 @@ async function sendNotification(message) {
   }
 }
 
+/** kind: crash | restartLoop | exception | stderr — dopo flag globali, prima del debounce */
+function isPm2NotifyTypeEnabled(settings, processName, kind) {
+  const name = String(processName || '').trim();
+  if (!name) return false;
+  if (settings.notifyPm2Scope === 'onlyListed') {
+    const list = settings.notifyPm2OnlyApps || [];
+    if (list.length === 0) return false;
+    if (!list.includes(name)) return false;
+  }
+  const per = settings.notifyPm2PerApp?.[name];
+  if (per && per[kind] === false) return false;
+  return true;
+}
+
 function shouldNotifyProcess(processName, eventType, debounceMs = NOTIFY_DEBOUNCE_MS) {
   const key = `${processName}:${eventType}`;
   const now = Date.now();
@@ -2699,10 +2773,21 @@ pm2.connect(async (err) => {
       const restartTime = data?.process?.restart_time ?? 0;
       logEvent('pm2_event', { event: ev, process: name, restartTime });
       const settings = await loadSettings();
-      if (ev === 'exit' && settings.notifyOnCrash !== false && shouldNotifyProcess(name, 'exit')) {
+      if (
+        ev === 'exit' &&
+        settings.notifyOnCrash !== false &&
+        isPm2NotifyTypeEnabled(settings, name, 'crash') &&
+        shouldNotifyProcess(name, 'exit')
+      ) {
         await sendNotification(`⚠️ Alert: Il processo '${name}' è crashato! (Riavvio automatico in corso...)`);
       }
-      if (ev === 'restart' && settings.notifyOnRestart !== false && restartTime >= 3 && shouldNotifyProcess(name, 'restart')) {
+      if (
+        ev === 'restart' &&
+        settings.notifyOnRestart !== false &&
+        restartTime >= 3 &&
+        isPm2NotifyTypeEnabled(settings, name, 'restartLoop') &&
+        shouldNotifyProcess(name, 'restart')
+      ) {
         await sendNotification(`🔄 Crash loop: Il processo '${name}' è stato riavviato ${restartTime} volte. Verifica i log.`);
       }
     });
@@ -2712,7 +2797,7 @@ pm2.connect(async (err) => {
       logEvent('pm2_exception', { process: name, message: msg.slice(0, 100) });
       const settings = await loadSettings();
       const sendException = settings.notifyOnException === true || (settings.notifyOnException !== false && settings.notifyOnCrash !== false);
-      if (!sendException || !shouldNotifyProcess(name, 'exception')) return;
+      if (!sendException || !isPm2NotifyTypeEnabled(settings, name, 'exception') || !shouldNotifyProcess(name, 'exception')) return;
       await sendNotification(`⚠️ Alert: Il processo '${name}' ha emesso un'eccezione: ${msg}`);
     });
     bus.on('log:err', async (data) => {
@@ -2721,7 +2806,7 @@ pm2.connect(async (err) => {
       if (msg) logEvent('pm2_log_err', { process: name, preview: msg.slice(0, 80) });
       const settings = await loadSettings();
       const sendStderr = settings.notifyOnLogErr === true;
-      if (!sendStderr || !msg || !shouldNotifyProcess(name, 'logerr', NOTIFY_DEBOUNCE_LOGERR_MS)) return;
+      if (!sendStderr || !msg || !isPm2NotifyTypeEnabled(settings, name, 'stderr') || !shouldNotifyProcess(name, 'logerr', NOTIFY_DEBOUNCE_LOGERR_MS)) return;
       await sendNotification(`⚠️ PM2 stderr [${name}]: ${msg}`);
     });
   });

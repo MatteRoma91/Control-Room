@@ -175,6 +175,109 @@
             </li>
           </ul>
         </div>
+        <% 
+          var pm2Rows = (typeof pm2Processes !== 'undefined' && Array.isArray(pm2Processes)) ? pm2Processes : [];
+          var perMap = settings.notifyPm2PerApp || {};
+          var savedOnlyApps = settings.notifyPm2OnlyApps || [];
+          var matrixNameSet = {};
+          pm2Rows.forEach(function(p) { if (p && p.name) matrixNameSet[p.name] = true; });
+          Object.keys(perMap).forEach(function(n) { matrixNameSet[n] = true; });
+          savedOnlyApps.forEach(function(n) { matrixNameSet[n] = true; });
+          var matrixNames = Object.keys(matrixNameSet).sort(function(a, b) { return a.localeCompare(b); });
+          var scopeOnlyListed = settings.notifyPm2Scope === 'onlyListed';
+        %>
+        <div class="border-t border-cr-inputBorder pt-4 mt-4" id="notifyPm2Advanced" aria-labelledby="notify-pm2-adv-heading">
+          <h3 id="notify-pm2-adv-heading" class="text-sm font-medium text-cr-text mb-2">Filtri notifiche PM2 per processo</h3>
+          <p class="text-xs text-cr-muted mb-3">
+            Valutazione in ordine: (1) master globali sopra (Crash, Loop, ecc.); (2) se scegli «Solo app selezionate», solo quelle possono generare notifiche PM2; (3) nella tabella, deseleziona una casella per escludere quel tipo per quel processo.
+            Con «Solo app selezionate» e lista vuota non partono notifiche PM2 né runbook «recover» per singola app. Massimo 64 nomi processo. Con elenco non vuoto, solo le app spuntate ricevono notifiche PM2 e runbook recover per app.
+          </p>
+          <fieldset class="space-y-2 mb-4">
+            <legend class="text-xs font-medium text-cr-text mb-2">Ambito processi PM2</legend>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="notifyPm2Scope" value="all" <%= !scopeOnlyListed ? 'checked' : '' %>
+                class="rounded-full border-cr-inputBorder bg-cr-surface2 text-cr-accent focus:ring-cr-accent" />
+              <span class="text-sm text-cr-text">Tutte le app PM2</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="notifyPm2Scope" value="onlyListed" <%= scopeOnlyListed ? 'checked' : '' %>
+                class="rounded-full border-cr-inputBorder bg-cr-surface2 text-cr-accent focus:ring-cr-accent" />
+              <span class="text-sm text-cr-text">Solo app selezionate (notifiche PM2 + runbook per app)</span>
+            </label>
+          </fieldset>
+          <div id="notifyPm2OnlyAppsPanel" class="mb-4 rounded-lg border border-cr-border bg-cr-surface2/50 p-3 <%= scopeOnlyListed ? '' : 'hidden' %>">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-medium text-cr-text">Seleziona le app che possono inviare notifiche PM2</span>
+              <span class="flex gap-2">
+                <button type="button" id="btnNotifyPm2OnlyAll" class="px-2 py-1 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover border border-cr-border">Tutte</button>
+                <button type="button" id="btnNotifyPm2OnlyNone" class="px-2 py-1 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover border border-cr-border">Nessuna</button>
+              </span>
+            </div>
+            <div id="notifyPm2OnlyAppsList" class="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+              <% matrixNames.forEach(function(appName) { %>
+              <label class="inline-flex items-center gap-1.5 px-2 py-1 rounded border border-cr-border bg-cr-surface text-xs cursor-pointer">
+                <input type="checkbox" class="notify-pm2-only-cb rounded border-cr-inputBorder" data-app-name="<%= appName.replace(/"/g, '&quot;') %>"
+                  <%= savedOnlyApps.indexOf(appName) >= 0 ? 'checked' : '' %> />
+                <span class="font-mono text-cr-text"><%= appName %></span>
+              </label>
+              <% }); %>
+            </div>
+            <p class="text-[11px] text-cr-muted mt-2">Aggiorna l’elenco dopo aver aggiunto processi in PM2 (pulsante sotto).</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 mb-2">
+            <button type="button" id="btnRefreshPm2NotifyList" class="px-3 py-1.5 rounded-lg bg-cr-surface2 hover:bg-cr-navHover text-sm">Aggiorna elenco da PM2</button>
+          </div>
+          <div class="overflow-x-auto rounded-lg border border-cr-border">
+            <table class="w-full text-sm min-w-[520px]">
+              <thead>
+                <tr class="border-b border-cr-border bg-cr-surface2/80 text-left">
+                  <th class="px-3 py-2 font-medium text-cr-text">Processo</th>
+                  <th class="px-2 py-2 font-medium text-cr-muted text-center w-24">Crash</th>
+                  <th class="px-2 py-2 font-medium text-cr-muted text-center w-24">Loop</th>
+                  <th class="px-2 py-2 font-medium text-cr-muted text-center w-24">Eccez.</th>
+                  <th class="px-2 py-2 font-medium text-cr-muted text-center w-24">Stderr</th>
+                  <th class="px-2 py-2 w-20"></th>
+                </tr>
+              </thead>
+              <tbody id="notifyPm2MatrixBody">
+                <% matrixNames.forEach(function(appName) {
+                     var row = perMap[appName] || {};
+                %>
+                <tr class="border-b border-cr-border/80 hover:bg-cr-navHover/30" data-app-name="<%= appName.replace(/"/g, '&quot;') %>">
+                  <td class="px-3 py-2 font-mono text-cr-text"><%= appName %></td>
+                  <td class="px-2 py-2 text-center">
+                    <input type="checkbox" data-nt="crash" class="rounded border-cr-inputBorder" <%= row.crash === false ? '' : 'checked' %>
+                      aria-label="Notifica crash per <%= appName.replace(/"/g, '&quot;') %>" />
+                  </td>
+                  <td class="px-2 py-2 text-center">
+                    <input type="checkbox" data-nt="restartLoop" class="rounded border-cr-inputBorder" <%= row.restartLoop === false ? '' : 'checked' %>
+                      aria-label="Notifica crash loop per <%= appName.replace(/"/g, '&quot;') %>" />
+                  </td>
+                  <td class="px-2 py-2 text-center">
+                    <input type="checkbox" data-nt="exception" class="rounded border-cr-inputBorder" <%= row.exception === false ? '' : 'checked' %>
+                      aria-label="Notifica eccezioni per <%= appName.replace(/"/g, '&quot;') %>" />
+                  </td>
+                  <td class="px-2 py-2 text-center">
+                    <input type="checkbox" data-nt="stderr" class="rounded border-cr-inputBorder" <%= row.stderr === false ? '' : 'checked' %>
+                      aria-label="Notifica stderr per <%= appName.replace(/"/g, '&quot;') %>" />
+                  </td>
+                  <td class="px-2 py-2 text-center">
+                    <button type="button" class="notify-pm2-remove-row text-xs text-cr-danger hover:underline">Rimuovi</button>
+                  </td>
+                </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <div class="flex flex-wrap items-end gap-2 mt-3">
+            <div class="flex-1 min-w-[12rem]">
+              <label for="notifyPm2AddName" class="block text-xs text-cr-muted mb-1">Aggiungi processo (nome PM2)</label>
+              <input type="text" id="notifyPm2AddName" placeholder="es. mia-app"
+                class="w-full px-3 py-2 rounded-lg bg-cr-surface2 border border-cr-inputBorder text-cr-text font-mono text-sm" />
+            </div>
+            <button type="button" id="btnNotifyPm2AddRow" class="px-3 py-2 rounded-lg bg-cr-surface2 hover:bg-cr-navHover text-sm">Aggiungi riga</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -212,16 +315,17 @@
       </button>
     </div>
 
-    <button type="submit" class="px-4 py-2 rounded-lg bg-cr-accent hover:bg-cr-accentHover text-white font-medium focus:ring-2 focus:ring-cr-accent">
+    <button type="submit" id="btnSettingsSave" class="px-4 py-2 rounded-lg bg-cr-accent hover:bg-cr-accentHover text-white font-medium focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas min-h-[44px]">
       Salva impostazioni
     </button>
   </form>
 </section>
 
 <script>
-  async function loadRedisHealth() {
+  async function loadRedisHealth(btn) {
     const el = document.getElementById('redisHealthText');
     if (!el) return;
+    if (typeof window.crButtonLoading === 'function') window.crButtonLoading(btn, true, 'Verifica…');
     el.textContent = 'Verifica in corso...';
     try {
       const res = await fetch('/api/redis-health');
@@ -234,13 +338,15 @@
     } catch (err) {
       el.textContent = 'Errore verifica Redis: ' + err.message;
     }
+    if (typeof window.crButtonLoading === 'function') window.crButtonLoading(btn, false);
   }
-  document.getElementById('btnCheckRedisHealth')?.addEventListener('click', loadRedisHealth);
-  loadRedisHealth();
+  document.getElementById('btnCheckRedisHealth')?.addEventListener('click', function () { loadRedisHealth(this); });
+  loadRedisHealth(null);
 
-  async function loadNotifyHealth() {
+  async function loadNotifyHealth(btn) {
     const el = document.getElementById('notifyHealthText');
     if (!el) return;
+    if (typeof window.crButtonLoading === 'function') window.crButtonLoading(btn, true, 'Verifica…');
     el.textContent = 'Verifica in corso...';
     try {
       const res = await fetch('/api/notifications/health');
@@ -253,9 +359,10 @@
     } catch (err) {
       el.textContent = 'Errore verifica notifiche: ' + err.message;
     }
+    if (typeof window.crButtonLoading === 'function') window.crButtonLoading(btn, false);
   }
-  document.getElementById('btnCheckNotifyHealth')?.addEventListener('click', loadNotifyHealth);
-  loadNotifyHealth();
+  document.getElementById('btnCheckNotifyHealth')?.addEventListener('click', function () { loadNotifyHealth(this); });
+  loadNotifyHealth(null);
 
   document.getElementById('webhookType').addEventListener('change', function() {
     const isWebhook = this.value === 'discord' || this.value === 'slack';
@@ -263,6 +370,181 @@
     document.getElementById('telegramFields').classList.toggle('hidden', this.value !== 'telegram');
   });
   document.getElementById('webhookType').dispatchEvent(new Event('change'));
+
+  function syncNotifyPm2ScopePanel() {
+    const only = document.querySelector('input[name="notifyPm2Scope"]:checked')?.value === 'onlyListed';
+    const panel = document.getElementById('notifyPm2OnlyAppsPanel');
+    if (panel) panel.classList.toggle('hidden', !only);
+  }
+  document.querySelectorAll('input[name="notifyPm2Scope"]').forEach(function (r) {
+    r.addEventListener('change', syncNotifyPm2ScopePanel);
+  });
+  syncNotifyPm2ScopePanel();
+
+  function matrixHasApp(name) {
+    return Array.from(document.querySelectorAll('#notifyPm2MatrixBody tr[data-app-name]')).some(function (tr) {
+      return tr.getAttribute('data-app-name') === name;
+    });
+  }
+
+  function appendOnlyAppCheckbox(appName, checked) {
+    const list = document.getElementById('notifyPm2OnlyAppsList');
+    if (!list) return;
+    if (Array.from(list.querySelectorAll('.notify-pm2-only-cb')).some(function (cb) {
+      return cb.getAttribute('data-app-name') === appName;
+    })) return;
+    const label = document.createElement('label');
+    label.className = 'inline-flex items-center gap-1.5 px-2 py-1 rounded border border-cr-border bg-cr-surface text-xs cursor-pointer';
+    const inp = document.createElement('input');
+    inp.type = 'checkbox';
+    inp.className = 'notify-pm2-only-cb rounded border-cr-inputBorder';
+    inp.setAttribute('data-app-name', appName);
+    inp.checked = !!checked;
+    const span = document.createElement('span');
+    span.className = 'font-mono text-cr-text';
+    span.textContent = appName;
+    label.appendChild(inp);
+    label.appendChild(span);
+    list.appendChild(label);
+  }
+
+  function appendPm2MatrixRow(appName, row) {
+    if (matrixHasApp(appName)) return;
+    const tbody = document.getElementById('notifyPm2MatrixBody');
+    if (!tbody) return;
+    const tr = document.createElement('tr');
+    tr.className = 'border-b border-cr-border/80 hover:bg-cr-navHover/30';
+    tr.setAttribute('data-app-name', appName);
+    const nameTd = document.createElement('td');
+    nameTd.className = 'px-3 py-2 font-mono text-cr-text';
+    nameTd.textContent = appName;
+    tr.appendChild(nameTd);
+    var kinds = [
+      { k: 'crash', lab: 'crash' },
+      { k: 'restartLoop', lab: 'crash loop' },
+      { k: 'exception', lab: 'eccezioni' },
+      { k: 'stderr', lab: 'stderr' },
+    ];
+    kinds.forEach(function (item) {
+      var td = document.createElement('td');
+      td.className = 'px-2 py-2 text-center';
+      var inp = document.createElement('input');
+      inp.type = 'checkbox';
+      inp.className = 'rounded border-cr-inputBorder';
+      inp.setAttribute('data-nt', item.k);
+      var off = row && row[item.k] === false;
+      inp.checked = !off;
+      inp.setAttribute('aria-label', 'Notifica ' + item.lab + ' per ' + appName);
+      td.appendChild(inp);
+      tr.appendChild(td);
+    });
+    var tdRm = document.createElement('td');
+    tdRm.className = 'px-2 py-2 text-center';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'notify-pm2-remove-row text-xs text-cr-danger hover:underline';
+    btn.textContent = 'Rimuovi';
+    tdRm.appendChild(btn);
+    tr.appendChild(tdRm);
+    tbody.appendChild(tr);
+    appendOnlyAppCheckbox(appName, false);
+  }
+
+  function removePm2NotifyRow(tr) {
+    if (!tr) return;
+    var name = tr.getAttribute('data-app-name');
+    tr.remove();
+    if (!name) return;
+    document.querySelectorAll('.notify-pm2-only-cb').forEach(function (cb) {
+      if (cb.getAttribute('data-app-name') === name) {
+        var lb = cb.closest('label');
+        if (lb) lb.remove();
+      }
+    });
+  }
+
+  document.getElementById('notifyPm2MatrixBody')?.addEventListener('click', function (e) {
+    if (e.target.classList.contains('notify-pm2-remove-row')) {
+      removePm2NotifyRow(e.target.closest('tr'));
+    }
+  });
+
+  document.getElementById('btnNotifyPm2OnlyAll')?.addEventListener('click', function () {
+    document.querySelectorAll('.notify-pm2-only-cb').forEach(function (cb) { cb.checked = true; });
+  });
+  document.getElementById('btnNotifyPm2OnlyNone')?.addEventListener('click', function () {
+    document.querySelectorAll('.notify-pm2-only-cb').forEach(function (cb) { cb.checked = false; });
+  });
+
+  document.getElementById('btnRefreshPm2NotifyList')?.addEventListener('click', async function () {
+    var self = this;
+    if (typeof window.crButtonLoading === 'function') window.crButtonLoading(self, true, 'Aggiornamento…');
+    try {
+      var res = await fetch('/api/processes');
+      var json = await res.json();
+      var list = json.processes || [];
+      var added = 0;
+      list.forEach(function (p) {
+        var n = (p && p.name) ? String(p.name).trim() : '';
+        if (!n) return;
+        if (!matrixHasApp(n)) {
+          appendPm2MatrixRow(n, {});
+          added += 1;
+        }
+      });
+      window.dispatchEvent(new CustomEvent('toast', {
+        detail: { message: added ? ('Aggiornato: ' + added + ' processo/i aggiunti alla tabella') : 'Elenco già allineato a PM2', type: 'success' },
+      }));
+    } catch (err) {
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Errore refresh PM2: ' + err.message, type: 'error' } }));
+    }
+    if (typeof window.crButtonLoading === 'function') window.crButtonLoading(self, false);
+  });
+
+  document.getElementById('btnNotifyPm2AddRow')?.addEventListener('click', function () {
+    var inp = document.getElementById('notifyPm2AddName');
+    var raw = (inp && inp.value) ? inp.value.trim() : '';
+    if (!raw) {
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Inserisci un nome processo', type: 'error' } }));
+      return;
+    }
+    if (raw.length > 200) {
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Nome troppo lungo (max 200)', type: 'error' } }));
+      return;
+    }
+    if (matrixHasApp(raw)) {
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Processo già presente in tabella', type: 'error' } }));
+      return;
+    }
+    appendPm2MatrixRow(raw, {});
+    inp.value = '';
+    window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Riga aggiunta (salva per persistere)', type: 'success' } }));
+  });
+
+  function collectNotifyPm2Payload() {
+    var scope = document.querySelector('input[name="notifyPm2Scope"]:checked')?.value === 'onlyListed' ? 'onlyListed' : 'all';
+    var onlyApps = [];
+    document.querySelectorAll('.notify-pm2-only-cb:checked').forEach(function (cb) {
+      var n = cb.getAttribute('data-app-name');
+      if (n) onlyApps.push(n);
+    });
+    var perApp = {};
+    document.querySelectorAll('#notifyPm2MatrixBody tr[data-app-name]').forEach(function (tr) {
+      var app = tr.getAttribute('data-app-name');
+      if (!app) return;
+      var row = {};
+      ['crash', 'restartLoop', 'exception', 'stderr'].forEach(function (k) {
+        var inp = tr.querySelector('input[data-nt="' + k + '"]');
+        if (inp && !inp.checked) row[k] = false;
+      });
+      if (Object.keys(row).length) perApp[app] = row;
+    });
+    return {
+      notifyPm2Scope: scope,
+      notifyPm2OnlyApps: scope === 'onlyListed' ? onlyApps : [],
+      notifyPm2PerApp: perApp,
+    };
+  }
 
   function collectSshProfiles() {
     const cards = document.querySelectorAll('.ssh-profile-card');
@@ -369,6 +651,9 @@
   document.getElementById('settingsForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const form = e.target;
+    const saveBtn = document.getElementById('btnSettingsSave');
+    if (typeof window.crButtonLoading === 'function') window.crButtonLoading(saveBtn, true, 'Salvataggio…');
+    var settingsSaveOk = false;
     const ipList = (form.ipWhitelist?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
     const data = {
       ipWhitelistEnabled: form.ipWhitelistEnabled?.checked === true,
@@ -387,18 +672,25 @@
       notifyOnRunbook: form.notifyOnRunbook?.checked === true,
       notifyOnIncident: form.notifyOnIncident?.checked === true,
       notifyOnSecurity: form.notifyOnSecurity?.checked === true,
-      sshProfiles: collectSshProfiles()
+      sshProfiles: collectSshProfiles(),
+      ...collectNotifyPm2Payload(),
     };
     try {
       const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       const json = await res.json();
       if (json.ok) {
-        window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Impostazioni salvate', type: 'success' } }));
+        settingsSaveOk = true;
+        window.dispatchEvent(new CustomEvent('toast', {
+          detail: { message: 'Impostazioni salvate correttamente.', type: 'success', duration: 6200 },
+        }));
       } else {
         window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Errore: ' + (json.error || 'Salvataggio fallito'), type: 'error' } }));
       }
     } catch (err) {
       window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Errore: ' + err.message, type: 'error' } }));
+    } finally {
+      if (saveBtn && typeof window.crButtonLoading === 'function') window.crButtonLoading(saveBtn, false);
     }
+    if (settingsSaveOk && typeof window.crButtonSavedFlash === 'function') window.crButtonSavedFlash(saveBtn, 'Salvato ✓', 2000);
   });
 </script>

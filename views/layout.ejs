@@ -125,5 +125,58 @@
 
   <%- typeof scripts !== 'undefined' ? scripts : '' %>
   <%- include('partials/password-toggle-script') %>
+  <script>
+    window.crToastStack = function () {
+      return {
+        toasts: [],
+        lastToast: { message: null, type: null, ts: 0 },
+        onToast(detail) {
+          if (!detail) return;
+          var msg = detail.message != null ? String(detail.message) : '';
+          var type = detail.type || 'info';
+          var now = Date.now();
+          if (this.lastToast.message === msg && this.lastToast.type === type && now - this.lastToast.ts < 1200) return;
+          var t = { id: now, message: msg, type: type };
+          this.lastToast = { message: msg, type: type, ts: now };
+          this.toasts.push(t);
+          var customMs = Number(detail.duration);
+          var ms = customMs > 0 ? customMs : (type === 'success' ? 5200 : type === 'error' ? 6800 : 4200);
+          var self = this;
+          setTimeout(function () {
+            self.toasts = self.toasts.filter(function (x) { return x.id !== t.id; });
+          }, ms);
+        },
+      };
+    };
+    window.crShowToast = function (message, type, duration) {
+      window.dispatchEvent(new CustomEvent('toast', {
+        detail: { message: message, type: type || 'info', duration: duration },
+      }));
+    };
+    window.crButtonLoading = function (btn, loading, loadingLabel) {
+      if (!btn) return;
+      if (loading) {
+        if (btn.dataset.crBtnOrig == null) btn.dataset.crBtnOrig = btn.textContent;
+        btn.textContent = loadingLabel || 'In corso…';
+        btn.disabled = true;
+        btn.setAttribute('aria-busy', 'true');
+      } else {
+        btn.textContent = btn.dataset.crBtnOrig != null ? btn.dataset.crBtnOrig : btn.textContent;
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+        delete btn.dataset.crBtnOrig;
+      }
+    };
+    window.crButtonSavedFlash = function (btn, doneText, ms) {
+      if (!btn) return;
+      var orig = btn.textContent;
+      btn.textContent = doneText || 'Fatto ✓';
+      btn.classList.add('ring-2', 'ring-cr-accent', 'ring-offset-2', 'ring-offset-cr-canvas', 'transition-shadow');
+      setTimeout(function () {
+        btn.textContent = orig;
+        btn.classList.remove('ring-2', 'ring-cr-accent', 'ring-offset-2', 'ring-offset-cr-canvas', 'transition-shadow');
+      }, ms || 1800);
+    };
+  </script>
 </body>
 </html>
