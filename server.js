@@ -80,9 +80,17 @@ function parseSsTcpListen() {
 
 const app = express();
 const PORT = process.env.PORT || 3005;
-const AUTH_USER = process.env.AUTH_USER || 'Matt91';
-const AUTH_PASSWORD = process.env.AUTH_PASSWORD || 'MattCONTROL1!';
-const SESSION_SECRET = process.env.SESSION_SECRET || 'change-me-in-production';
+function readRequiredEnv(name, minLen = 1) {
+  const value = String(process.env[name] || '').trim();
+  if (!value || value.length < minLen) {
+    throw new Error(`${name} is required${minLen > 1 ? ` (min ${minLen} chars)` : ''}`);
+  }
+  return value;
+}
+
+const AUTH_USER = readRequiredEnv('AUTH_USER', 3);
+const AUTH_PASSWORD = readRequiredEnv('AUTH_PASSWORD', 12);
+const SESSION_SECRET = readRequiredEnv('SESSION_SECRET', 32);
 const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 const REDIS_PREFIX = process.env.REDIS_PREFIX || 'cr:sess:';
 const REDIS_CONNECT_TIMEOUT_MS = parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS || '5000', 10);
@@ -235,7 +243,22 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Helmet - sicurezza headers
-app.use(helmet({ contentSecurityPolicy: false })); // CSP disabilitato per CDN Tailwind/Alpine
+const cspConnectSrc = ["'self'"];
+if (process.env.NODE_ENV !== 'production') cspConnectSrc.push('ws:', 'wss:');
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      "default-src": ["'self'"],
+      "script-src": ["'self'", "'unsafe-inline'", 'https://cdn.tailwindcss.com', 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
+      "style-src": ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdn.jsdelivr.net'],
+      "font-src": ["'self'", 'data:', 'https://fonts.gstatic.com'],
+      "img-src": ["'self'", 'data:', 'blob:'],
+      "connect-src": cspConnectSrc,
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
 
 // Middleware
 app.use(express.urlencoded({ extended: true }));
@@ -1382,19 +1405,23 @@ server {
     output.push('File generato: ' + tmpPath);
 
     try {
-      execSync(`sudo cp ${destPath} ${backupPath}`, { encoding: 'utf8' });
+      execFileSync('sudo', ['cp', destPath, backupPath], { encoding: 'utf8' });
       output.push('Backup config esistente: ' + backupPath);
     } catch (_) {}
-    execSync(`sudo cp ${tmpPath} ${destPath}`, { encoding: 'utf8' });
+    execFileSync('sudo', ['cp', tmpPath, destPath], { encoding: 'utf8' });
     output.push('Copiato in: ' + destPath);
 
-    execSync(`sudo ln -sf ${destPath} /etc/nginx/sites-enabled/${domain}.conf`, { encoding: 'utf8' });
+    execFileSync('sudo', ['ln', '-sf', destPath, `/etc/nginx/sites-enabled/${domain}.conf`], { encoding: 'utf8' });
     output.push('Symlink creato in sites-enabled');
 
     if (ssl) {
       try {
         const certbotEmail = process.env.CR_CONTACT_EMAIL || `admin@${domain}`;
-        execSync(`sudo certbot certonly --nginx -d ${domain} --non-interactive --agree-tos --email ${certbotEmail} 2>&1`, { encoding: 'utf8' });
+        execFileSync(
+          'sudo',
+          ['certbot', 'certonly', '--nginx', '-d', domain, '--non-interactive', '--agree-tos', '--email', certbotEmail],
+          { encoding: 'utf8' }
+        );
         output.push('Certificato SSL ottenuto con Certbot');
         const httpsBlock = `
 # HTTPS - abilitato da Certbot
@@ -1419,16 +1446,16 @@ server {
 }
 `;
         await fs.writeFile(tmpPath, httpBlock + httpsBlock, 'utf8');
-        execSync(`sudo cp ${tmpPath} ${destPath}`, { encoding: 'utf8' });
+        execFileSync('sudo', ['cp', tmpPath, destPath], { encoding: 'utf8' });
       } catch (certErr) {
         output.push('Certbot fallito (certificati potrebbero esistere già): ' + (certErr.message || certErr));
       }
     }
 
-    execSync('sudo nginx -t 2>&1', { encoding: 'utf8' });
+    execFileSync('sudo', ['nginx', '-t'], { encoding: 'utf8' });
     output.push('nginx -t OK');
 
-    execSync('sudo /bin/systemctl reload nginx 2>&1', { encoding: 'utf8' });
+    execFileSync('sudo', ['/bin/systemctl', 'reload', 'nginx'], { encoding: 'utf8' });
     output.push('Nginx ricaricato');
 
     await audit('nginx_generate', { user: req.session?.user, domain, port: portNum, ssl: !!ssl });
@@ -1467,9 +1494,9 @@ app.post('/api/nginx-rollback', requireAuth, async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Dominio non valido' });
     }
     const destPath = `/etc/nginx/sites-available/${domain}.conf`;
-    execSync(`sudo cp ${backupPath} ${destPath}`, { encoding: 'utf8' });
-    execSync('sudo nginx -t 2>&1', { encoding: 'utf8' });
-    execSync('sudo /bin/systemctl reload nginx 2>&1', { encoding: 'utf8' });
+    execFileSync('sudo', ['cp', backupPath, destPath], { encoding: 'utf8' });
+    execFileSync('sudo', ['nginx', '-t'], { encoding: 'utf8' });
+    execFileSync('sudo', ['/bin/systemctl', 'reload', 'nginx'], { encoding: 'utf8' });
     await audit('nginx_rollback', { user: req.session?.user, domain, backupPath });
     res.json({ ok: true });
   } catch (err) {
@@ -2340,13 +2367,34 @@ function formatUptime(ms) {
 
 const httpServer = http.createServer(app);
 
+function parseAllowedOrigins(raw) {
+  return String(raw || '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+const allowedOrigins = parseAllowedOrigins(process.env.CR_ALLOWED_ORIGINS);
+function isOriginAllowed(origin) {
+  if (!origin) return true;
+  if (allowedOrigins.length === 0) return true;
+  return allowedOrigins.includes(origin);
+}
+
 const io = new Server(httpServer, {
   path: '/socket.io',
-  cors: { origin: '*' },
+  cors: {
+    origin: (origin, callback) => callback(isOriginAllowed(origin) ? null : new Error('Origin not allowed'), isOriginAllowed(origin)),
+    credentials: true,
+  },
 });
 
 // Socket.io session middleware - verifica autenticazione
 io.use((socket, next) => {
+  const origin = socket.handshake.headers.origin;
+  if (!isOriginAllowed(origin)) {
+    return next(new Error('Forbidden origin'));
+  }
   const res = {};
   res.setHeader = () => {};
   res.end = () => {};
