@@ -29,6 +29,24 @@ openssl rand -hex 32
 # Copia l'output in SESSION_SECRET nel .env
 ```
 
+Configura anche Redis per lo store sessioni (obbligatorio in produzione):
+
+```env
+REDIS_URL=redis://127.0.0.1:6379
+REDIS_PREFIX=cr:sess:
+SESSION_REDIS_REQUIRED=true
+```
+
+Installazione Redis (server Ubuntu):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y redis-server redis-tools
+sudo systemctl enable redis-server
+sudo systemctl restart redis-server
+redis-cli ping   # atteso: PONG
+```
+
 ### 3. Avvia con PM2
 
 Control Room è incluso nella **configurazione PM2 centralizzata** `~/ecosystem.config.js` (porta 3005, max_memory 256M). Per avviare tutte le app del server:
@@ -134,3 +152,4 @@ Per Certbot, opzionalmente imposta `CR_CONTACT_EMAIL` nel `.env` (email per Let'
 - Non committare mai il file `.env`
 - Non usare credenziali di esempio in produzione
 - SSL obbligatorio in produzione
+- Sessioni in produzione su Redis (`connect-redis`), non su MemoryStore

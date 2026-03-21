@@ -17,6 +17,8 @@ const { execSync, execFileSync, spawn } = require('child_process');
 
 const express = require('express');
 const session = require('express-session');
+const { RedisStore } = require('connect-redis');
+const { createClient } = require('redis');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { Server } = require('socket.io');
@@ -78,10 +80,18 @@ const PORT = process.env.PORT || 3005;
 const AUTH_USER = process.env.AUTH_USER || 'Matt91';
 const AUTH_PASSWORD = process.env.AUTH_PASSWORD || 'MattCONTROL1!';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change-me-in-production';
+const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+const REDIS_PREFIX = process.env.REDIS_PREFIX || 'cr:sess:';
+const REDIS_CONNECT_TIMEOUT_MS = parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS || '5000', 10);
+const SESSION_REDIS_REQUIRED = process.env.SESSION_REDIS_REQUIRED !== 'false' && process.env.NODE_ENV === 'production';
 const SESSION_IDLE_MINUTES = parseInt(process.env.SESSION_IDLE_MINUTES || '120', 10);
 const SESSION_IDLE_MS = Math.max(5, SESSION_IDLE_MINUTES) * 60 * 1000;
 const AUDIT_LOG_PATH = path.join(__dirname, 'logs', 'audit-events.log');
 const DEFAULT_PANIC_DURATION_MIN = parseInt(process.env.PANIC_MODE_DURATION_MIN || '30', 10);
+let redisClient = null;
+let redisReady = false;
+let redisLastError = '';
+let redisLastOkAt = '';
 
 const HIGH_RISK_PHRASES = Object.freeze({
   restartAll: 'RESTART-ALL',
@@ -224,18 +234,50 @@ app.use(express.json());
 const SESSION_MAX_AGE_DAYS = parseInt(process.env.SESSION_MAX_AGE_DAYS || '7', 10);
 const SESSION_MAX_AGE_MS = SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 
-const sessionMiddleware = session({
+function setupRedisClient() {
+  const client = createClient({
+    url: REDIS_URL,
+    socket: {
+      connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+      reconnectStrategy: (retries) => Math.min(retries * 200, 2000),
+    },
+  });
+  client.on('ready', () => {
+    redisReady = true;
+    redisLastError = '';
+    redisLastOkAt = new Date().toISOString();
+    logEvent('redis_ready', { url: REDIS_URL });
+  });
+  client.on('error', (err) => {
+    redisReady = false;
+    redisLastError = err.message;
+    logEvent('redis_error', { error: err.message });
+  });
+  return client;
+}
+
+redisClient = setupRedisClient();
+const redisStore = new RedisStore({
+  client: redisClient,
+  prefix: REDIS_PREFIX,
+});
+
+const sessionConfig = {
   name: 'controlroom.sid',
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  rolling: true,
+  store: redisStore,
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     maxAge: SESSION_MAX_AGE_MS,
   },
-});
+};
+
+const sessionMiddleware = session(sessionConfig);
 app.use(sessionMiddleware);
 
 // Rate limit sul login (brute force protection)
@@ -788,6 +830,43 @@ app.get('/api/health/summary', requireAuth, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/redis-health', requireAuth, async (req, res) => {
+  try {
+    if (!redisClient) {
+      return res.status(500).json({ ok: false, status: 'not_configured', error: 'Redis client non inizializzato' });
+    }
+    let pong = '';
+    try {
+      pong = await redisClient.ping();
+      redisReady = pong === 'PONG';
+      if (redisReady) redisLastOkAt = new Date().toISOString();
+    } catch (err) {
+      redisReady = false;
+      redisLastError = err.message;
+      throw err;
+    }
+    res.json({
+      ok: true,
+      status: redisReady ? 'ready' : 'degraded',
+      ping: pong,
+      prefix: REDIS_PREFIX,
+      url: REDIS_URL,
+      lastOkAt: redisLastOkAt || null,
+      lastError: redisLastError || null,
+    });
+  } catch (err) {
+    res.status(503).json({
+      ok: false,
+      status: 'error',
+      error: err.message,
+      prefix: REDIS_PREFIX,
+      url: REDIS_URL,
+      lastOkAt: redisLastOkAt || null,
+      lastError: redisLastError || err.message,
+    });
   }
 });
 
@@ -2020,10 +2099,26 @@ function shouldNotifyProcess(processName, eventType, debounceMs = NOTIFY_DEBOUNC
 
 // ============ STARTUP ============
 
-pm2.connect((err) => {
+pm2.connect(async (err) => {
   if (err) {
     console.error('PM2 connect failed:', err);
     process.exit(1);
+  }
+  try {
+    await redisClient.connect();
+    const ping = await redisClient.ping();
+    if (ping !== 'PONG') throw new Error(`Ping Redis inatteso: ${ping}`);
+    redisReady = true;
+    redisLastOkAt = new Date().toISOString();
+    logEvent('redis_startup_check_ok', { ping });
+  } catch (redisErr) {
+    redisReady = false;
+    redisLastError = redisErr.message;
+    logEvent('redis_startup_check_error', { error: redisErr.message, required: SESSION_REDIS_REQUIRED });
+    if (SESSION_REDIS_REQUIRED) {
+      console.error('Redis required in production but not reachable. Aborting startup.');
+      process.exit(1);
+    }
   }
   registerCronJobs();
   registerDailyCheckFromSettings().catch((e) => {
@@ -2075,6 +2170,13 @@ process.on('SIGINT', () => {
     p.out?.kill();
     p.err?.kill();
   });
-  pm2.disconnect();
-  process.exit(0);
+  Promise.resolve()
+    .then(async () => {
+      if (redisClient?.isOpen) await redisClient.quit();
+    })
+    .catch(() => {})
+    .finally(() => {
+      pm2.disconnect();
+      process.exit(0);
+    });
 });

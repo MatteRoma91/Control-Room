@@ -67,6 +67,7 @@
   </div>
   <div class="flex flex-wrap gap-4 items-center">
     <span id="nginxStatus" class="text-sm text-slate-400">Nginx: -</span>
+    <span id="redisStatus" class="text-sm text-slate-400">Redis: -</span>
     <button
       id="btnNginxReload"
       onclick="nginxReload(this)"
@@ -429,9 +430,10 @@
 
   async function loadSystem() {
     try {
-      const [sysRes, nginxRes] = await Promise.all([fetch('/api/system'), fetch('/api/nginx-status')]);
+      const [sysRes, nginxRes, redisRes] = await Promise.all([fetch('/api/system'), fetch('/api/nginx-status'), fetch('/api/redis-health')]);
       const sys = await sysRes.json();
       const nginx = await nginxRes.json();
+      const redis = await redisRes.json();
       if (sys.uptime !== undefined) {
         document.getElementById('sysUptime').textContent = sys.uptime;
         document.getElementById('sysCpu').textContent = sys.loadAvg1;
@@ -439,6 +441,10 @@
         document.getElementById('sysDisk').textContent = sys.diskUsedGB + ' / ' + sys.diskTotalGB + ' GB (' + sys.diskPercent + '%)';
       }
       document.getElementById('nginxStatus').textContent = 'Nginx: ' + (nginx.active ? 'attivo' : 'non attivo');
+      const redisText = redis.ok
+        ? `Redis: ready (${redis.ping || 'PONG'})`
+        : `Redis: errore (${redis.error || 'n/d'})`;
+      document.getElementById('redisStatus').textContent = redisText;
     } catch (e) {
       document.getElementById('sysUptime').textContent = 'Errore';
     }

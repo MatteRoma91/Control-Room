@@ -1,6 +1,12 @@
 <section class="mb-8" aria-labelledby="settings-heading">
   <h1 id="settings-heading" class="text-2xl font-bold text-slate-200 mb-6">Impostazioni</h1>
 
+  <div class="rounded-lg border border-slate-700 bg-slate-800 p-6 mb-8 max-w-2xl">
+    <h2 class="text-lg font-semibold text-slate-200 mb-2">Session Store Redis</h2>
+    <p id="redisHealthText" class="text-sm text-slate-300 mb-3">Verifica stato Redis...</p>
+    <button type="button" id="btnCheckRedisHealth" class="px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 text-sm">Controlla stato Redis</button>
+  </div>
+
   <!-- Autenticazione a due fattori -->
   <div class="rounded-lg border border-slate-700 bg-slate-800 p-6 mb-8 max-w-2xl">
     <h2 class="text-lg font-semibold text-slate-200 mb-4">Autenticazione a due fattori</h2>
@@ -172,6 +178,25 @@
 </section>
 
 <script>
+  async function loadRedisHealth() {
+    const el = document.getElementById('redisHealthText');
+    if (!el) return;
+    el.textContent = 'Verifica in corso...';
+    try {
+      const res = await fetch('/api/redis-health');
+      const json = await res.json();
+      if (json.ok) {
+        el.textContent = `Stato: READY | prefix=${json.prefix} | lastOk=${json.lastOkAt || '-'}`;
+      } else {
+        el.textContent = `Stato: ERRORE | ${json.error || 'n/d'}`;
+      }
+    } catch (err) {
+      el.textContent = 'Errore verifica Redis: ' + err.message;
+    }
+  }
+  document.getElementById('btnCheckRedisHealth')?.addEventListener('click', loadRedisHealth);
+  loadRedisHealth();
+
   document.getElementById('webhookType').addEventListener('change', function() {
     const isWebhook = this.value === 'discord' || this.value === 'slack';
     document.getElementById('discordFields').classList.toggle('hidden', !isWebhook);
