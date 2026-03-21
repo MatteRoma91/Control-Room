@@ -17,30 +17,46 @@
     function crSidebarShell() {
       return {
         sidebarOpen: false,
+        /** Mobile drawer chiuso: inert toglie hit-test su WebKit (oltre a pointer-events CSS). */
+        drawerInert: false,
         toggleSidebar() {
           this.sidebarOpen = !this.sidebarOpen;
           // #region agent log
           if (typeof fetch === 'function') {
-            fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:toggleSidebar',message:'hamburger toggle',data:{sidebarOpen:this.sidebarOpen,iw:typeof window!=='undefined'&&typeof window.innerWidth==='number'?window.innerWidth:null,vvW:typeof window!=='undefined'&&window.visualViewport?window.visualViewport.width:null},timestamp:Date.now(),runId:'alpine-click',hypothesisId:'H2'})}).catch(function(){});
+            fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:toggleSidebar',message:'hamburger toggle',data:{sidebarOpen:this.sidebarOpen,drawerInert:this.drawerInert,iw:typeof window!=='undefined'&&typeof window.innerWidth==='number'?window.innerWidth:null,vvW:typeof window!=='undefined'&&window.visualViewport?window.visualViewport.width:null},timestamp:Date.now(),runId:'inert-drawer',hypothesisId:'H2'})}).catch(function(){});
           }
           // #endregion
         },
         init() {
           var self = this;
+          function syncDrawerInert() {
+            var narrow = typeof window !== 'undefined' && typeof window.innerWidth === 'number' && window.innerWidth < 768;
+            self.drawerInert = narrow && !self.sidebarOpen;
+          }
           function closeDrawerIfDesktop() {
             if (typeof window !== 'undefined' && typeof window.innerWidth === 'number' && window.innerWidth >= 768) {
               self.sidebarOpen = false;
             }
           }
+          function onResize() {
+            closeDrawerIfDesktop();
+            syncDrawerInert();
+          }
           closeDrawerIfDesktop();
+          syncDrawerInert();
+          if (typeof self.$watch === 'function') {
+            self.$watch('sidebarOpen', function () {
+              syncDrawerInert();
+            });
+          }
           // #region agent log
           if (typeof fetch === 'function' && typeof window !== 'undefined' && typeof window.innerWidth === 'number') {
-            fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:init',message:'alpine init',data:{iw:window.innerWidth,vvW:window.visualViewport?window.visualViewport.width:null,sidebarOpen:self.sidebarOpen},timestamp:Date.now(),runId:'alpine-click',hypothesisId:'H1'})}).catch(function(){});
+            fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:init',message:'alpine init',data:{iw:window.innerWidth,vvW:window.visualViewport?window.visualViewport.width:null,sidebarOpen:self.sidebarOpen,drawerInert:self.drawerInert},timestamp:Date.now(),runId:'inert-drawer',hypothesisId:'H1'})}).catch(function(){});
           }
           // #endregion
-          window.addEventListener('resize', closeDrawerIfDesktop, { passive: true });
+          window.addEventListener('resize', onResize, { passive: true });
           if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', closeDrawerIfDesktop, { passive: true });
+            window.visualViewport.addEventListener('resize', onResize, { passive: true });
           }
         },
       };
@@ -54,7 +70,7 @@
   <%- typeof headExtra !== 'undefined' ? headExtra : '' %>
 </head>
 <body class="min-h-screen bg-cr-canvas text-cr-text font-sans antialiased" x-data="crSidebarShell()">
-  <nav class="fixed top-0 left-0 right-0 z-50 bg-cr-nav border-b border-cr-border px-3 md:px-4 py-2.5 flex justify-between items-center gap-2 shadow-sm isolate">
+  <nav id="cr-top-nav" class="fixed top-0 left-0 right-0 z-50 bg-cr-nav border-b border-cr-border px-3 md:px-4 py-2.5 flex justify-between items-center gap-2 shadow-sm isolate">
     <div class="flex items-center gap-2 md:gap-3 min-w-0">
       <button
         type="button"
@@ -121,6 +137,7 @@
     id="cr-sidebar"
     class="fixed inset-y-0 left-0 z-30 w-[17rem] pointer-events-none md:pointer-events-auto bg-cr-nav border-r border-cr-border shadow-lg md:shadow-none"
     :class="sidebarOpen ? 'cr-drawer-open' : ''"
+    :inert="drawerInert"
     aria-label="Navigazione principale"
   >
     <div class="cr-sidebar-inner pointer-events-auto flex min-h-0 flex-col mt-14 h-[calc(100%-3.5rem)] md:mt-0 md:h-full md:pt-16">

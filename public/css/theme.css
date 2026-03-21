@@ -129,6 +129,11 @@ html.dark .cr-thead {
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* Sopra drawer (z-30), sotto overlay modali (z-50) */
+  #cr-top-nav {
+    z-index: 45 !important;
+  }
 }
 
 @media (min-width: 768px) {
