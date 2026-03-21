@@ -107,7 +107,7 @@ Poi modifica `/etc/nginx/sites-available/matteroma.duckdns.conf`:
    - **Porte in ascolto**: tabella siti con porta backend (3000, 3001, 3002, 3005) e Nginx (80, 443), verificata con `ss` sul server
    - **Health check**: verifica via HTTP le webapp con URL pubblico (incluso Control Room)
    - **Link rapidi** alle webapp
-   - **Processi PM2**: aggiornamento live ogni 3s, start, stop, restart singoli, visualizzazione log
+   - **Processi PM2**: griglia di **card mini-dashboard** (desktop e mobile) con metriche (CPU, RAM, uptime, restart), stato crash loop, badge modulo, azioni Start/Stop/Restart/Flush/Azzera restart; aggiornamento live ogni 3s; link al dettaglio processo e log
    - **Processi di sistema**: top 25 per CPU (nginx, node, systemd, ecc.), tabella ordinabile cliccando sulle colonne (PID, Nome, CPU %, RAM, Utente)
    - **Reload Nginx** (richiede sudoers configurato)
 
@@ -139,17 +139,30 @@ Per Certbot, opzionalmente imposta `CR_CONTACT_EMAIL` nel `.env` (email per Let'
 
 ## Funzionalità
 
-- **Monitoraggio live**: Grafici CPU/RAM (scala 0–100%), tabelle PM2 e processi di sistema con refresh manuale o "Aggiorna tutto"
+- **Monitoraggio live**: Grafici CPU/RAM (scala 0–100%), **card PM2** (griglia responsive) e tabella processi di sistema con refresh manuale o "Aggiorna tutto"
 - **Processi di sistema**: Top 25 per CPU, ordinamento cliccando sulle intestazioni di colonna
 - **Editor .env**: Modifica variabili d'ambiente con valori mascherati (Rivela) e backup `.env.bak`
 - **Cron Jobs**: Crea e personalizza job pianificati (PM2 restart, backup DB, comandi)
-- **Notifiche**: Discord, Slack o Telegram su crash/restart dei processi
+- **Notifiche**: Discord, Slack o Telegram; master globali (crash, loop restart, eccezioni, stderr, runbook, incidenti, security) e **filtri per processo PM2** in Impostazioni (ambito «tutte le app» vs «solo app selezionate», matrice per disattivare tipi per singola app, sincronizzazione elenco da PM2). Con ambito ristretto, anche le notifiche runbook «recover» per singola app rispettano l’elenco. Persistenza in `settings.json` (non committare URL/token in repo)
+- **Feedback UI**: toast con icone e durate differenziate; stati **In corso…** / **Salvato ✓** su salvataggio impostazioni e pulsanti di verifica dove applicabile
 - **Firewall IP**: Whitelist e Panic Mode per restringere l'accesso
 - **Nginx Generator**: Form per generare e applicare config per nuovi domini
 - **Incident Center**: Gestione incidenti con stato open/ack/resolved e timeline operativa
 - **Automation Suite**: Runbook multi-app (soft/full/safe-rollback), batch mode e storico esecuzioni
 - **Analytics & Capacity**: KPI operativi, runbook success rate, capacity risk
 - **Maintenance & Security**: Session inventory/revoke, log explorer e diagnostica guidata
+
+### Riferimento `settings.json` – notifiche PM2 (operatori)
+
+Oltre a `webhookType`, `webhookUrl`, token Telegram e i flag `notifyOn*` globali, la Control Room persiste:
+
+| Chiave | Tipo | Significato |
+|--------|------|-------------|
+| `notifyPm2Scope` | `"all"` \| `"onlyListed"` | Con `onlyListed`, solo i processi in `notifyPm2OnlyApps` possono generare notifiche PM2 (exit, loop, eccezione, stderr). Lista vuota = nessuna notifica PM2 di quel tipo. |
+| `notifyPm2OnlyApps` | `string[]` | Nomi processo PM2 consentiti quando lo scope è `onlyListed` (max 64 voci, nomi normalizzati). |
+| `notifyPm2PerApp` | oggetto | Per ogni nome processo, campi opzionali `crash`, `restartLoop`, `exception`, `stderr`: valore **`false`** disattiva quel tipo per quell’app (i master globali restano il primo filtro). |
+
+Il markup delle card PM2 in dashboard è condiviso tra SSR (partial EJS) e aggiornamento client; suffissi `m`/`d` sugli `id` delle card evitano duplicati tra vista mobile e desktop nello stesso documento.
 
 ## Sicurezza
 
