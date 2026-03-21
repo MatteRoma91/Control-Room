@@ -13,54 +13,41 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
   <link rel="manifest" href="/manifest.json">
   <script>
-    /** Drawer: posizione da CSS (theme.css) + classe cr-drawer-open; niente mdUp / x-bind:style. */
-    function crSidebarShell() {
-      return {
-        sidebarOpen: false,
-        /** Mobile drawer chiuso: inert toglie hit-test su WebKit (oltre a pointer-events CSS). */
-        drawerInert: false,
-        toggleSidebar() {
-          this.sidebarOpen = !this.sidebarOpen;
-          // #region agent log
-          if (typeof fetch === 'function') {
-            fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:toggleSidebar',message:'hamburger toggle',data:{sidebarOpen:this.sidebarOpen,drawerInert:this.drawerInert,iw:typeof window!=='undefined'&&typeof window.innerWidth==='number'?window.innerWidth:null,vvW:typeof window!=='undefined'&&window.visualViewport?window.visualViewport.width:null},timestamp:Date.now(),runId:'inert-drawer',hypothesisId:'H2'})}).catch(function(){});
-          }
-          // #endregion
-        },
-        init() {
-          var self = this;
-          function syncDrawerInert() {
-            var narrow = typeof window !== 'undefined' && typeof window.innerWidth === 'number' && window.innerWidth < 768;
-            self.drawerInert = narrow && !self.sidebarOpen;
-          }
-          function closeDrawerIfDesktop() {
-            if (typeof window !== 'undefined' && typeof window.innerWidth === 'number' && window.innerWidth >= 768) {
-              self.sidebarOpen = false;
-            }
-          }
-          function onResize() {
-            closeDrawerIfDesktop();
-            syncDrawerInert();
-          }
-          closeDrawerIfDesktop();
-          syncDrawerInert();
-          if (typeof self.$watch === 'function') {
-            self.$watch('sidebarOpen', function () {
-              syncDrawerInert();
-            });
-          }
-          // #region agent log
-          if (typeof fetch === 'function' && typeof window !== 'undefined' && typeof window.innerWidth === 'number') {
-            fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:init',message:'alpine init',data:{iw:window.innerWidth,vvW:window.visualViewport?window.visualViewport.width:null,sidebarOpen:self.sidebarOpen,drawerInert:self.drawerInert},timestamp:Date.now(),runId:'inert-drawer',hypothesisId:'H1'})}).catch(function(){});
-          }
-          // #endregion
-          window.addEventListener('resize', onResize, { passive: true });
-          if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', onResize, { passive: true });
-          }
-        },
-      };
-    }
+    /** Mobile drawer: checkbox + label (no Alpine). Desktop: checkbox ignorato da CSS. */
+    (function () {
+      function crCloseMobileDrawer() {
+        var c = document.getElementById('cr-drawer-toggle');
+        if (c) c.checked = false;
+      }
+      window.crCloseMobileDrawer = crCloseMobileDrawer;
+
+      function crSyncDrawerDesktop() {
+        var c = document.getElementById('cr-drawer-toggle');
+        if (!c || typeof window.innerWidth !== 'number') return;
+        if (window.innerWidth >= 768 && c.checked) c.checked = false;
+      }
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') crCloseMobileDrawer();
+      });
+      window.addEventListener('resize', crSyncDrawerDesktop, { passive: true });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', crSyncDrawerDesktop, { passive: true });
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        var c = document.getElementById('cr-drawer-toggle');
+        crSyncDrawerDesktop();
+        // #region agent log
+        if (typeof fetch === 'function' && c) {
+          fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:init',message:'drawer dom ready',data:{iw:window.innerWidth,drawerOpen:c.checked},timestamp:Date.now(),runId:'checkbox-drawer',hypothesisId:'H1'})}).catch(function(){});
+          c.addEventListener('change', function () {
+            fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:drawer-checkbox',message:'drawer checkbox',data:{open:c.checked,iw:window.innerWidth},timestamp:Date.now(),runId:'checkbox-drawer',hypothesisId:'H2'})}).catch(function(){});
+          });
+        }
+        // #endregion
+      });
+    })();
   </script>
   <%- include('partials/head-common') %>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
@@ -69,20 +56,22 @@
   <script defer src="/js/cr-theme.js"></script>
   <%- typeof headExtra !== 'undefined' ? headExtra : '' %>
 </head>
-<body class="min-h-screen bg-cr-canvas text-cr-text font-sans antialiased" x-data="crSidebarShell()">
+<body class="min-h-screen bg-cr-canvas text-cr-text font-sans antialiased">
+  <input type="checkbox" id="cr-drawer-toggle" class="peer sr-only" autocomplete="off" tabindex="-1" aria-hidden="true"/>
   <nav id="cr-top-nav" class="fixed top-0 left-0 right-0 z-50 bg-cr-nav border-b border-cr-border px-3 md:px-4 py-2.5 flex justify-between items-center gap-2 shadow-sm isolate">
     <div class="flex items-center gap-2 md:gap-3 min-w-0">
-      <button
-        type="button"
+      <label
+        for="cr-drawer-toggle"
         id="cr-nav-menu-btn"
         class="md:hidden touch-manipulation cursor-pointer p-2 rounded-lg hover:bg-cr-navHover text-cr-text focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center relative z-10"
+        role="button"
         aria-label="Apri o chiudi menu"
-        @click.stop="toggleSidebar()"
+        aria-controls="cr-sidebar"
       >
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
-      </button>
+      </label>
       <div class="min-w-0 hidden sm:block">
         <h1 class="text-lg md:text-xl font-bold tracking-tight truncate text-cr-text">Control Room</h1>
         <p class="hidden md:block text-xs text-cr-muted truncate">Ops console · recovery · incidenti · sicurezza</p>
@@ -119,25 +108,15 @@
     </div>
   </nav>
 
-  <div
-    x-show="sidebarOpen"
-    x-transition:enter="transition-opacity duration-200"
-    x-transition:leave="transition-opacity duration-200"
-    x-transition:enter-start="opacity-0"
-    x-transition:enter-end="opacity-100"
-    x-transition:leave-start="opacity-100"
-    x-transition:leave-end="opacity-0"
-    @click="sidebarOpen = false"
-    @keydown.escape.window="sidebarOpen = false"
-    class="md:hidden fixed inset-0 z-20 bg-black/40 dark:bg-black/50"
-    style="display: none;"
+  <label
+    for="cr-drawer-toggle"
+    id="cr-drawer-backdrop"
+    class="md:hidden fixed inset-0 z-[25] bg-black/40 opacity-0 pointer-events-none transition-opacity duration-200 dark:bg-black/50 peer-checked:opacity-100 peer-checked:pointer-events-auto"
     aria-hidden="true"
-  ></div>
+  ></label>
   <aside
     id="cr-sidebar"
     class="fixed inset-y-0 left-0 z-30 w-[17rem] pointer-events-none md:pointer-events-auto bg-cr-nav border-r border-cr-border shadow-lg md:shadow-none"
-    :class="sidebarOpen ? 'cr-drawer-open' : ''"
-    :inert="drawerInert"
     aria-label="Navigazione principale"
   >
     <div class="cr-sidebar-inner pointer-events-auto flex min-h-0 flex-col mt-14 h-[calc(100%-3.5rem)] md:mt-0 md:h-full md:pt-16">
@@ -145,7 +124,7 @@
     </div>
   </aside>
 
-  <main class="pt-14 md:pt-16 md:pl-[17rem] min-h-screen overflow-x-hidden">
+  <main class="relative z-0 pt-14 md:pt-16 md:pl-[17rem] min-h-screen overflow-x-hidden">
     <div class="p-4 md:p-6 max-w-7xl mx-auto">
       <%- include('partials/toast') %>
       <%- include('partials/confirm-modal') %>
