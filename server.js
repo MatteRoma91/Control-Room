@@ -402,12 +402,15 @@ async function ipWhitelistMiddleware(req, res, next) {
 app.use(ipWhitelistMiddleware);
 
 // Agent debug: append NDJSON (session fccd24). Auth-only; remove after menu verification.
-const AGENT_DEBUG_LOG = path.join(os.homedir(), '.cursor', 'debug-fccd24.log');
+const fssync = require('fs');
+const AGENT_DEBUG_LOG_DIR = path.join(os.homedir(), '.cursor');
+const AGENT_DEBUG_LOG = path.join(AGENT_DEBUG_LOG_DIR, 'debug-fccd24.log');
 app.post('/api/_agent-debug', requireAuth, (req, res) => {
   try {
     const payload = req.body && typeof req.body === 'object' ? req.body : {};
     const line = JSON.stringify({ ...payload, receivedAt: Date.now() }) + '\n';
-    require('fs').appendFileSync(AGENT_DEBUG_LOG, line);
+    fssync.mkdirSync(AGENT_DEBUG_LOG_DIR, { recursive: true });
+    fssync.appendFileSync(AGENT_DEBUG_LOG, line);
   } catch (err) {
     logEvent('agent_debug_append_failed', { error: String(err && err.message) });
   }

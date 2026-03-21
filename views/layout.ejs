@@ -21,7 +21,7 @@
           this.sidebarOpen = !this.sidebarOpen;
           // #region agent log
           if (typeof fetch === 'function') {
-            fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:toggleSidebar',message:'hamburger toggle',data:{sidebarOpen:this.sidebarOpen,iw:typeof window!=='undefined'&&typeof window.innerWidth==='number'?window.innerWidth:null,vvW:typeof window!=='undefined'&&window.visualViewport?window.visualViewport.width:null},timestamp:Date.now(),runId:'tap-fix',hypothesisId:'H2'})}).catch(function(){});
+            fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:toggleSidebar',message:'hamburger toggle',data:{sidebarOpen:this.sidebarOpen,iw:typeof window!=='undefined'&&typeof window.innerWidth==='number'?window.innerWidth:null,vvW:typeof window!=='undefined'&&window.visualViewport?window.visualViewport.width:null},timestamp:Date.now(),runId:'alpine-click',hypothesisId:'H2'})}).catch(function(){});
           }
           // #endregion
         },
@@ -35,31 +35,13 @@
           closeDrawerIfDesktop();
           // #region agent log
           if (typeof fetch === 'function' && typeof window !== 'undefined' && typeof window.innerWidth === 'number') {
-            fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:init',message:'alpine init',data:{iw:window.innerWidth,vvW:window.visualViewport?window.visualViewport.width:null,sidebarOpen:self.sidebarOpen},timestamp:Date.now(),runId:'tap-fix',hypothesisId:'H1'})}).catch(function(){});
+            fetch('/api/_agent-debug',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({sessionId:'fccd24',location:'layout.ejs:init',message:'alpine init',data:{iw:window.innerWidth,vvW:window.visualViewport?window.visualViewport.width:null,sidebarOpen:self.sidebarOpen},timestamp:Date.now(),runId:'alpine-click',hypothesisId:'H1'})}).catch(function(){});
           }
           // #endregion
           window.addEventListener('resize', closeDrawerIfDesktop, { passive: true });
           if (window.visualViewport) {
             window.visualViewport.addEventListener('resize', closeDrawerIfDesktop, { passive: true });
           }
-          // Menu: pointerup (touch/pen/mouse) + click solo se non già gestito (tastiera / click sintetico)
-          var bindMenu = function () {
-            var menuBtn = document.getElementById('cr-nav-menu-btn');
-            if (!menuBtn || menuBtn.getAttribute('data-cr-nav-bound') === '1') return;
-            menuBtn.setAttribute('data-cr-nav-bound', '1');
-            var lastPointerToggle = 0;
-            menuBtn.addEventListener('pointerup', function (e) {
-              if (e.pointerType === 'mouse' && e.button !== 0) return;
-              lastPointerToggle = Date.now();
-              self.toggleSidebar();
-            });
-            menuBtn.addEventListener('click', function () {
-              if (Date.now() - lastPointerToggle < 500) return;
-              self.toggleSidebar();
-            });
-          };
-          if (typeof self.$nextTick === 'function') self.$nextTick(bindMenu);
-          else queueMicrotask(bindMenu);
         },
       };
     }
@@ -79,6 +61,7 @@
         id="cr-nav-menu-btn"
         class="md:hidden touch-manipulation cursor-pointer p-2 rounded-lg hover:bg-cr-navHover text-cr-text focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center relative z-10"
         aria-label="Apri o chiudi menu"
+        @click.stop="toggleSidebar()"
       >
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>

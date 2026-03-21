@@ -117,11 +117,17 @@ html.dark .cr-thead {
     transform: translateX(0);
   }
   /*
-   * Il figlio con pointer-events-auto riceve comunque hit-test; con transform su WebKit
-   * può restare una zona “invisibile” sopra l’header. Chiudi gli eventi finché il drawer è chiuso.
+   * Qualsiasi discendente con pointer-events:auto può rubare tocchi sopra l’header (WebKit + transform).
+   * Drawer chiuso: nessun hit-test sull’intero sottoalbero.
    */
-  #cr-sidebar:not(.cr-drawer-open) .cr-sidebar-inner {
+  #cr-sidebar:not(.cr-drawer-open),
+  #cr-sidebar:not(.cr-drawer-open) * {
     pointer-events: none !important;
+  }
+
+  #cr-nav-menu-btn {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
