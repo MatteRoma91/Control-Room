@@ -1,36 +1,36 @@
-<a href="/" class="inline-block mb-4 text-emerald-400 hover:underline focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900 rounded">
+<a href="/" class="inline-block mb-4 text-cr-accent hover:underline focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas rounded">
   &larr; Dashboard
 </a>
 
 <section class="mb-6" aria-labelledby="process-header">
   <div class="flex flex-wrap items-center gap-4 mb-4">
     <h1 id="process-header" class="text-2xl font-bold font-mono"><%= process.name %></h1>
-    <span class="px-2 py-0.5 rounded text-xs font-medium <%= process.status === 'online' ? 'bg-emerald-900/60 text-emerald-300' : process.status === 'stopped' ? 'bg-amber-900/60 text-amber-300' : 'bg-red-900/60 text-red-300' %>">
+    <span class="px-2 py-0.5 rounded text-xs font-medium <%= process.status === 'online' ? 'bg-[var(--cr-success-bg)] text-cr-accent' : process.status === 'stopped' ? 'bg-[var(--cr-warning-bg)] text-cr-warning' : 'bg-[var(--cr-danger-bg)] text-cr-danger' %>">
       <%= process.status %>
     </span>
   </div>
   <div class="flex flex-wrap gap-2">
     <button
       onclick="processAction('start', this)"
-      class="px-3 py-1.5 rounded text-sm bg-emerald-700 hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+      class="px-3 py-1.5 rounded text-sm bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-cr-accent disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Start
     </button>
     <button
       onclick="processAction('stop', this)"
-      class="px-3 py-1.5 rounded text-sm bg-amber-700 hover:bg-amber-600 focus:ring-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
+      class="px-3 py-1.5 rounded text-sm bg-cr-warning hover:opacity-90 text-white dark:text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-cr-warning disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Stop
     </button>
     <button
       onclick="processAction('restart', this)"
-      class="px-3 py-1.5 rounded text-sm bg-blue-700 hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+      class="px-3 py-1.5 rounded text-sm bg-cr-info hover:opacity-90 focus:ring-2 focus:ring-cr-info disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Restart
     </button>
     <button
       onclick="processFlush(this)"
-      class="px-3 py-1.5 rounded text-sm bg-slate-600 hover:bg-slate-500 focus:ring-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
+      class="px-3 py-1.5 rounded text-sm bg-cr-surface2 hover:bg-cr-navHover focus:ring-2 focus:ring-cr-border disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Flush Logs
     </button>
@@ -38,8 +38,8 @@
 </section>
 
 <section aria-labelledby="logs-heading">
-  <h2 id="logs-heading" class="text-lg font-semibold text-slate-200 mb-2">Log Real-time</h2>
-  <div id="terminal" class="rounded-lg border border-slate-700 bg-slate-900 p-2" style="min-height: 400px;"></div>
+  <h2 id="logs-heading" class="text-lg font-semibold text-cr-text mb-2">Log Real-time</h2>
+  <div id="terminal" class="rounded-lg border border-cr-border bg-zinc-950 p-2 shadow-inner" style="min-height: 400px;"></div>
 </section>
 
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>

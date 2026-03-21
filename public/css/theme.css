@@ -1,0 +1,105 @@
+/* Control Room design tokens — light default, .dark on <html> for dark mode */
+
+:root {
+  color-scheme: light;
+  --cr-canvas: #eef2f7;
+  --cr-surface: #ffffff;
+  --cr-surface-2: #e4eaf2;
+  --cr-border: #c1cad8;
+  --cr-text: #0f172a;
+  --cr-text-muted: #5a6b80;
+  --cr-accent: #0d9488;
+  --cr-accent-hover: #0f766e;
+  --cr-success: #059669;
+  --cr-success-bg: rgba(5, 150, 105, 0.12);
+  --cr-danger: #dc2626;
+  --cr-danger-bg: rgba(220, 38, 38, 0.12);
+  --cr-warning: #b45309;
+  --cr-warning-bg: rgba(180, 83, 9, 0.14);
+  --cr-info: #2563eb;
+  --cr-info-bg: rgba(37, 99, 235, 0.12);
+  --cr-nav: #f8fafc;
+  --cr-nav-hover: #e2e8f0;
+  --cr-input-bg: #ffffff;
+  --cr-input-border: #94a3b8;
+  --cr-overlay: rgba(15, 23, 42, 0.5);
+  --cr-code-bg: #f1f5f9;
+  --cr-chart-cpu: #0d9488;
+  --cr-chart-cpu-fill: rgba(13, 148, 136, 0.14);
+  --cr-chart-ram: #2563eb;
+  --cr-chart-ram-fill: rgba(37, 99, 235, 0.14);
+  --cr-chart-grid: rgba(100, 116, 139, 0.22);
+  --cr-chart-tick: var(--cr-text-muted);
+  --cr-theme-color: #0d9488;
+  --cr-ring: var(--cr-accent);
+}
+
+html.dark {
+  color-scheme: dark;
+  --cr-canvas: #070b12;
+  --cr-surface: #101824;
+  --cr-surface-2: #182030;
+  --cr-border: #2a3548;
+  --cr-text: #e8edf4;
+  --cr-text-muted: #8b9aaf;
+  --cr-accent: #2dd4bf;
+  --cr-accent-hover: #5eead4;
+  --cr-success: #34d399;
+  --cr-success-bg: rgba(52, 211, 153, 0.14);
+  --cr-danger: #f87171;
+  --cr-danger-bg: rgba(248, 113, 113, 0.14);
+  --cr-warning: #fbbf24;
+  --cr-warning-bg: rgba(251, 191, 36, 0.12);
+  --cr-info: #60a5fa;
+  --cr-info-bg: rgba(96, 165, 250, 0.14);
+  --cr-nav: #0d1219;
+  --cr-nav-hover: #1a2433;
+  --cr-input-bg: #0c1018;
+  --cr-input-border: #3d4d66;
+  --cr-overlay: rgba(0, 0, 0, 0.6);
+  --cr-code-bg: #080c12;
+  --cr-chart-cpu: #2dd4bf;
+  --cr-chart-cpu-fill: rgba(45, 212, 191, 0.16);
+  --cr-chart-ram: #60a5fa;
+  --cr-chart-ram-fill: rgba(96, 165, 250, 0.16);
+  --cr-chart-grid: rgba(148, 163, 184, 0.18);
+  --cr-chart-tick: var(--cr-text-muted);
+  --cr-theme-color: #101824;
+  --cr-ring: var(--cr-accent);
+}
+
+body {
+  font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  background-color: var(--cr-canvas);
+  color: var(--cr-text);
+}
+
+[x-cloak] {
+  display: none !important;
+}
+
+.cr-card {
+  border: 1px solid var(--cr-border);
+  background: var(--cr-surface);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+html.dark .cr-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.cr-title {
+  color: var(--cr-text);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Table header subtle band without Tailwind opacity on CSS vars */
+.cr-thead {
+  background: var(--cr-surface-2);
+}
+
+html.dark .cr-thead {
+  background: color-mix(in srgb, var(--cr-surface-2) 85%, var(--cr-canvas));
+}

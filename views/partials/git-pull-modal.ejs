@@ -11,18 +11,19 @@
   aria-modal="true"
   aria-labelledby="git-pull-title"
 >
-  <div class="absolute inset-0 bg-black/60" @click="$dispatch('git-pull-hide')"></div>
-  <div class="absolute inset-4 md:inset-10 bg-slate-800 rounded-lg border border-slate-700 flex flex-col">
-    <div class="flex justify-between items-center p-4 border-b border-slate-700">
-      <h2 id="git-pull-title" class="text-lg font-semibold">Git Pull Output</h2>
+  <div class="absolute inset-0 bg-[var(--cr-overlay)] backdrop-blur-[2px]" @click="$dispatch('git-pull-hide')"></div>
+  <div class="absolute inset-4 md:inset-10 bg-cr-surface rounded-xl border border-cr-border flex flex-col shadow-xl overflow-hidden">
+    <div class="flex justify-between items-center p-4 border-b border-cr-border bg-cr-nav">
+      <h2 id="git-pull-title" class="text-lg font-semibold text-cr-text">Git Pull Output</h2>
       <button
+        type="button"
         @click="$dispatch('git-pull-hide')"
-        class="p-2 rounded hover:bg-slate-700 focus:ring-2 focus:ring-emerald-500"
+        class="p-2 rounded-lg hover:bg-cr-navHover text-cr-muted hover:text-cr-text focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-surface"
         aria-label="Chiudi"
       >
-        <span class="text-xl">&times;</span>
+        <span class="text-xl leading-none" aria-hidden="true">&times;</span>
       </button>
     </div>
-    <pre class="flex-1 p-4 overflow-auto text-xs font-mono text-slate-300 bg-slate-900 rounded m-4 whitespace-pre-wrap" x-text="output || (loading ? 'Esecuzione in corso...' : '')"></pre>
+    <pre class="flex-1 p-4 m-4 overflow-auto text-xs font-mono text-cr-text bg-cr-code border border-cr-border rounded-lg whitespace-pre-wrap" x-text="output || (loading ? 'Esecuzione in corso...' : '')"></pre>
   </div>
 </div>

@@ -1,73 +1,73 @@
 <section class="mb-8" aria-labelledby="cron-heading">
-  <h1 id="cron-heading" class="text-2xl font-bold text-slate-200 mb-6">Cron Jobs (Pianificazione)</h1>
-  <p class="text-slate-400 mb-6">Pianifica riavvii PM2, backup database o comandi personalizzati. Formato cron: minuto ora giorno mese giorno_settimana (es. <code class="text-emerald-400">0 4 * * *</code> = ogni giorno alle 04:00, <code class="text-emerald-400">0 4 * * 5</code> = ogni venerdì alle 04:00).</p>
+  <h1 id="cron-heading" class="text-2xl font-bold text-cr-text mb-6">Cron Jobs (Pianificazione)</h1>
+  <p class="text-cr-muted mb-6">Pianifica riavvii PM2, backup database o comandi personalizzati. Formato cron: minuto ora giorno mese giorno_settimana (es. <code class="text-cr-accent">0 4 * * *</code> = ogni giorno alle 04:00, <code class="text-cr-accent">0 4 * * 5</code> = ogni venerdì alle 04:00).</p>
 
-  <div class="rounded-lg border border-slate-700 bg-slate-800 p-6 mb-8">
-    <h2 class="text-lg font-semibold text-slate-200 mb-2">Daily App Check (auto-ripristino)</h2>
-    <p class="text-slate-400 text-sm mb-4">Controllo automatico giornaliero di tutte le webapp (locale + internet) con tentativo di ripristino automatico in caso di problemi.</p>
+  <div class="rounded-lg border border-cr-border bg-cr-surface p-6 mb-8">
+    <h2 class="text-lg font-semibold text-cr-text mb-2">Daily App Check (auto-ripristino)</h2>
+    <p class="text-cr-muted text-sm mb-4">Controllo automatico giornaliero di tutte le webapp (locale + internet) con tentativo di ripristino automatico in caso di problemi.</p>
     <div class="flex flex-wrap gap-3 items-center mb-4">
-      <label class="flex items-center gap-2 text-sm text-slate-300">
-        <input type="checkbox" id="dailyCheckEnabled" class="rounded border-slate-600 bg-slate-700" <%= (dailyCheck && dailyCheck.enabled !== false) ? 'checked' : '' %> />
+      <label class="flex items-center gap-2 text-sm text-cr-text">
+        <input type="checkbox" id="dailyCheckEnabled" class="rounded border-cr-inputBorder bg-cr-surface2" <%= (dailyCheck && dailyCheck.enabled !== false) ? 'checked' : '' %> />
         Attivo
       </label>
-      <label class="text-sm text-slate-300">
+      <label class="text-sm text-cr-text">
         Orario
-        <input type="time" id="dailyCheckTime" value="<%= (dailyCheck && dailyCheck.time) ? dailyCheck.time : '00:00' %>" class="ml-2 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-100" />
+        <input type="time" id="dailyCheckTime" value="<%= (dailyCheck && dailyCheck.time) ? dailyCheck.time : '00:00' %>" class="ml-2 px-2 py-1 rounded bg-cr-surface2 border border-cr-inputBorder text-cr-text" />
       </label>
-      <button type="button" id="btnSaveDailyCheck" class="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm">Salva orario</button>
-      <button type="button" id="btnRunDailyCheck" class="px-3 py-1.5 rounded bg-blue-700 hover:bg-blue-600 text-sm" <%= dailyCheckRunning ? 'disabled' : '' %>>Esegui ora</button>
+      <button type="button" id="btnSaveDailyCheck" class="px-3 py-1.5 rounded bg-cr-accent hover:bg-cr-accent text-sm">Salva orario</button>
+      <button type="button" id="btnRunDailyCheck" class="px-3 py-1.5 rounded bg-cr-info hover:opacity-90 text-sm" <%= dailyCheckRunning ? 'disabled' : '' %>>Esegui ora</button>
     </div>
-    <div class="text-sm text-slate-400 mb-2">Ultimo check: <span id="dailyCheckLastMeta" class="text-slate-300">caricamento...</span></div>
-    <pre id="dailyCheckLastReport" class="whitespace-pre-wrap text-xs bg-slate-900/60 border border-slate-700 rounded p-3 text-slate-300 min-h-[80px]"></pre>
+    <div class="text-sm text-cr-muted mb-2">Ultimo check: <span id="dailyCheckLastMeta" class="text-cr-text">caricamento...</span></div>
+    <pre id="dailyCheckLastReport" class="whitespace-pre-wrap text-xs bg-cr-code border border-cr-border rounded p-3 text-cr-text min-h-[80px]"></pre>
   </div>
 
   <script>window.cronProcesses = <%- JSON.stringify((processes && processes.length) ? processes.map(p => p.name) : ['padel-tour','roma-buche','gestione-veicoli','control-room']) %>;</script>
   <div class="space-y-4 mb-8" id="cronJobsList">
     <% (cronJobs || []).forEach((job) => { %>
-    <div class="cron-job-card flex flex-wrap items-center gap-4 p-4 rounded-lg border border-slate-700 bg-slate-800" data-id="<%= job.id %>">
+    <div class="cron-job-card flex flex-wrap items-center gap-4 p-4 rounded-lg border border-cr-border bg-cr-surface" data-id="<%= job.id %>">
       <div class="flex-1 min-w-0 space-y-2">
-        <input type="text" class="cron-name w-full bg-transparent border-b border-slate-600 px-0 py-1 text-slate-200 font-medium focus:ring-0 focus:border-emerald-500" value="<%= (job.name || '') %>" placeholder="Nome" />
-        <input type="text" class="cron-schedule block w-full bg-transparent border-b border-slate-600 px-0 py-1 text-slate-400 font-mono text-sm focus:ring-0 focus:border-emerald-500" value="<%= (job.schedule || '') %>" placeholder="0 4 * * *" />
+        <input type="text" class="cron-name w-full bg-transparent border-b border-cr-inputBorder px-0 py-1 text-cr-text font-medium focus:ring-0 focus:border-cr-accent" value="<%= (job.name || '') %>" placeholder="Nome" />
+        <input type="text" class="cron-schedule block w-full bg-transparent border-b border-cr-inputBorder px-0 py-1 text-cr-muted font-mono text-sm focus:ring-0 focus:border-cr-accent" value="<%= (job.schedule || '') %>" placeholder="0 4 * * *" />
         <div class="flex flex-wrap gap-2 items-center mt-2">
-          <select class="cron-action px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-100 text-sm">
+          <select class="cron-action px-2 py-1 rounded bg-cr-surface2 border border-cr-inputBorder text-cr-text text-sm">
             <option value="pm2-restart" <%= (job.action || 'pm2-restart') === 'pm2-restart' ? 'selected' : '' %>>Riavvia PM2</option>
             <option value="pm2-start" <%= job.action === 'pm2-start' ? 'selected' : '' %>>Avvia PM2</option>
             <option value="command" <%= job.action === 'command' ? 'selected' : '' %>>Comando</option>
             <option value="db-backup" <%= job.action === 'db-backup' ? 'selected' : '' %>>Backup DB</option>
           </select>
           <span class="cron-target-wrap" style="<%= (job.action === 'pm2-restart' || job.action === 'pm2-start') ? '' : 'display:none' %>">
-            <select class="cron-target px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-100 text-sm">
+            <select class="cron-target px-2 py-1 rounded bg-cr-surface2 border border-cr-inputBorder text-cr-text text-sm">
               <% (processes || [{name:'padel-tour'},{name:'roma-buche'},{name:'gestione-veicoli'},{name:'control-room'}]).forEach((p) => { %>
               <option value="<%= p.name %>" <%= (job.target || '') === p.name ? 'selected' : '' %>><%= p.name %></option>
               <% }); %>
             </select>
           </span>
           <span class="cron-command-wrap" style="<%= job.action === 'command' ? '' : 'display:none' %>">
-            <input type="text" class="cron-command px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-100 text-sm font-mono" value="<%= (job.command || '') %>" placeholder="/path/to/script.sh" style="min-width: 200px" />
+            <input type="text" class="cron-command px-2 py-1 rounded bg-cr-surface2 border border-cr-inputBorder text-cr-text text-sm font-mono" value="<%= (job.command || '') %>" placeholder="/path/to/script.sh" style="min-width: 200px" />
           </span>
         </div>
       </div>
       <label class="flex items-center gap-2 shrink-0">
-        <input type="checkbox" class="cron-enabled rounded border-slate-600 bg-slate-700" <%= job.enabled !== false ? 'checked' : '' %> />
-        <span class="text-sm text-slate-300">Attivo</span>
+        <input type="checkbox" class="cron-enabled rounded border-cr-inputBorder bg-cr-surface2" <%= job.enabled !== false ? 'checked' : '' %> />
+        <span class="text-sm text-cr-text">Attivo</span>
       </label>
-      <button type="button" class="cron-remove px-2 py-1 rounded text-red-400 hover:text-red-300 text-sm shrink-0">Rimuovi</button>
+      <button type="button" class="cron-remove px-2 py-1 rounded text-cr-danger hover:text-cr-danger text-sm shrink-0">Rimuovi</button>
     </div>
     <% }); %>
   </div>
 
-  <div class="rounded-lg border border-slate-700 bg-slate-800 p-6 mb-6">
-    <h2 class="text-lg font-semibold text-slate-200 mb-4">Aggiungi job</h2>
+  <div class="rounded-lg border border-cr-border bg-cr-surface p-6 mb-6">
+    <h2 class="text-lg font-semibold text-cr-text mb-4">Aggiungi job</h2>
     <div class="space-y-4">
       <div>
-        <label class="block text-sm text-slate-400 mb-1">Nome</label>
-        <input type="text" id="cronName" placeholder="Es: Riavvia Padel ogni notte" class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100" />
+        <label class="block text-sm text-cr-muted mb-1">Nome</label>
+        <input type="text" id="cronName" placeholder="Es: Riavvia Padel ogni notte" class="w-full px-4 py-2 rounded-lg bg-cr-surface2 border border-cr-inputBorder text-cr-text" />
       </div>
       <div>
-        <label class="block text-sm text-slate-400 mb-1">Schedule (cron)</label>
+        <label class="block text-sm text-cr-muted mb-1">Schedule (cron)</label>
         <div class="flex gap-2">
-          <input type="text" id="cronSchedule" placeholder="0 4 * * *  (ogni giorno alle 04:00)" class="flex-1 px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 font-mono" />
-          <select id="cronSchedulePreset" class="px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 text-sm" title="Preset rapidi">
+          <input type="text" id="cronSchedule" placeholder="0 4 * * *  (ogni giorno alle 04:00)" class="flex-1 px-4 py-2 rounded-lg bg-cr-surface2 border border-cr-inputBorder text-cr-text font-mono" />
+          <select id="cronSchedulePreset" class="px-4 py-2 rounded-lg bg-cr-surface2 border border-cr-inputBorder text-cr-text text-sm" title="Preset rapidi">
             <option value="">Preset...</option>
             <option value="0 4 * * *">Ogni notte 04:00</option>
             <option value="0 4 * * 5">Ogni venerdì 04:00</option>
@@ -75,13 +75,13 @@
             <option value="0 * * * *">Ogni ora</option>
             <option value="*/15 * * * *">Ogni 15 min</option>
           </select>
-          <button type="button" id="btnPreviewCron" class="px-3 py-2 rounded-lg bg-slate-600 hover:bg-slate-500 text-sm">Preview</button>
+          <button type="button" id="btnPreviewCron" class="px-3 py-2 rounded-lg bg-cr-surface2 hover:bg-cr-navHover text-sm">Preview</button>
         </div>
-        <div id="cronPreviewOut" class="mt-2 text-xs text-slate-400"></div>
+        <div id="cronPreviewOut" class="mt-2 text-xs text-cr-muted"></div>
       </div>
       <div>
-        <label class="block text-sm text-slate-400 mb-1">Azione</label>
-        <select id="cronAction" class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100">
+        <label class="block text-sm text-cr-muted mb-1">Azione</label>
+        <select id="cronAction" class="w-full px-4 py-2 rounded-lg bg-cr-surface2 border border-cr-inputBorder text-cr-text">
           <option value="pm2-restart">Riavvia processo PM2</option>
           <option value="pm2-start">Avvia processo PM2</option>
           <option value="command">Comando shell</option>
@@ -89,8 +89,8 @@
         </select>
       </div>
       <div id="cronTargetWrap">
-        <label class="block text-sm text-slate-400 mb-1">Processo PM2</label>
-        <select id="cronTarget" class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100">
+        <label class="block text-sm text-cr-muted mb-1">Processo PM2</label>
+        <select id="cronTarget" class="w-full px-4 py-2 rounded-lg bg-cr-surface2 border border-cr-inputBorder text-cr-text">
           <% (processes || []).forEach((p) => { %>
           <option value="<%= p.name %>"><%= p.name %></option>
           <% }); %>
@@ -98,23 +98,23 @@
         </select>
       </div>
       <div id="cronCommandWrap" class="hidden">
-        <label class="block text-sm text-slate-400 mb-1">Comando</label>
-        <input type="text" id="cronCommand" placeholder="/home/ubuntu/scripts/backup.sh" class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 font-mono" />
+        <label class="block text-sm text-cr-muted mb-1">Comando</label>
+        <input type="text" id="cronCommand" placeholder="/home/ubuntu/scripts/backup.sh" class="w-full px-4 py-2 rounded-lg bg-cr-surface2 border border-cr-inputBorder text-cr-text font-mono" />
       </div>
-      <p id="cronDbBackupNote" class="hidden text-sm text-slate-500">Salva in backups/ (richiede DB configurato in .env)</p>
-      <button type="button" id="btnAddCron" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500">
+      <p id="cronDbBackupNote" class="hidden text-sm text-cr-muted">Salva in backups/ (richiede DB configurato in .env)</p>
+      <button type="button" id="btnAddCron" class="px-4 py-2 rounded-lg bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas">
         Aggiungi
       </button>
     </div>
   </div>
 
-  <button type="button" id="btnSaveCron" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500">
+  <button type="button" id="btnSaveCron" class="px-4 py-2 rounded-lg bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas">
     Salva configurazione
   </button>
 
-  <div class="rounded-lg border border-slate-700 bg-slate-800 p-6 mt-6">
-    <h2 class="text-lg font-semibold text-slate-200 mb-2">Storico esecuzioni cron</h2>
-    <div id="cronHistory" class="text-xs text-slate-300 font-mono whitespace-pre-wrap">Caricamento...</div>
+  <div class="rounded-lg border border-cr-border bg-cr-surface p-6 mt-6">
+    <h2 class="text-lg font-semibold text-cr-text mb-2">Storico esecuzioni cron</h2>
+    <div id="cronHistory" class="text-xs text-cr-text font-mono whitespace-pre-wrap">Caricamento...</div>
   </div>
 </section>
 
@@ -192,34 +192,34 @@
       return `<option value="${name}"${sel}>${name}</option>`;
     }).join('');
     const card = document.createElement('div');
-    card.className = 'cron-job-card flex flex-wrap items-center gap-4 p-4 rounded-lg border border-slate-700 bg-slate-800';
+    card.className = 'cron-job-card flex flex-wrap items-center gap-4 p-4 rounded-lg border border-cr-border bg-cr-surface';
     card.dataset.id = job.id || 'cron-' + Date.now();
     const showTarget = job.action === 'pm2-restart' || job.action === 'pm2-start';
     const showCommand = job.action === 'command';
     card.innerHTML = `
       <div class="flex-1 min-w-0 space-y-2">
-        <input type="text" class="cron-name w-full bg-transparent border-b border-slate-600 px-0 py-1 text-slate-200 font-medium" value="${(job.name || '').replace(/"/g, '&quot;')}" placeholder="Nome" />
-        <input type="text" class="cron-schedule block w-full bg-transparent border-b border-slate-600 px-0 py-1 text-slate-400 font-mono text-sm" value="${(job.schedule || '').replace(/"/g, '&quot;')}" placeholder="0 4 * * *" />
+        <input type="text" class="cron-name w-full bg-transparent border-b border-cr-inputBorder px-0 py-1 text-cr-text font-medium" value="${(job.name || '').replace(/"/g, '&quot;')}" placeholder="Nome" />
+        <input type="text" class="cron-schedule block w-full bg-transparent border-b border-cr-inputBorder px-0 py-1 text-cr-muted font-mono text-sm" value="${(job.schedule || '').replace(/"/g, '&quot;')}" placeholder="0 4 * * *" />
         <div class="flex flex-wrap gap-2 items-center mt-2">
-          <select class="cron-action px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-100 text-sm">
+          <select class="cron-action px-2 py-1 rounded bg-cr-surface2 border border-cr-inputBorder text-cr-text text-sm">
             <option value="pm2-restart" ${(job.action || 'pm2-restart') === 'pm2-restart' ? 'selected' : ''}>Riavvia PM2</option>
             <option value="pm2-start" ${job.action === 'pm2-start' ? 'selected' : ''}>Avvia PM2</option>
             <option value="command" ${job.action === 'command' ? 'selected' : ''}>Comando</option>
             <option value="db-backup" ${job.action === 'db-backup' ? 'selected' : ''}>Backup DB</option>
           </select>
           <span class="cron-target-wrap" style="${showTarget ? '' : 'display:none'}">
-            <select class="cron-target px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-100 text-sm">${targetOpts}</select>
+            <select class="cron-target px-2 py-1 rounded bg-cr-surface2 border border-cr-inputBorder text-cr-text text-sm">${targetOpts}</select>
           </span>
           <span class="cron-command-wrap" style="${showCommand ? '' : 'display:none'}">
-            <input type="text" class="cron-command px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-100 text-sm font-mono" value="${(job.command || '').replace(/"/g, '&quot;')}" placeholder="/path/to/script.sh" style="min-width: 200px" />
+            <input type="text" class="cron-command px-2 py-1 rounded bg-cr-surface2 border border-cr-inputBorder text-cr-text text-sm font-mono" value="${(job.command || '').replace(/"/g, '&quot;')}" placeholder="/path/to/script.sh" style="min-width: 200px" />
           </span>
         </div>
       </div>
       <label class="flex items-center gap-2 shrink-0">
-        <input type="checkbox" class="cron-enabled rounded border-slate-600 bg-slate-700" ${job.enabled !== false ? 'checked' : ''} />
-        <span class="text-sm text-slate-300">Attivo</span>
+        <input type="checkbox" class="cron-enabled rounded border-cr-inputBorder bg-cr-surface2" ${job.enabled !== false ? 'checked' : ''} />
+        <span class="text-sm text-cr-text">Attivo</span>
       </label>
-      <button type="button" class="cron-remove px-2 py-1 rounded text-red-400 hover:text-red-300 text-sm shrink-0">Rimuovi</button>
+      <button type="button" class="cron-remove px-2 py-1 rounded text-cr-danger hover:text-cr-danger text-sm shrink-0">Rimuovi</button>
     `;
     card.querySelector('.cron-remove').addEventListener('click', () => card.remove());
     bindCronActionToggle(card);

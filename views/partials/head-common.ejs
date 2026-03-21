@@ -1,0 +1,48 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/theme.css">
+<script>
+(function(){try{var k='cr-theme';var s=localStorage.getItem(k);var m=s==='light'||s==='dark'||s==='system'?s:'system';var d=m==='dark'||(m==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();
+</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        cr: {
+          canvas: 'var(--cr-canvas)',
+          surface: 'var(--cr-surface)',
+          surface2: 'var(--cr-surface-2)',
+          border: 'var(--cr-border)',
+          text: 'var(--cr-text)',
+          muted: 'var(--cr-text-muted)',
+          accent: 'var(--cr-accent)',
+          accentHover: 'var(--cr-accent-hover)',
+          success: 'var(--cr-success)',
+          danger: 'var(--cr-danger)',
+          warning: 'var(--cr-warning)',
+          info: 'var(--cr-info)',
+          nav: 'var(--cr-nav)',
+          navHover: 'var(--cr-nav-hover)',
+          input: 'var(--cr-input-bg)',
+          inputBorder: 'var(--cr-input-border)',
+          code: 'var(--cr-code-bg)',
+        },
+      },
+      fontFamily: {
+        sans: ['DM Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+      },
+      ringColor: {
+        cr: { accent: 'var(--cr-ring)' },
+      },
+      ringOffsetColor: {
+        cr: { canvas: 'var(--cr-canvas)', nav: 'var(--cr-nav)', surface: 'var(--cr-surface)' },
+      },
+    },
+  },
+};
+</script>

@@ -313,6 +313,12 @@ const sessionConfig = {
 const sessionMiddleware = session(sessionConfig);
 app.use(sessionMiddleware);
 
+/** Path corrente per evidenziazione nav nelle viste EJS */
+app.use((req, res, next) => {
+  res.locals.reqPath = req.path || '';
+  next();
+});
+
 // Rate limit sul login (brute force protection)
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minuti

@@ -1,12 +1,12 @@
 <section aria-labelledby="audit-heading">
   <div class="flex items-center justify-between gap-3 mb-4">
-    <h1 id="audit-heading" class="text-2xl font-bold text-slate-200">Audit log</h1>
-    <button id="btnRefreshAudit" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Aggiorna</button>
+    <h1 id="audit-heading" class="text-2xl font-bold text-cr-text">Audit log</h1>
+    <button id="btnRefreshAudit" class="px-4 py-2 rounded-lg bg-cr-surface2 hover:bg-cr-navHover">Aggiorna</button>
   </div>
-  <p class="text-sm text-slate-400 mb-4">Storico azioni amministrative e operazioni sensibili.</p>
-  <div class="rounded-lg border border-slate-700 bg-slate-800 overflow-x-auto">
+  <p class="text-sm text-cr-muted mb-4">Storico azioni amministrative e operazioni sensibili.</p>
+  <div class="rounded-lg border border-cr-border bg-cr-surface overflow-x-auto">
     <table class="w-full text-sm">
-      <thead class="bg-slate-700/50">
+      <thead class="cr-thead">
         <tr>
           <th class="text-left px-4 py-2">Timestamp</th>
           <th class="text-left px-4 py-2">Evento</th>
@@ -15,7 +15,7 @@
         </tr>
       </thead>
       <tbody id="auditBody">
-        <tr><td colspan="4" class="px-4 py-6 text-center text-slate-500">Caricamento...</td></tr>
+        <tr><td colspan="4" class="px-4 py-6 text-center text-cr-muted">Caricamento...</td></tr>
       </tbody>
     </table>
   </div>
@@ -39,16 +39,16 @@
       const res = await fetch('/api/audit/events?limit=200');
       const json = await res.json();
       const rows = (json.events || []).map((ev) => (
-        `<tr class="border-t border-slate-700 hover:bg-slate-700/30">
+        `<tr class="border-t border-cr-border hover:bg-cr-surface2/30">
           <td class="px-4 py-2 whitespace-nowrap">${esc(new Date(ev.ts).toLocaleString('it-IT'))}</td>
-          <td class="px-4 py-2 font-mono text-emerald-300">${esc(ev.event || '-')}</td>
+          <td class="px-4 py-2 font-mono text-cr-accent">${esc(ev.event || '-')}</td>
           <td class="px-4 py-2">${esc(ev.user || 'system')}</td>
-          <td class="px-4 py-2 text-slate-400" title="${esc(JSON.stringify(ev))}">${esc(compactDetails(ev))}</td>
+          <td class="px-4 py-2 text-cr-muted" title="${esc(JSON.stringify(ev))}">${esc(compactDetails(ev))}</td>
         </tr>`
       )).join('');
-      document.getElementById('auditBody').innerHTML = rows || '<tr><td colspan="4" class="px-4 py-6 text-center text-slate-500">Nessun evento</td></tr>';
+      document.getElementById('auditBody').innerHTML = rows || '<tr><td colspan="4" class="px-4 py-6 text-center text-cr-muted">Nessun evento</td></tr>';
     } catch (e) {
-      document.getElementById('auditBody').innerHTML = `<tr><td colspan="4" class="px-4 py-6 text-center text-red-400">Errore: ${esc(e.message)}</td></tr>`;
+      document.getElementById('auditBody').innerHTML = `<tr><td colspan="4" class="px-4 py-6 text-center text-cr-danger">Errore: ${esc(e.message)}</td></tr>`;
     }
   }
   document.getElementById('btnRefreshAudit').addEventListener('click', loadAudit);

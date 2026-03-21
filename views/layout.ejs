@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#0d9488">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Control Room">
@@ -12,44 +12,58 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
   <link rel="manifest" href="/manifest.json">
-  <script src="https://cdn.tailwindcss.com"></script>
+  <%- include('partials/head-common') %>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="/socket.io/socket.io.js"></script>
-  <style>
-    [x-cloak] { display: none !important; }
-    .cr-card { border: 1px solid rgb(51 65 85); background: rgb(30 41 59 / 0.9); border-radius: 0.75rem; }
-    .cr-title { color: rgb(226 232 240); font-weight: 700; letter-spacing: 0.01em; }
-  </style>
+  <script defer src="/js/cr-theme.js"></script>
   <%- typeof headExtra !== 'undefined' ? headExtra : '' %>
 </head>
-<body class="min-h-screen bg-slate-900 text-slate-200" x-data="{ sidebarOpen: false }">
-  <nav class="fixed top-0 left-0 right-0 z-40 bg-slate-800 border-b border-slate-700 px-4 py-3 flex justify-between items-center">
-    <div class="flex items-center gap-3 min-w-0">
+<body class="min-h-screen bg-cr-canvas text-cr-text font-sans antialiased" x-data="{ sidebarOpen: false }">
+  <nav class="fixed top-0 left-0 right-0 z-40 bg-cr-nav border-b border-cr-border px-3 md:px-4 py-2.5 flex justify-between items-center gap-2 shadow-sm">
+    <div class="flex items-center gap-2 md:gap-3 min-w-0">
       <button
+        type="button"
         @click="sidebarOpen = !sidebarOpen"
-        class="md:hidden p-2 rounded-lg hover:bg-slate-700 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800 shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
-        aria-label="Toggle menu"
+        class="md:hidden p-2 rounded-lg hover:bg-cr-navHover text-cr-text focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+        aria-label="Apri o chiudi menu"
       >
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
       </button>
-      <div class="min-w-0">
-        <h1 class="text-xl font-bold truncate">Control Room</h1>
-        <p class="hidden md:block text-xs text-slate-400 truncate">Ops Console · Recovery · Incidenti · Sicurezza</p>
+      <div class="min-w-0 hidden sm:block">
+        <h1 class="text-lg md:text-xl font-bold tracking-tight truncate text-cr-text">Control Room</h1>
+        <p class="hidden md:block text-xs text-cr-muted truncate">Ops console · recovery · incidenti · sicurezza</p>
+      </div>
+      <div class="min-w-0 sm:hidden">
+        <h1 class="text-base font-bold truncate">CR</h1>
       </div>
     </div>
-    <div class="hidden md:flex items-center gap-2 shrink-0">
-      <a href="/incidents" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Incidenti">Incidenti</a>
-      <a href="/automation" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Automation">Automation</a>
-      <a href="/analytics" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Analytics">Analytics</a>
-      <a href="/settings" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Impostazioni">Impostazioni</a>
-      <a href="/cron" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Cron Jobs">Cron</a>
-      <a href="/nginx" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Nginx">Nginx</a>
-      <a href="/audit" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Audit">Audit</a>
+    <div class="flex items-center gap-1.5 md:gap-2 shrink-0">
+      <button
+        type="button"
+        data-cr-theme-cycle
+        class="p-2 rounded-lg border border-cr-border bg-cr-surface hover:bg-cr-surface2 text-cr-muted hover:text-cr-text focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav min-h-[44px] min-w-[44px] flex flex-col items-center justify-center leading-none"
+        title="Cambia tema"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+        </svg>
+        <span class="text-[9px] font-medium text-cr-muted mt-0.5 max-w-[52px] truncate hidden md:inline" data-cr-theme-label>Sistema</span>
+      </button>
+      <div class="hidden lg:flex items-center gap-1 flex-wrap justify-end max-w-[52rem]">
+        <% var hp = typeof reqPath !== 'undefined' ? reqPath : ''; %>
+        <a href="/incidents" class="px-2.5 py-1.5 rounded-md text-sm border transition-colors focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav <%= hp === '/incidents' ? 'border-cr-accent bg-cr-surface2 text-cr-accent font-medium' : 'border-transparent bg-cr-surface2 hover:bg-cr-navHover text-cr-text' %>" aria-current="<%= hp === '/incidents' ? 'page' : 'false' %>">Incidenti</a>
+        <a href="/automation" class="px-2.5 py-1.5 rounded-md text-sm border transition-colors focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav <%= hp === '/automation' ? 'border-cr-accent bg-cr-surface2 text-cr-accent font-medium' : 'border-transparent bg-cr-surface2 hover:bg-cr-navHover text-cr-text' %>" aria-current="<%= hp === '/automation' ? 'page' : 'false' %>">Automation</a>
+        <a href="/analytics" class="px-2.5 py-1.5 rounded-md text-sm border transition-colors focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav <%= hp === '/analytics' ? 'border-cr-accent bg-cr-surface2 text-cr-accent font-medium' : 'border-transparent bg-cr-surface2 hover:bg-cr-navHover text-cr-text' %>" aria-current="<%= hp === '/analytics' ? 'page' : 'false' %>">Analytics</a>
+        <a href="/settings" class="px-2.5 py-1.5 rounded-md text-sm border transition-colors focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav <%= hp.indexOf('/settings') === 0 ? 'border-cr-accent bg-cr-surface2 text-cr-accent font-medium' : 'border-transparent bg-cr-surface2 hover:bg-cr-navHover text-cr-text' %>" aria-current="<%= hp.indexOf('/settings') === 0 ? 'page' : 'false' %>">Impostazioni</a>
+        <a href="/cron" class="px-2.5 py-1.5 rounded-md text-sm border transition-colors focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav <%= hp === '/cron' ? 'border-cr-accent bg-cr-surface2 text-cr-accent font-medium' : 'border-transparent bg-cr-surface2 hover:bg-cr-navHover text-cr-text' %>" aria-current="<%= hp === '/cron' ? 'page' : 'false' %>">Cron</a>
+        <a href="/nginx" class="px-2.5 py-1.5 rounded-md text-sm border transition-colors focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav <%= hp === '/nginx' ? 'border-cr-accent bg-cr-surface2 text-cr-accent font-medium' : 'border-transparent bg-cr-surface2 hover:bg-cr-navHover text-cr-text' %>" aria-current="<%= hp === '/nginx' ? 'page' : 'false' %>">Nginx</a>
+        <a href="/audit" class="px-2.5 py-1.5 rounded-md text-sm border transition-colors focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav <%= hp === '/audit' ? 'border-cr-accent bg-cr-surface2 text-cr-accent font-medium' : 'border-transparent bg-cr-surface2 hover:bg-cr-navHover text-cr-text' %>" aria-current="<%= hp === '/audit' ? 'page' : 'false' %>">Audit</a>
+      </div>
       <form method="POST" action="/logout" class="inline">
-        <button type="submit" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800">Logout</button>
+        <button type="submit" class="px-3 py-2 rounded-md bg-cr-surface2 hover:bg-cr-navHover border border-cr-border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav">Logout</button>
       </form>
     </div>
   </nav>
@@ -63,17 +77,20 @@
     x-transition:leave-start="opacity-100"
     x-transition:leave-end="opacity-0"
     @click="sidebarOpen = false"
-    class="md:hidden fixed inset-0 z-20 bg-black/50"
+    @keydown.escape.window="sidebarOpen = false"
+    class="md:hidden fixed inset-0 z-20 bg-black/40 dark:bg-black/50"
     style="display: none;"
+    aria-hidden="true"
   ></div>
   <aside
-    class="fixed inset-y-0 left-0 z-30 w-64 bg-slate-800 border-r border-slate-700 pt-16 transition-transform duration-200 -translate-x-full md:translate-x-0"
+    class="fixed inset-y-0 left-0 z-30 w-[17rem] bg-cr-nav border-r border-cr-border pt-14 md:pt-16 transition-transform duration-200 ease-out -translate-x-full md:translate-x-0 shadow-lg md:shadow-none"
     :class="{ 'translate-x-0': sidebarOpen }"
+    aria-label="Navigazione principale"
   >
     <%- include('partials/sidebar') %>
   </aside>
 
-  <main class="pt-16 md:pl-64 min-h-screen overflow-x-hidden">
+  <main class="pt-14 md:pt-16 md:pl-[17rem] min-h-screen overflow-x-hidden">
     <div class="p-4 md:p-6 max-w-7xl mx-auto">
       <%- include('partials/toast') %>
       <%- include('partials/confirm-modal') %>

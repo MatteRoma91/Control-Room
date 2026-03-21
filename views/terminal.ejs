@@ -1,43 +1,43 @@
 <section class="mb-6" aria-labelledby="terminal-heading">
   <div class="flex flex-wrap items-center gap-4 mb-2">
-    <h1 id="terminal-heading" class="text-lg font-semibold text-slate-200">Terminale SSH</h1>
-    <select id="sshProfileSelect" class="px-3 py-1.5 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 text-sm">
+    <h1 id="terminal-heading" class="text-lg font-semibold text-cr-text">Terminale SSH</h1>
+    <select id="sshProfileSelect" class="px-3 py-1.5 rounded-lg bg-cr-surface2 border border-cr-inputBorder text-cr-text text-sm">
       <option value="">-- Seleziona connessione --</option>
     </select>
     <button
       id="btnConnectSsh"
-      class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
+      class="px-4 py-2 rounded-lg bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Connetti
     </button>
     <button
       id="btnDisconnectSsh"
-      class="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-600 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
+      class="px-4 py-2 rounded-lg bg-cr-danger hover:opacity-90 text-white font-medium focus:outline-none focus:ring-2 focus:ring-cr-danger focus:ring-offset-2 focus:ring-offset-cr-canvas disabled:opacity-50 disabled:cursor-not-allowed"
       title="Disconnetti dalla connessione SSH in corso"
     >
       Disconnetti
     </button>
   </div>
-  <p class="text-sm text-slate-400 mb-2">Configura le connessioni in <a href="/settings" class="text-emerald-400 hover:underline">Impostazioni</a>. Con auth password, la password va inserita al collegamento.</p>
-  <div id="terminal" class="rounded-lg border border-slate-700 bg-slate-900 overflow-hidden" style="min-height: 400px;"></div>
+  <p class="text-sm text-cr-muted mb-2">Configura le connessioni in <a href="/settings" class="text-cr-accent hover:underline">Impostazioni</a>. Con auth password, la password va inserita al collegamento.</p>
+  <div id="terminal" class="rounded-lg border border-cr-border bg-zinc-950 overflow-hidden shadow-inner" style="min-height: 400px;"></div>
 </section>
 
 <!-- Modale password SSH -->
 <div id="sshPasswordModal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
-  <div class="absolute inset-0 bg-black/60" id="sshPasswordModalBackdrop"></div>
-  <div class="absolute inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-96 bg-slate-800 rounded-lg border border-slate-700 p-6">
-    <h3 class="text-lg font-semibold text-slate-200 mb-2">Password SSH</h3>
-    <p class="text-sm text-slate-400 mb-4">Inserisci la password per <span id="sshPasswordModalProfile">la connessione</span></p>
+  <div class="absolute inset-0 bg-[var(--cr-overlay)] backdrop-blur-[2px]" id="sshPasswordModalBackdrop"></div>
+  <div class="absolute inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-96 bg-cr-surface rounded-lg border border-cr-border p-6">
+    <h3 class="text-lg font-semibold text-cr-text mb-2">Password SSH</h3>
+    <p class="text-sm text-cr-muted mb-4">Inserisci la password per <span id="sshPasswordModalProfile">la connessione</span></p>
     <div class="relative mb-4" data-password-toggle="3">
       <input type="password" id="sshPasswordInput" placeholder="Password" autocomplete="current-password"
-        class="w-full px-4 py-2 pr-12 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 focus:ring-2 focus:ring-emerald-500" />
-      <button type="button" data-password-toggle-btn class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-slate-400 hover:text-slate-300 hover:bg-slate-600 transition-colors" aria-label="Mostra password (tieni premuto 3 secondi)"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
+        class="w-full px-4 py-2 pr-12 rounded-lg bg-cr-surface2 border border-cr-inputBorder text-cr-text focus:ring-2 focus:ring-cr-accent" />
+      <button type="button" data-password-toggle-btn class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-cr-muted hover:text-cr-text hover:bg-cr-navHover transition-colors" aria-label="Mostra password (tieni premuto 3 secondi)"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
     </div>
     <div class="flex gap-2">
-      <button type="button" id="sshPasswordConnect" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500">
+      <button type="button" id="sshPasswordConnect" class="px-4 py-2 rounded-lg bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-cr-accent">
         Connetti
       </button>
-      <button type="button" id="sshPasswordCancel" class="px-4 py-2 rounded-lg bg-slate-600 hover:bg-slate-500">
+      <button type="button" id="sshPasswordCancel" class="px-4 py-2 rounded-lg bg-cr-surface2 hover:bg-cr-navHover text-cr-text text-sm font-medium border border-cr-border focus:outline-none focus:ring-2 focus:ring-cr-border">
         Annulla
       </button>
     </div>

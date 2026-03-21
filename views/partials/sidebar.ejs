@@ -1,48 +1,62 @@
-<div class="py-4">
-  <a href="/" class="flex items-center min-h-[44px] px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white border-l-2 border-transparent hover:border-emerald-500">
+<% var p = typeof reqPath !== 'undefined' ? reqPath : ''; %>
+<% function navItem(href, isActive) {
+  var base = 'flex items-center min-h-[44px] px-4 py-2.5 text-sm border-l-2 transition-colors rounded-r-md mr-2 ';
+  if (isActive) return base + 'border-cr-accent bg-cr-surface2 text-cr-accent font-semibold';
+  return base + 'border-transparent text-cr-muted hover:bg-cr-navHover hover:text-cr-text';
+} %>
+<div class="py-3 flex flex-col h-[calc(100vh-4rem)] overflow-y-auto">
+  <p class="px-4 pb-1 text-[10px] font-semibold uppercase tracking-wider text-cr-muted">Operazioni</p>
+  <a href="/" class="<%= navItem('/', p === '/' || p.indexOf('/process/') === 0) %>">
     Dashboard
   </a>
-  <a href="/incidents" class="flex items-center min-h-[44px] px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white">
+  <a href="/incidents" class="<%= navItem('/incidents', p === '/incidents') %>">
     Incident Center
   </a>
-  <a href="/automation" class="flex items-center min-h-[44px] px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white">
+  <a href="/automation" class="<%= navItem('/automation', p === '/automation') %>">
     Automation
   </a>
-  <a href="/analytics" class="flex items-center min-h-[44px] px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white">
+  <a href="/analytics" class="<%= navItem('/analytics', p === '/analytics') %>">
     Analytics
   </a>
-  <a href="/maintenance" class="flex items-center min-h-[44px] px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white">
+  <a href="/maintenance" class="<%= navItem('/maintenance', p === '/maintenance') %>">
     Maintenance
   </a>
-  <a href="/settings" class="flex items-center min-h-[44px] px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white">
+  <a href="/settings" class="<%= navItem('/settings', p.indexOf('/settings') === 0) %>">
     Impostazioni
   </a>
-  <a href="/terminal" class="flex items-center min-h-[44px] px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white">
+  <a href="/terminal" class="<%= navItem('/terminal', p === '/terminal') %>">
     Terminale SSH
   </a>
-  <a href="/cron" class="flex items-center min-h-[44px] px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white">
+  <a href="/cron" class="<%= navItem('/cron', p === '/cron') %>">
     Cron Jobs
   </a>
-  <a href="/nginx" class="flex items-center min-h-[44px] px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white">
+  <a href="/nginx" class="<%= navItem('/nginx', p === '/nginx') %>">
     Nginx
   </a>
-  <a href="/audit" class="flex items-center min-h-[44px] px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white">
+  <a href="/audit" class="<%= navItem('/audit', p === '/audit') %>">
     Audit log
   </a>
-  <a href="https://bananapadeltour.duckdns.org/" target="_blank" rel="noopener" @click="sidebarOpen = false" class="flex items-center min-h-[44px] px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white">
+
+  <p class="px-4 pt-5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-cr-muted">Siti</p>
+  <a href="https://bananapadeltour.duckdns.org/" target="_blank" rel="noopener" @click="sidebarOpen = false" class="flex items-center min-h-[44px] px-4 py-2 text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2 gap-2">
+    <span class="opacity-60" aria-hidden="true">↗</span>
     Banana Padel Tour
   </a>
-  <a href="https://ibuche.duckdns.org/" target="_blank" rel="noopener" @click="sidebarOpen = false" class="flex items-center min-h-[44px] px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white">
+  <a href="https://ibuche.duckdns.org/" target="_blank" rel="noopener" @click="sidebarOpen = false" class="flex items-center min-h-[44px] px-4 py-2 text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2 gap-2">
+    <span class="opacity-60" aria-hidden="true">↗</span>
     Roma-Buche
   </a>
-  <a href="https://gestione-veicoli.duckdns.org/" target="_blank" rel="noopener" @click="sidebarOpen = false" class="flex items-center min-h-[44px] px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white">
-    Gestione-Veicoli
+  <a href="https://gestione-veicoli.duckdns.org/" target="_blank" rel="noopener" @click="sidebarOpen = false" class="flex items-center min-h-[44px] px-4 py-2 text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2 gap-2">
+    <span class="opacity-60" aria-hidden="true">↗</span>
+    Gestione Veicoli
   </a>
-  <a href="https://matteroma.duckdns.org/" target="_blank" rel="noopener" @click="sidebarOpen = false" class="flex items-center min-h-[44px] px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white">
+  <a href="https://matteroma.duckdns.org/" target="_blank" rel="noopener" @click="sidebarOpen = false" class="flex items-center min-h-[44px] px-4 py-2 text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2 gap-2">
+    <span class="opacity-60" aria-hidden="true">↗</span>
     Control Room
   </a>
-  <form method="POST" action="/logout" class="md:hidden mt-4 border-t border-slate-700 pt-4">
-    <button type="submit" class="flex items-center min-h-[44px] w-full px-4 py-2 text-left text-slate-300 hover:bg-slate-700 hover:text-white rounded-r">
+
+  <form method="POST" action="/logout" class="md:hidden mt-auto border-t border-cr-border pt-3 pb-4">
+    <button type="submit" class="flex items-center min-h-[44px] w-full px-4 py-2 text-left text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2">
       Logout
     </button>
   </form>

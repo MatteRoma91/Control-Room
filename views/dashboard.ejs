@@ -1,5 +1,5 @@
 <% if (typeof error !== 'undefined' && error) { %>
-  <div class="mb-4 p-4 bg-red-900/50 border border-red-700 rounded-lg text-red-200" role="alert">
+  <div class="mb-4 p-4 bg-[var(--cr-danger-bg)] border border-cr-danger rounded-lg text-cr-danger" role="alert">
     Errore: <%= error %>
   </div>
 <% } %>
@@ -8,10 +8,10 @@
   <div id="incidentBanner" class="hidden rounded-lg border p-4">
     <div class="flex items-center justify-between gap-2">
       <div>
-        <h2 id="incident-heading" class="text-lg font-semibold">Incident center</h2>
-        <p id="incidentText" class="text-sm text-slate-300 mt-1"></p>
+        <h2 id="incident-heading" class="text-lg font-semibold text-cr-text">Incident center</h2>
+        <p id="incidentText" class="text-sm text-cr-text mt-1"></p>
       </div>
-      <a href="/audit" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-sm">Apri audit</a>
+      <a href="/audit" class="px-3 py-1.5 rounded bg-cr-surface2 hover:bg-cr-navHover text-sm">Apri audit</a>
     </div>
   </div>
 </section>
@@ -19,11 +19,11 @@
 <!-- Grafici CPU e RAM (scala 0-100%) -->
 <section class="mb-8" aria-labelledby="charts-heading">
   <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-    <h2 id="charts-heading" class="text-lg font-semibold text-slate-200">Risorse Server (Real-time)</h2>
+    <h2 id="charts-heading" class="text-lg font-semibold text-cr-text">Risorse Server (Real-time)</h2>
     <button
       id="btnRefreshAll"
       onclick="refreshAllTables(this)"
-      class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900 flex items-center gap-2"
+      class="px-4 py-2 rounded-lg bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas flex items-center gap-2"
       aria-label="Aggiorna tutte le tabelle"
     >
       <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -33,12 +33,12 @@
     </button>
   </div>
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
-      <h3 class="text-sm text-slate-400 mb-2">CPU % (0–100)</h3>
+    <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
+      <h3 class="text-sm text-cr-muted mb-2">CPU % (0–100)</h3>
       <canvas id="chartCpu" height="120"></canvas>
     </div>
-    <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
-      <h3 class="text-sm text-slate-400 mb-2">RAM % (0–100)</h3>
+    <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
+      <h3 class="text-sm text-cr-muted mb-2">RAM % (0–100)</h3>
       <canvas id="chartRam" height="120"></canvas>
     </div>
   </div>
@@ -46,32 +46,32 @@
 
 <!-- Overview Server -->
 <section class="mb-8" aria-labelledby="overview-heading">
-  <h2 id="overview-heading" class="text-lg font-semibold text-slate-200 mb-4">Overview Server</h2>
+  <h2 id="overview-heading" class="text-lg font-semibold text-cr-text mb-4">Overview Server</h2>
   <div id="systemOverview" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-    <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
-      <div class="text-sm text-slate-400">Uptime</div>
+    <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
+      <div class="text-sm text-cr-muted">Uptime</div>
       <div id="sysUptime" class="text-lg font-mono">-</div>
     </div>
-    <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
-      <div class="text-sm text-slate-400">Load 1m</div>
+    <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
+      <div class="text-sm text-cr-muted">Load 1m</div>
       <div id="sysCpu" class="text-lg font-mono">-</div>
     </div>
-    <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
-      <div class="text-sm text-slate-400">RAM</div>
+    <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
+      <div class="text-sm text-cr-muted">RAM</div>
       <div id="sysMem" class="text-lg font-mono">-</div>
     </div>
-    <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
-      <div class="text-sm text-slate-400">Disco</div>
+    <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
+      <div class="text-sm text-cr-muted">Disco</div>
       <div id="sysDisk" class="text-lg font-mono">-</div>
     </div>
   </div>
   <div class="flex flex-wrap gap-4 items-center">
-    <span id="nginxStatus" class="text-sm text-slate-400">Nginx: -</span>
-    <span id="redisStatus" class="text-sm text-slate-400">Redis: -</span>
+    <span id="nginxStatus" class="text-sm text-cr-muted">Nginx: -</span>
+    <span id="redisStatus" class="text-sm text-cr-muted">Redis: -</span>
     <button
       id="btnNginxReload"
       onclick="nginxReload(this)"
-      class="px-3 py-1.5 rounded text-sm bg-slate-700 hover:bg-slate-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+      class="px-3 py-1.5 rounded text-sm bg-cr-surface2 hover:bg-cr-navHover focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas"
       aria-label="Ricarica configurazione Nginx"
     >
       Reload Nginx
@@ -81,37 +81,37 @@
 
 <!-- Azioni globali -->
 <section class="mb-8" aria-labelledby="global-actions-heading">
-  <h2 id="global-actions-heading" class="text-lg font-semibold text-slate-200 mb-4">Azioni globali</h2>
+  <h2 id="global-actions-heading" class="text-lg font-semibold text-cr-text mb-4">Azioni globali</h2>
   <div class="flex flex-wrap gap-4">
     <button
       onclick="restartAllWebapps(this)"
-      class="px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
+      class="px-4 py-2 rounded-lg bg-cr-info hover:opacity-90 text-white font-medium focus:outline-none focus:ring-2 focus:ring-cr-info focus:ring-offset-2 focus:ring-offset-cr-canvas disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Riavvia tutte le webapp
     </button>
     <button
       onclick="restoreAll(this)"
-      class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
+      class="px-4 py-2 rounded-lg bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Ripristina tutti i processi
     </button>
     <button
       onclick="runRecoverRunbook('padel-tour', this)"
-      class="px-4 py-2 rounded-lg bg-purple-700 hover:bg-purple-600 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
+      class="px-4 py-2 rounded-lg bg-purple-700 hover:bg-purple-600 text-white font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-cr-canvas disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Runbook Recovery (padel-tour)
     </button>
   </div>
-  <div class="mt-4 rounded-lg border border-slate-700 bg-slate-800 p-4">
+  <div class="mt-4 rounded-lg border border-cr-border bg-cr-surface p-4">
     <div class="flex flex-wrap items-end gap-3 mb-3">
-      <label class="text-sm text-slate-300">Modalita runbook
-        <select id="runbookMode" class="ml-2 rounded bg-slate-700 border border-slate-600 px-2 py-1">
+      <label class="text-sm text-cr-text">Modalita runbook
+        <select id="runbookMode" class="ml-2 rounded bg-cr-surface2 border border-cr-inputBorder px-2 py-1">
           <option value="soft_recover">soft_recover</option>
           <option value="full_recover" selected>full_recover</option>
           <option value="safe_rollback">safe_rollback</option>
         </select>
       </label>
-      <label class="text-sm text-slate-300">
+      <label class="text-sm text-cr-text">
         <input id="runbookDryRun" type="checkbox" class="mr-1 align-middle" />
         dry-run
       </label>
@@ -124,34 +124,34 @@
 <section class="mb-8" aria-labelledby="ports-heading">
   <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
     <div>
-      <h2 id="ports-heading" class="text-lg font-semibold text-slate-200">Porte in ascolto</h2>
-      <p class="text-sm text-slate-400 mt-1">Webapp (backend Node) e Nginx 80/443; stato rilevato con <span class="font-mono text-slate-300">ss</span> sul server.</p>
+      <h2 id="ports-heading" class="text-lg font-semibold text-cr-text">Porte in ascolto</h2>
+      <p class="text-sm text-cr-muted mt-1">Webapp (backend Node) e Nginx 80/443; stato rilevato con <span class="font-mono text-cr-text">ss</span> sul server.</p>
     </div>
     <button
       type="button"
       onclick="loadSitePorts(this)"
-      class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+      class="px-4 py-2 rounded-lg bg-cr-surface2 hover:bg-cr-navHover focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas"
     >
       Aggiorna porte
     </button>
   </div>
-  <p id="sitePortsSsWarn" class="hidden mb-3 text-sm text-amber-400"></p>
+  <p id="sitePortsSsWarn" class="hidden mb-3 text-sm text-cr-warning"></p>
   <div id="sitePortsMobile" class="md:hidden space-y-3"></div>
-  <div class="hidden md:block rounded-lg border border-slate-700 bg-slate-800 overflow-x-auto">
+  <div class="hidden md:block rounded-lg border border-cr-border bg-cr-surface overflow-x-auto">
     <table class="w-full min-w-[640px]">
-      <thead class="bg-slate-700/50">
+      <thead class="cr-thead">
         <tr>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">Sito / servizio</th>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">URL pubblico</th>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">Porta</th>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">PM2</th>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">In ascolto</th>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">Indirizzo</th>
+          <th class="text-left px-4 py-3 text-cr-text font-medium">Sito / servizio</th>
+          <th class="text-left px-4 py-3 text-cr-text font-medium">URL pubblico</th>
+          <th class="text-left px-4 py-3 text-cr-text font-medium">Porta</th>
+          <th class="text-left px-4 py-3 text-cr-text font-medium">PM2</th>
+          <th class="text-left px-4 py-3 text-cr-text font-medium">In ascolto</th>
+          <th class="text-left px-4 py-3 text-cr-text font-medium">Indirizzo</th>
         </tr>
       </thead>
       <tbody id="sitePortsBody">
         <tr>
-          <td colspan="6" class="px-4 py-6 text-center text-slate-500">Caricamento…</td>
+          <td colspan="6" class="px-4 py-6 text-center text-cr-muted">Caricamento…</td>
         </tr>
       </tbody>
     </table>
@@ -161,10 +161,10 @@
 <!-- Database Backup -->
 <% if (dbConfigured) { %>
 <section class="mb-8" aria-labelledby="db-heading">
-  <h2 id="db-heading" class="text-lg font-semibold text-slate-200 mb-4">Database</h2>
+  <h2 id="db-heading" class="text-lg font-semibold text-cr-text mb-4">Database</h2>
   <a
     href="/api/db-backup"
-    class="inline-block px-4 py-2 rounded-lg bg-violet-700 hover:bg-violet-600 focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+    class="inline-block px-4 py-2 rounded-lg bg-violet-700 hover:bg-violet-600 focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:ring-offset-cr-canvas"
     download
   >
     Backup MySQL (.sql.gz)
@@ -172,30 +172,30 @@
 </section>
 <% } else { %>
 <section class="mb-8" aria-labelledby="db-heading">
-  <h2 id="db-heading" class="text-lg font-semibold text-slate-200 mb-4">Database</h2>
-  <p class="text-slate-500 text-sm">Database MySQL non configurato. Imposta DB_HOST, DB_USER, DB_NAME in .env.</p>
+  <h2 id="db-heading" class="text-lg font-semibold text-cr-text mb-4">Database</h2>
+  <p class="text-cr-muted text-sm">Database MySQL non configurato. Imposta DB_HOST, DB_USER, DB_NAME in .env.</p>
 </section>
 <% } %>
 
 <!-- Health check -->
 <section class="mb-8" aria-labelledby="health-heading">
-  <h2 id="health-heading" class="text-lg font-semibold text-slate-200 mb-4">Health check webapp</h2>
+  <h2 id="health-heading" class="text-lg font-semibold text-cr-text mb-4">Health check webapp</h2>
   <button
     onclick="checkHealth()"
-    class="mb-4 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+    class="mb-4 px-4 py-2 rounded-lg bg-cr-surface2 hover:bg-cr-navHover focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas"
   >
     Verifica
   </button>
   <div id="healthResults" class="hidden">
     <div class="md:hidden space-y-3" id="healthCards"></div>
-    <div class="hidden md:block rounded-lg border border-slate-700 bg-slate-800">
+    <div class="hidden md:block rounded-lg border border-cr-border bg-cr-surface">
       <table class="w-full">
-        <thead class="bg-slate-700/50">
+        <thead class="cr-thead">
           <tr>
-            <th class="text-left px-4 py-3 text-slate-300 font-medium">Webapp</th>
-            <th class="text-left px-4 py-3 text-slate-300 font-medium">URL</th>
-            <th class="text-left px-4 py-3 text-slate-300 font-medium">Status</th>
-            <th class="text-left px-4 py-3 text-slate-300 font-medium">Tempo (ms)</th>
+            <th class="text-left px-4 py-3 text-cr-text font-medium">Webapp</th>
+            <th class="text-left px-4 py-3 text-cr-text font-medium">URL</th>
+            <th class="text-left px-4 py-3 text-cr-text font-medium">Status</th>
+            <th class="text-left px-4 py-3 text-cr-text font-medium">Tempo (ms)</th>
           </tr>
         </thead>
         <tbody id="healthBody"></tbody>
@@ -205,67 +205,67 @@
 </section>
 
 <section class="mb-8" aria-labelledby="quality-heading">
-  <h2 id="quality-heading" class="text-lg font-semibold text-slate-200 mb-3">Quality gates</h2>
-  <div id="qualityGatesBox" class="rounded-lg border border-slate-700 bg-slate-800 p-4 text-sm text-slate-300">Caricamento KPI operativi...</div>
+  <h2 id="quality-heading" class="text-lg font-semibold text-cr-text mb-3">Quality gates</h2>
+  <div id="qualityGatesBox" class="rounded-lg border border-cr-border bg-cr-surface p-4 text-sm text-cr-text">Caricamento KPI operativi...</div>
 </section>
 
 <!-- Processi PM2 (aggiornamento live ogni 3s) -->
 <section class="mb-8" aria-labelledby="processes-heading">
-  <h2 id="processes-heading" class="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
+  <h2 id="processes-heading" class="text-lg font-semibold text-cr-text mb-4 flex items-center gap-2">
     Processi PM2
-    <span id="pm2LiveIndicator" class="inline-flex items-center gap-1 text-xs font-normal text-slate-500">
-      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true"></span>
+    <span id="pm2LiveIndicator" class="inline-flex items-center gap-1 text-xs font-normal text-cr-muted">
+      <span class="w-2 h-2 rounded-full bg-cr-accentHover animate-pulse" aria-hidden="true"></span>
       <span>live</span>
     </span>
   </h2>
   <div id="processCardsMobile" class="md:hidden space-y-3">
     <% (processes || []).forEach((p) => { %>
-    <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
-      <a href="/process/<%= p.name %>" class="text-emerald-400 hover:underline font-mono font-medium block mb-2"><%= p.name %></a>
-      <div class="flex flex-wrap gap-2 text-sm text-slate-400 mb-3">
-        <span class="px-2 py-0.5 rounded text-xs font-medium <%= p.status === 'online' ? 'bg-emerald-900/60 text-emerald-300' : p.status === 'stopped' ? 'bg-amber-900/60 text-amber-300' : 'bg-red-900/60 text-red-300' %>"><%= p.status %></span>
+    <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
+      <a href="/process/<%= p.name %>" class="text-cr-accent hover:underline font-mono font-medium block mb-2"><%= p.name %></a>
+      <div class="flex flex-wrap gap-2 text-sm text-cr-muted mb-3">
+        <span class="px-2 py-0.5 rounded text-xs font-medium <%= p.status === 'online' ? 'bg-[var(--cr-success-bg)] text-cr-accent' : p.status === 'stopped' ? 'bg-[var(--cr-warning-bg)] text-cr-warning' : 'bg-[var(--cr-danger-bg)] text-cr-danger' %>"><%= p.status %></span>
         <span>CPU <%= p.cpu %>%</span>
         <span><%= p.memory %> MB</span>
         <span>Uptime <%= p.uptime %></span>
         <span>Restart <%= p.restart_time %></span>
         <% if (p.restart_time >= 3) { %>
-          <span class="px-2 py-0.5 rounded text-xs font-medium bg-red-900/60 text-red-300">Crash loop?</span>
+          <span class="px-2 py-0.5 rounded text-xs font-medium bg-[var(--cr-danger-bg)] text-cr-danger">Crash loop?</span>
         <% } %>
       </div>
       <div class="flex flex-wrap gap-1">
-        <button onclick="processAction('<%= p.name %>', 'start', this)" class="px-2 py-1.5 rounded text-xs bg-emerald-700 hover:bg-emerald-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Start</button>
-        <button onclick="processAction('<%= p.name %>', 'stop', this)" class="px-2 py-1.5 rounded text-xs bg-amber-700 hover:bg-amber-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>
-        <button onclick="processAction('<%= p.name %>', 'restart', this)" class="px-2 py-1.5 rounded text-xs bg-blue-700 hover:bg-blue-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>
-        <% if (!p.isModule) { %><button onclick="processFlush('<%= p.name %>', this)" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Flush</button><% } %>
-        <button onclick="resetRestartCount('<%= p.name %>', this)" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>
+        <button onclick="processAction('<%= p.name %>', 'start', this)" class="px-2 py-1.5 rounded text-xs bg-cr-accent hover:bg-cr-accent min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Start</button>
+        <button onclick="processAction('<%= p.name %>', 'stop', this)" class="px-2 py-1.5 rounded text-xs bg-cr-warning hover:opacity-90 text-white dark:text-slate-900 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed font-medium">Stop</button>
+        <button onclick="processAction('<%= p.name %>', 'restart', this)" class="px-2 py-1.5 rounded text-xs bg-cr-info hover:opacity-90 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>
+        <% if (!p.isModule) { %><button onclick="processFlush('<%= p.name %>', this)" class="px-2 py-1.5 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Flush</button><% } %>
+        <button onclick="resetRestartCount('<%= p.name %>', this)" class="px-2 py-1.5 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>
       </div>
     </div>
     <% }); %>
     <% if (!processes || processes.length === 0) { %>
-    <p class="text-slate-500 text-center py-8">Nessun processo PM2</p>
+    <p class="text-cr-muted text-center py-8">Nessun processo PM2</p>
     <% } %>
   </div>
-  <div class="hidden md:block rounded-lg border border-slate-700 bg-slate-800">
+  <div class="hidden md:block rounded-lg border border-cr-border bg-cr-surface">
     <table class="w-full">
-      <thead class="bg-slate-700/50">
+      <thead class="cr-thead">
         <tr>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">Nome</th>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">Status</th>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">CPU %</th>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">Memory</th>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">Uptime</th>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">Restarts</th>
-          <th class="text-left px-4 py-3 text-slate-300 font-medium">Azioni</th>
+          <th class="text-left px-4 py-3 text-cr-text font-medium">Nome</th>
+          <th class="text-left px-4 py-3 text-cr-text font-medium">Status</th>
+          <th class="text-left px-4 py-3 text-cr-text font-medium">CPU %</th>
+          <th class="text-left px-4 py-3 text-cr-text font-medium">Memory</th>
+          <th class="text-left px-4 py-3 text-cr-text font-medium">Uptime</th>
+          <th class="text-left px-4 py-3 text-cr-text font-medium">Restarts</th>
+          <th class="text-left px-4 py-3 text-cr-text font-medium">Azioni</th>
         </tr>
       </thead>
       <tbody id="processTableBody">
         <% (processes || []).forEach((p) => { %>
-          <tr class="border-t border-slate-700 hover:bg-slate-700/30">
+          <tr class="border-t border-cr-border hover:bg-cr-navHover">
             <td class="px-4 py-3 font-mono">
-              <a href="/process/<%= p.name %>" class="text-emerald-400 hover:underline"><%= p.name %></a>
+              <a href="/process/<%= p.name %>" class="text-cr-accent hover:underline"><%= p.name %></a>
             </td>
             <td class="px-4 py-3">
-              <span class="px-2 py-0.5 rounded text-xs font-medium <%= p.status === 'online' ? 'bg-emerald-900/60 text-emerald-300' : p.status === 'stopped' ? 'bg-amber-900/60 text-amber-300' : 'bg-red-900/60 text-red-300' %>">
+              <span class="px-2 py-0.5 rounded text-xs font-medium <%= p.status === 'online' ? 'bg-[var(--cr-success-bg)] text-cr-accent' : p.status === 'stopped' ? 'bg-[var(--cr-warning-bg)] text-cr-warning' : 'bg-[var(--cr-danger-bg)] text-cr-danger' %>">
                 <%= p.status %>
               </span>
             </td>
@@ -275,23 +275,23 @@
             <td class="px-4 py-3">
               <%= p.restart_time %>
               <% if (p.restart_time >= 3) { %>
-                <span class="ml-2 px-2 py-0.5 rounded text-[11px] font-medium bg-red-900/60 text-red-300 whitespace-nowrap">Crash loop?</span>
+                <span class="ml-2 px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--cr-danger-bg)] text-cr-danger whitespace-nowrap">Crash loop?</span>
               <% } %>
             </td>
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-1">
-                <button onclick="processAction('<%= p.name %>', 'start', this)" class="px-2 py-1 rounded text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed">Start</button>
-                <button onclick="processAction('<%= p.name %>', 'stop', this)" class="px-2 py-1 rounded text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>
-                <button onclick="processAction('<%= p.name %>', 'restart', this)" class="px-2 py-1 rounded text-xs bg-blue-700 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>
-                <% if (!p.isModule) { %><button onclick="processFlush('<%= p.name %>', this)" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed">Flush</button><% } %>
-                <button onclick="resetRestartCount('<%= p.name %>', this)" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>
+                <button onclick="processAction('<%= p.name %>', 'start', this)" class="px-2 py-1 rounded text-xs bg-cr-accent hover:bg-cr-accent disabled:opacity-50 disabled:cursor-not-allowed">Start</button>
+                <button onclick="processAction('<%= p.name %>', 'stop', this)" class="px-2 py-1 rounded text-xs bg-cr-warning hover:opacity-90 text-white dark:text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed font-medium">Stop</button>
+                <button onclick="processAction('<%= p.name %>', 'restart', this)" class="px-2 py-1 rounded text-xs bg-cr-info hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>
+                <% if (!p.isModule) { %><button onclick="processFlush('<%= p.name %>', this)" class="px-2 py-1 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover disabled:opacity-50 disabled:cursor-not-allowed">Flush</button><% } %>
+                <button onclick="resetRestartCount('<%= p.name %>', this)" class="px-2 py-1 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>
               </div>
             </td>
           </tr>
         <% }); %>
         <% if (!processes || processes.length === 0) { %>
           <tr>
-            <td colspan="7" class="px-4 py-8 text-center text-slate-500">Nessun processo PM2</td>
+            <td colspan="7" class="px-4 py-8 text-center text-cr-muted">Nessun processo PM2</td>
           </tr>
         <% } %>
       </tbody>
@@ -303,27 +303,27 @@
 <section class="mb-8" aria-labelledby="sysprocesses-heading">
   <div class="flex flex-wrap items-center gap-4 mb-4">
     <div>
-      <h2 id="sysprocesses-heading" class="text-lg font-semibold text-slate-200">Processi di sistema</h2>
-      <p class="text-sm text-slate-400 mt-1">Top 25 processi per RAM (nginx, node, systemd, ecc.)</p>
+      <h2 id="sysprocesses-heading" class="text-lg font-semibold text-cr-text">Processi di sistema</h2>
+      <p class="text-sm text-cr-muted mt-1">Top 25 processi per RAM (nginx, node, systemd, ecc.)</p>
     </div>
     <button
       onclick="loadSystemProcesses(this)"
-      class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+      class="px-4 py-2 rounded-lg bg-cr-surface2 hover:bg-cr-navHover focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas"
     >
       Aggiorna processi sistema
     </button>
   </div>
   <div id="sysProcessesContainer" class="hidden">
-    <div class="rounded-lg border border-slate-700 bg-slate-800 overflow-x-auto">
+    <div class="rounded-lg border border-cr-border bg-cr-surface overflow-x-auto">
       <table class="w-full min-w-[500px]">
-        <thead class="bg-slate-700/50">
+        <thead class="cr-thead">
           <tr>
-            <th data-sort="pid" onclick="sortSysProcessesBy('pid')" class="text-left px-4 py-3 text-slate-300 font-medium cursor-pointer select-none hover:text-slate-100 hover:bg-slate-700 transition-colors">PID <span class="sort-indicator"></span></th>
-            <th data-sort="name" onclick="sortSysProcessesBy('name')" class="text-left px-4 py-3 text-slate-300 font-medium cursor-pointer select-none hover:text-slate-100 hover:bg-slate-700 transition-colors">Nome <span class="sort-indicator"></span></th>
-            <th data-sort="detail" onclick="sortSysProcessesBy('detail')" class="text-left px-4 py-3 text-slate-300 font-medium cursor-pointer select-none hover:text-slate-100 hover:bg-slate-700 transition-colors">Dettaglio <span class="sort-indicator"></span></th>
-            <th data-sort="cpu" onclick="sortSysProcessesBy('cpu')" class="text-left px-4 py-3 text-slate-300 font-medium cursor-pointer select-none hover:text-slate-100 hover:bg-slate-700 transition-colors">CPU % <span class="sort-indicator"></span></th>
-            <th data-sort="memRss" onclick="sortSysProcessesBy('memRss')" class="text-left px-4 py-3 text-slate-300 font-medium cursor-pointer select-none hover:text-slate-100 hover:bg-slate-700 transition-colors">RAM (MB) <span class="sort-indicator"></span></th>
-            <th data-sort="user" onclick="sortSysProcessesBy('user')" class="text-left px-4 py-3 text-slate-300 font-medium cursor-pointer select-none hover:text-slate-100 hover:bg-slate-700 transition-colors">Utente <span class="sort-indicator"></span></th>
+            <th data-sort="pid" onclick="sortSysProcessesBy('pid')" class="text-left px-4 py-3 text-cr-text font-medium cursor-pointer select-none hover:text-cr-text hover:bg-cr-surface2 transition-colors">PID <span class="sort-indicator"></span></th>
+            <th data-sort="name" onclick="sortSysProcessesBy('name')" class="text-left px-4 py-3 text-cr-text font-medium cursor-pointer select-none hover:text-cr-text hover:bg-cr-surface2 transition-colors">Nome <span class="sort-indicator"></span></th>
+            <th data-sort="detail" onclick="sortSysProcessesBy('detail')" class="text-left px-4 py-3 text-cr-text font-medium cursor-pointer select-none hover:text-cr-text hover:bg-cr-surface2 transition-colors">Dettaglio <span class="sort-indicator"></span></th>
+            <th data-sort="cpu" onclick="sortSysProcessesBy('cpu')" class="text-left px-4 py-3 text-cr-text font-medium cursor-pointer select-none hover:text-cr-text hover:bg-cr-surface2 transition-colors">CPU % <span class="sort-indicator"></span></th>
+            <th data-sort="memRss" onclick="sortSysProcessesBy('memRss')" class="text-left px-4 py-3 text-cr-text font-medium cursor-pointer select-none hover:text-cr-text hover:bg-cr-surface2 transition-colors">RAM (MB) <span class="sort-indicator"></span></th>
+            <th data-sort="user" onclick="sortSysProcessesBy('user')" class="text-left px-4 py-3 text-cr-text font-medium cursor-pointer select-none hover:text-cr-text hover:bg-cr-surface2 transition-colors">Utente <span class="sort-indicator"></span></th>
           </tr>
         </thead>
         <tbody id="sysProcessesBody"></tbody>
@@ -490,36 +490,36 @@
     }
     const rows = data.sites || [];
     function listenBadge(listening) {
-      if (listening === true) return '<span class="px-2 py-0.5 rounded text-xs font-medium bg-emerald-900/60 text-emerald-300">Sì</span>';
-      if (listening === false) return '<span class="px-2 py-0.5 rounded text-xs font-medium bg-red-900/60 text-red-300">No</span>';
-      return '<span class="text-slate-500">n/d</span>';
+      if (listening === true) return '<span class="px-2 py-0.5 rounded text-xs font-medium bg-[var(--cr-success-bg)] text-cr-accent">Sì</span>';
+      if (listening === false) return '<span class="px-2 py-0.5 rounded text-xs font-medium bg-[var(--cr-danger-bg)] text-cr-danger">No</span>';
+      return '<span class="text-cr-muted">n/d</span>';
     }
     function kindLabel(kind) {
-      return kind === 'proxy' ? '<span class="text-slate-500 text-xs ml-1">(proxy)</span>' : '';
+      return kind === 'proxy' ? '<span class="text-cr-muted text-xs ml-1">(proxy)</span>' : '';
     }
     if (tbody) {
       tbody.innerHTML = rows.map(function (s) {
-        const urlCell = s.url ? '<a href="' + escapeHtml(s.url) + '" class="text-emerald-400 hover:underline break-all text-sm" target="_blank" rel="noopener">' + escapeHtml(s.url) + '</a>' : '<span class="text-slate-500">—</span>';
-        const pm2Cell = s.pm2 ? '<span class="font-mono text-sm">' + escapeHtml(s.pm2) + '</span>' : '<span class="text-slate-500">—</span>';
-        const procHint = (s.processHints && s.processHints.length) ? '<div class="text-xs text-slate-500 mt-1 truncate max-w-[200px]" title="' + escapeHtml(s.processHints.join(', ')) + '">' + escapeHtml(s.processHints.join(', ')) + '</div>' : '';
-        return '<tr class="border-t border-slate-700 hover:bg-slate-700/30">' +
-          '<td class="px-4 py-3 text-slate-200">' + escapeHtml(s.name) + kindLabel(s.kind) + '</td>' +
+        const urlCell = s.url ? '<a href="' + escapeHtml(s.url) + '" class="text-cr-accent hover:underline break-all text-sm" target="_blank" rel="noopener">' + escapeHtml(s.url) + '</a>' : '<span class="text-cr-muted">—</span>';
+        const pm2Cell = s.pm2 ? '<span class="font-mono text-sm">' + escapeHtml(s.pm2) + '</span>' : '<span class="text-cr-muted">—</span>';
+        const procHint = (s.processHints && s.processHints.length) ? '<div class="text-xs text-cr-muted mt-1 truncate max-w-[200px]" title="' + escapeHtml(s.processHints.join(', ')) + '">' + escapeHtml(s.processHints.join(', ')) + '</div>' : '';
+        return '<tr class="border-t border-cr-border hover:bg-cr-navHover">' +
+          '<td class="px-4 py-3 text-cr-text">' + escapeHtml(s.name) + kindLabel(s.kind) + '</td>' +
           '<td class="px-4 py-3">' + urlCell + '</td>' +
-          '<td class="px-4 py-3 font-mono text-emerald-300">' + escapeHtml(String(s.port)) + '</td>' +
+          '<td class="px-4 py-3 font-mono text-cr-accent">' + escapeHtml(String(s.port)) + '</td>' +
           '<td class="px-4 py-3">' + pm2Cell + '</td>' +
           '<td class="px-4 py-3">' + listenBadge(s.listening) + procHint + '</td>' +
-          '<td class="px-4 py-3 text-sm text-slate-400">' + escapeHtml(formatBindAddresses(s.bindAddresses)) + '</td></tr>';
+          '<td class="px-4 py-3 text-sm text-cr-muted">' + escapeHtml(formatBindAddresses(s.bindAddresses)) + '</td></tr>';
       }).join('');
     }
     if (mobile) {
       mobile.innerHTML = rows.map(function (s) {
-        const urlLine = s.url ? '<a href="' + escapeHtml(s.url) + '" class="text-emerald-400 hover:underline break-all text-sm" target="_blank" rel="noopener">' + escapeHtml(s.url) + '</a>' : '<span class="text-slate-500 text-sm">—</span>';
-        return '<div class="rounded-lg border border-slate-700 bg-slate-800 p-4">' +
-          '<div class="font-medium text-slate-200 mb-2">' + escapeHtml(s.name) + (s.kind === 'proxy' ? ' <span class="text-slate-500 text-xs">(proxy)</span>' : '') + '</div>' +
-          '<div class="space-y-1 text-sm text-slate-400"><div>Porta <span class="font-mono text-emerald-300">' + escapeHtml(String(s.port)) + '</span></div>' +
+        const urlLine = s.url ? '<a href="' + escapeHtml(s.url) + '" class="text-cr-accent hover:underline break-all text-sm" target="_blank" rel="noopener">' + escapeHtml(s.url) + '</a>' : '<span class="text-cr-muted text-sm">—</span>';
+        return '<div class="rounded-lg border border-cr-border bg-cr-surface p-4">' +
+          '<div class="font-medium text-cr-text mb-2">' + escapeHtml(s.name) + (s.kind === 'proxy' ? ' <span class="text-cr-muted text-xs">(proxy)</span>' : '') + '</div>' +
+          '<div class="space-y-1 text-sm text-cr-muted"><div>Porta <span class="font-mono text-cr-accent">' + escapeHtml(String(s.port)) + '</span></div>' +
           '<div>' + urlLine + '</div>' +
           (s.pm2 ? '<div>PM2 <span class="font-mono">' + escapeHtml(s.pm2) + '</span></div>' : '') +
-          '<div class="pt-2">' + (s.listening === true ? '<span class="text-emerald-300">In ascolto</span>' : s.listening === false ? '<span class="text-red-400">Non in ascolto</span>' : '<span class="text-slate-500">Stato n/d</span>') + '</div>' +
+          '<div class="pt-2">' + (s.listening === true ? '<span class="text-cr-accent">In ascolto</span>' : s.listening === false ? '<span class="text-cr-danger">Non in ascolto</span>' : '<span class="text-cr-muted">Stato n/d</span>') + '</div>' +
           '<div class="text-xs">' + escapeHtml(formatBindAddresses(s.bindAddresses)) + '</div></div></div>';
       }).join('');
     }
@@ -537,7 +537,7 @@
     } catch (e) {
       showToast('Errore porte: ' + e.message, 'error');
       const tbody = document.getElementById('sitePortsBody');
-      if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-red-400">Errore caricamento</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-cr-danger">Errore caricamento</td></tr>';
     }
     if (btn) setBtnLoading(btn, false);
   }
@@ -592,15 +592,15 @@
       tbody.innerHTML = '';
       cardsContainer.innerHTML = '';
       (data.results || []).forEach(function (r) {
-        const statusCls = r.ok ? 'text-emerald-300' : 'text-red-400';
+        const statusCls = r.ok ? 'text-cr-accent' : 'text-cr-danger';
         const statusText = r.ok ? r.status + ' OK' : (r.error || 'Errore');
         const tr = document.createElement('tr');
-        tr.className = 'border-t border-slate-700';
+        tr.className = 'border-t border-cr-border';
         tr.innerHTML = '<td class="px-4 py-3">' + (r.name || '') + '</td><td class="px-4 py-3 font-mono text-sm">' + (r.url || '') + '</td><td class="px-4 py-3 ' + statusCls + '">' + statusText + '</td><td class="px-4 py-3">' + (r.elapsed || '-') + '</td>';
         tbody.appendChild(tr);
         const card = document.createElement('div');
-        card.className = 'rounded-lg border border-slate-700 bg-slate-800 p-4';
-        card.innerHTML = '<div class="font-medium text-slate-200 mb-1">' + (r.name || '') + '</div><div class="font-mono text-sm text-slate-400 mb-2 break-all">' + (r.url || '') + '</div><div class="flex flex-wrap gap-2"><span class="' + statusCls + ' text-sm">' + statusText + '</span><span class="text-slate-400 text-sm">' + (r.elapsed || '-') + ' ms</span></div>';
+        card.className = 'rounded-lg border border-cr-border bg-cr-surface p-4';
+        card.innerHTML = '<div class="font-medium text-cr-text mb-1">' + (r.name || '') + '</div><div class="font-mono text-sm text-cr-muted mb-2 break-all">' + (r.url || '') + '</div><div class="flex flex-wrap gap-2"><span class="' + statusCls + ' text-sm">' + statusText + '</span><span class="text-cr-muted text-sm">' + (r.elapsed || '-') + ' ms</span></div>';
         cardsContainer.appendChild(card);
       });
       container.classList.remove('hidden');
@@ -629,40 +629,71 @@
     }
   }
 
-  // Chart.js - CPU e RAM (scala fissa 0-100%)
-  const chartScale100 = {
-    min: 0,
-    max: 100,
-    grid: { color: 'rgba(148, 163, 184, 0.2)' },
-    ticks: { color: '#94a3b8', stepSize: 25 }
-  };
-  const chartConfig = {
-    type: 'line',
-    options: {
+  // Chart.js - CPU e RAM (scala fissa 0-100%), colori da CSS variables (tema light/dark)
+  function crChartTokens() {
+    const st = getComputedStyle(document.documentElement);
+    return {
+      grid: st.getPropertyValue('--cr-chart-grid').trim() || 'rgba(148, 163, 184, 0.2)',
+      tick: st.getPropertyValue('--cr-chart-tick').trim() || '#64748b',
+      cpu: st.getPropertyValue('--cr-chart-cpu').trim(),
+      cpuFill: st.getPropertyValue('--cr-chart-cpu-fill').trim(),
+      ram: st.getPropertyValue('--cr-chart-ram').trim(),
+      ramFill: st.getPropertyValue('--cr-chart-ram-fill').trim(),
+    };
+  }
+
+  function buildChartOptions(t) {
+    const chartScale100 = {
+      min: 0,
+      max: 100,
+      grid: { color: t.grid },
+      ticks: { color: t.tick, stepSize: 25 }
+    };
+    return {
       responsive: true,
       maintainAspectRatio: true,
       plugins: { legend: { display: false } },
       scales: {
         x: {
-          grid: { color: 'rgba(148, 163, 184, 0.2)' },
-          ticks: { color: '#94a3b8', maxTicksLimit: 8 }
+          grid: { color: t.grid },
+          ticks: { color: t.tick, maxTicksLimit: 8 }
         },
         y: chartScale100
       }
-    }
-  };
+    };
+  }
 
-  const cpuData = { labels: [], datasets: [{ label: 'CPU %', data: [], borderColor: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.1)', fill: true }] };
-  const ramData = { labels: [], datasets: [{ label: 'RAM %', data: [], borderColor: '#60a5fa', backgroundColor: 'rgba(96, 165, 250, 0.1)', fill: true }] };
-
+  const t0 = crChartTokens();
   const chartCpu = new Chart(document.getElementById('chartCpu'), {
-    ...chartConfig,
-    data: cpuData
+    type: 'line',
+    options: buildChartOptions(t0),
+    data: { labels: [], datasets: [{ label: 'CPU %', data: [], borderColor: t0.cpu, backgroundColor: t0.cpuFill, fill: true }] }
   });
   const chartRam = new Chart(document.getElementById('chartRam'), {
-    ...chartConfig,
-    data: ramData
+    type: 'line',
+    options: buildChartOptions(t0),
+    data: { labels: [], datasets: [{ label: 'RAM %', data: [], borderColor: t0.ram, backgroundColor: t0.ramFill, fill: true }] }
   });
+
+  function applyChartTheme() {
+    const t = crChartTokens();
+    [chartCpu, chartRam].forEach((ch) => {
+      const ds = ch.data.datasets[0];
+      if (ch === chartCpu) {
+        ds.borderColor = t.cpu;
+        ds.backgroundColor = t.cpuFill;
+      } else {
+        ds.borderColor = t.ram;
+        ds.backgroundColor = t.ramFill;
+      }
+      ch.options.scales.x.grid.color = t.grid;
+      ch.options.scales.x.ticks.color = t.tick;
+      ch.options.scales.y.grid.color = t.grid;
+      ch.options.scales.y.ticks.color = t.tick;
+      ch.update('none');
+    });
+  }
+  window.addEventListener('cr-theme-change', applyChartTheme);
 
   function setChartFromHistory(chart, labels, values) {
     chart.data.labels = labels.slice();
@@ -719,15 +750,15 @@
           tbody.innerHTML = '';
           cardsContainer.innerHTML = '';
           (data.results || []).forEach(function (r) {
-            const statusCls = r.ok ? 'text-emerald-300' : 'text-red-400';
+            const statusCls = r.ok ? 'text-cr-accent' : 'text-cr-danger';
             const statusText = r.ok ? r.status + ' OK' : (r.error || 'Errore');
             const tr = document.createElement('tr');
-            tr.className = 'border-t border-slate-700';
+            tr.className = 'border-t border-cr-border';
             tr.innerHTML = '<td class="px-4 py-3">' + (r.name || '') + '</td><td class="px-4 py-3 font-mono text-sm">' + (r.url || '') + '</td><td class="px-4 py-3 ' + statusCls + '">' + statusText + '</td><td class="px-4 py-3">' + (r.elapsed || '-') + '</td>';
             tbody.appendChild(tr);
             const card = document.createElement('div');
-            card.className = 'rounded-lg border border-slate-700 bg-slate-800 p-4';
-            card.innerHTML = '<div class="font-medium text-slate-200 mb-1">' + (r.name || '') + '</div><div class="font-mono text-sm text-slate-400 mb-2 break-all">' + (r.url || '') + '</div><div class="flex flex-wrap gap-2"><span class="' + statusCls + ' text-sm">' + statusText + '</span><span class="text-slate-400 text-sm">' + (r.elapsed || '-') + ' ms</span></div>';
+            card.className = 'rounded-lg border border-cr-border bg-cr-surface p-4';
+            card.innerHTML = '<div class="font-medium text-cr-text mb-1">' + (r.name || '') + '</div><div class="font-mono text-sm text-cr-muted mb-2 break-all">' + (r.url || '') + '</div><div class="flex flex-wrap gap-2"><span class="' + statusCls + ' text-sm">' + statusText + '</span><span class="text-cr-muted text-sm">' + (r.elapsed || '-') + ' ms</span></div>';
             cardsContainer.appendChild(card);
           });
           container.classList.remove('hidden');
@@ -779,20 +810,20 @@
   async function loadRunbookApps() {
     const root = document.getElementById('runbookApps');
     if (!root) return;
-    root.innerHTML = '<span class="text-sm text-slate-400">Caricamento app...</span>';
+    root.innerHTML = '<span class="text-sm text-cr-muted">Caricamento app...</span>';
     try {
       const res = await fetch('/api/runbook/apps');
       const json = await res.json();
       root.innerHTML = '';
       (json.apps || []).forEach((app) => {
         const b = document.createElement('button');
-        b.className = 'px-3 py-1.5 rounded bg-purple-700 hover:bg-purple-600 text-sm';
+        b.className = 'px-3 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-600 text-sm text-white font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-cr-surface';
         b.textContent = `Recover ${app.name}`;
         b.onclick = () => runRecoverRunbook(app.name, b);
         root.appendChild(b);
       });
     } catch (err) {
-      root.innerHTML = `<span class="text-sm text-red-300">Errore caricamento app: ${err.message}</span>`;
+      root.innerHTML = `<span class="text-sm text-cr-danger">Errore caricamento app: ${err.message}</span>`;
     }
   }
 
@@ -803,12 +834,12 @@
       const banner = document.getElementById('incidentBanner');
       const text = document.getElementById('incidentText');
       if (!banner || !text) return;
-      banner.classList.remove('hidden', 'border-red-700', 'bg-red-900/40', 'border-emerald-700', 'bg-emerald-900/30');
+      banner.classList.remove('hidden', 'border-cr-danger', 'bg-[var(--cr-danger-bg)]', 'border-cr-success', 'bg-[var(--cr-success-bg)]');
       if (data.severity === 'critical') {
-        banner.classList.add('border-red-700', 'bg-red-900/40');
+        banner.classList.add('border-cr-danger', 'bg-[var(--cr-danger-bg)]');
         text.textContent = (data.incidents && data.incidents.length) ? data.incidents.slice(0, 3).join(' | ') : 'Sono presenti anomalie operative.';
       } else {
-        banner.classList.add('border-emerald-700', 'bg-emerald-900/30');
+        banner.classList.add('border-cr-success', 'bg-[var(--cr-success-bg)]');
         text.textContent = 'Nessun incidente critico rilevato. Tutti i servizi principali risultano stabili.';
       }
     } catch (_) {}
@@ -832,36 +863,36 @@
   }
 
   function statusClass(status) {
-    if (status === 'online') return 'bg-emerald-900/60 text-emerald-300';
-    if (status === 'stopped') return 'bg-amber-900/60 text-amber-300';
-    return 'bg-red-900/60 text-red-300';
+    if (status === 'online') return 'bg-[var(--cr-success-bg)] text-cr-accent';
+    if (status === 'stopped') return 'bg-[var(--cr-warning-bg)] text-cr-warning';
+    return 'bg-[var(--cr-danger-bg)] text-cr-danger';
   }
 
   function renderProcessRow(p) {
-    const crashBadge = p.restart_time >= 3 ? '<span class="ml-2 px-2 py-0.5 rounded text-[11px] font-medium bg-red-900/60 text-red-300 whitespace-nowrap">Crash loop?</span>' : '';
-    const flushBtn = p.isModule ? '' : '<button onclick="processFlush(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>';
-    return '<tr class="border-t border-slate-700 hover:bg-slate-700/30">' +
-      '<td class="px-4 py-3 font-mono"><a href="/process/' + encodeURIComponent(p.name) + '" class="text-emerald-400 hover:underline">' + escapeHtml(p.name) + '</a></td>' +
+    const crashBadge = p.restart_time >= 3 ? '<span class="ml-2 px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--cr-danger-bg)] text-cr-danger whitespace-nowrap">Crash loop?</span>' : '';
+    const flushBtn = p.isModule ? '' : '<button onclick="processFlush(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>';
+    return '<tr class="border-t border-cr-border hover:bg-cr-navHover">' +
+      '<td class="px-4 py-3 font-mono"><a href="/process/' + encodeURIComponent(p.name) + '" class="text-cr-accent hover:underline">' + escapeHtml(p.name) + '</a></td>' +
       '<td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs font-medium ' + statusClass(p.status) + '">' + escapeHtml(p.status) + '</span></td>' +
       '<td class="px-4 py-3">' + escapeHtml(String(p.cpu)) + '%</td>' +
       '<td class="px-4 py-3">' + escapeHtml(String(p.memory)) + ' MB</td>' +
       '<td class="px-4 py-3">' + escapeHtml(p.uptime || '-') + '</td>' +
       '<td class="px-4 py-3">' + escapeHtml(String(p.restart_time)) + crashBadge + '</td>' +
       '<td class="px-4 py-3"><div class="flex flex-wrap gap-1">' +
-      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'start\', this)" class="px-2 py-1 rounded text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed">Start</button>' +
-      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'stop\', this)" class="px-2 py-1 rounded text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>' +
-      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'restart\', this)" class="px-2 py-1 rounded text-xs bg-blue-700 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>' +
+      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'start\', this)" class="px-2 py-1 rounded text-xs bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-medium disabled:opacity-50 disabled:cursor-not-allowed">Start</button>' +
+      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'stop\', this)" class="px-2 py-1 rounded text-xs bg-cr-warning hover:opacity-90 text-white dark:text-slate-900 font-medium disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>' +
+      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'restart\', this)" class="px-2 py-1 rounded text-xs bg-cr-info hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>' +
       flushBtn +
-      '<button onclick="resetRestartCount(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1 rounded text-xs bg-slate-600 hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>' +
+      '<button onclick="resetRestartCount(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>' +
       '</div></td></tr>';
   }
 
   function renderProcessCard(p) {
-    const crashBadge = p.restart_time >= 3 ? '<span class="px-2 py-0.5 rounded text-xs font-medium bg-red-900/60 text-red-300">Crash loop?</span>' : '';
-    const flushBtn = p.isModule ? '' : '<button onclick="processFlush(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>';
-    return '<div class="rounded-lg border border-slate-700 bg-slate-800 p-4">' +
-      '<a href="/process/' + encodeURIComponent(p.name) + '" class="text-emerald-400 hover:underline font-mono font-medium block mb-2">' + escapeHtml(p.name) + '</a>' +
-      '<div class="flex flex-wrap gap-2 text-sm text-slate-400 mb-3">' +
+    const crashBadge = p.restart_time >= 3 ? '<span class="px-2 py-0.5 rounded text-xs font-medium bg-[var(--cr-danger-bg)] text-cr-danger">Crash loop?</span>' : '';
+    const flushBtn = p.isModule ? '' : '<button onclick="processFlush(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1.5 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>';
+    return '<div class="rounded-lg border border-cr-border bg-cr-surface p-4">' +
+      '<a href="/process/' + encodeURIComponent(p.name) + '" class="text-cr-accent hover:underline font-mono font-medium block mb-2">' + escapeHtml(p.name) + '</a>' +
+      '<div class="flex flex-wrap gap-2 text-sm text-cr-muted mb-3">' +
       '<span class="px-2 py-0.5 rounded text-xs font-medium ' + statusClass(p.status) + '">' + escapeHtml(p.status) + '</span>' +
       '<span>CPU ' + escapeHtml(String(p.cpu)) + '%</span>' +
       '<span>' + escapeHtml(String(p.memory)) + ' MB</span>' +
@@ -869,11 +900,11 @@
       '<span>Restart ' + escapeHtml(String(p.restart_time)) + '</span>' + crashBadge +
       '</div>' +
       '<div class="flex flex-wrap gap-1">' +
-      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'start\', this)" class="px-2 py-1.5 rounded text-xs bg-emerald-700 hover:bg-emerald-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Start</button>' +
-      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'stop\', this)" class="px-2 py-1.5 rounded text-xs bg-amber-700 hover:bg-amber-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>' +
-      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'restart\', this)" class="px-2 py-1.5 rounded text-xs bg-blue-700 hover:bg-blue-600 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>' +
+      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'start\', this)" class="px-2 py-1.5 rounded text-xs bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-medium min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Start</button>' +
+      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'stop\', this)" class="px-2 py-1.5 rounded text-xs bg-cr-warning hover:opacity-90 text-white dark:text-slate-900 font-medium min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>' +
+      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'restart\', this)" class="px-2 py-1.5 rounded text-xs bg-cr-info hover:opacity-90 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>' +
       flushBtn +
-      '<button onclick="resetRestartCount(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1.5 rounded text-xs bg-slate-600 hover:bg-slate-500 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>' +
+      '<button onclick="resetRestartCount(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1.5 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>' +
       '</div></div>';
   }
 
@@ -889,21 +920,21 @@
   let sysProcessesSort = { col: 'memRss', dir: -1 };
 
   function renderSysProcessesRow(p) {
-    const detail = p.detail ? '<span class="text-emerald-400/90">' + escapeHtml(p.detail) + '</span>' : '<span class="text-slate-500">—</span>';
-    return '<tr class="border-t border-slate-700 hover:bg-slate-700/30">' +
+    const detail = p.detail ? '<span class="text-cr-accent/90">' + escapeHtml(p.detail) + '</span>' : '<span class="text-cr-muted">—</span>';
+    return '<tr class="border-t border-cr-border hover:bg-cr-navHover">' +
       '<td class="px-4 py-2 font-mono text-sm">' + escapeHtml(p.pid) + '</td>' +
       '<td class="px-4 py-2 font-mono text-sm">' + escapeHtml(p.name) + '</td>' +
       '<td class="px-4 py-2 text-sm max-w-[220px] truncate"' + (p.detail && p.detail.length > 35 ? ' title="' + escapeHtml(p.detail) + '"' : '') + '>' + detail + '</td>' +
       '<td class="px-4 py-2">' + escapeHtml(p.cpu) + '%</td>' +
       '<td class="px-4 py-2">' + escapeHtml(p.memRss) + ' MB</td>' +
-      '<td class="px-4 py-2 text-slate-400">' + escapeHtml(p.user) + '</td></tr>';
+      '<td class="px-4 py-2 text-cr-muted">' + escapeHtml(p.user) + '</td></tr>';
   }
 
   function renderSysProcessesTable(processes, emptyMsg) {
     const tbody = document.getElementById('sysProcessesBody');
     if (!tbody) return;
     if (!processes || processes.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500">' + escapeHtml(emptyMsg || 'Nessun dato') + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-cr-muted">' + escapeHtml(emptyMsg || 'Nessun dato') + '</td></tr>';
       document.querySelectorAll('#sysProcessesContainer th[data-sort] .sort-indicator').forEach(function (s) { s.textContent = ''; s.className = 'sort-indicator'; });
       return;
     }
@@ -930,7 +961,7 @@
       if (!span) return;
       if (th.dataset.sort === sysProcessesSort.col) {
         span.textContent = sysProcessesSort.dir === 1 ? ' ▲' : ' ▼';
-        span.className = 'sort-indicator text-emerald-400';
+        span.className = 'sort-indicator text-cr-accent';
       } else {
         span.textContent = '';
         span.className = 'sort-indicator';
@@ -953,8 +984,8 @@
     const cards = document.getElementById('processCardsMobile');
     if (!tbody || !cards) return;
     if (!processes || processes.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">Nessun processo PM2</td></tr>';
-      cards.innerHTML = '<p class="text-slate-500 text-center py-8">Nessun processo PM2</p>';
+      tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-cr-muted">Nessun processo PM2</td></tr>';
+      cards.innerHTML = '<p class="text-cr-muted text-center py-8">Nessun processo PM2</p>';
       return;
     }
     tbody.innerHTML = processes.map(renderProcessRow).join('');

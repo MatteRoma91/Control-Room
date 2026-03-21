@@ -11,78 +11,82 @@
   aria-modal="true"
   aria-labelledby="env-editor-title"
 >
-  <div class="absolute inset-0 bg-black/60" @click="$dispatch('env-editor-hide')"></div>
-  <div class="absolute inset-4 md:inset-10 bg-slate-800 rounded-lg border border-slate-700 flex flex-col">
-    <div class="flex justify-between items-center p-4 border-b border-slate-700">
-      <h2 id="env-editor-title" class="text-lg font-semibold">Editor .env — <span x-text="processName || '...'"></span></h2>
+  <div class="absolute inset-0 bg-[var(--cr-overlay)] backdrop-blur-[2px]" @click="$dispatch('env-editor-hide')"></div>
+  <div class="absolute inset-4 md:inset-10 bg-cr-surface rounded-xl border border-cr-border flex flex-col shadow-xl overflow-hidden">
+    <div class="flex justify-between items-center p-4 border-b border-cr-border bg-cr-nav">
+      <h2 id="env-editor-title" class="text-lg font-semibold text-cr-text">Editor .env — <span x-text="processName || '...'"></span></h2>
       <button
+        type="button"
         @click="$dispatch('env-editor-hide')"
-        class="p-2 rounded hover:bg-slate-700 focus:ring-2 focus:ring-emerald-500"
+        class="p-2 rounded-lg hover:bg-cr-navHover text-cr-muted focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-surface"
         aria-label="Chiudi"
       >
-        <span class="text-xl">&times;</span>
+        <span class="text-xl leading-none" aria-hidden="true">&times;</span>
       </button>
     </div>
     <div class="flex-1 flex flex-col p-4 overflow-auto">
-      <p x-show="error" class="text-red-400 text-sm mb-2" x-text="error"></p>
+      <p x-show="error" class="text-cr-danger text-sm mb-2" x-text="error"></p>
       <template x-if="!loading">
         <div class="space-y-2 font-mono text-sm">
           <template x-for="(row, idx) in variables" :key="idx">
             <div class="flex items-center gap-2 group" :class="{ 'flex-wrap': row.type === 'var' }">
               <template x-if="row.type === 'var'">
                 <div class="flex-1 flex items-center gap-2 min-w-0">
-                  <span class="text-slate-400 shrink-0" x-text="row.key + '='"></span>
+                  <span class="text-cr-muted shrink-0" x-text="row.key + '='"></span>
                   <input
                     :type="row.revealed ? 'text' : 'password'"
                     x-model="row.value"
-                    class="flex-1 min-w-0 px-2 py-1 bg-slate-900 border border-slate-600 rounded text-slate-200 focus:ring-1 focus:ring-emerald-500"
+                    class="flex-1 min-w-0 px-2 py-1 bg-cr-code border border-cr-inputBorder rounded text-cr-text text-sm focus:outline-none focus:ring-2 focus:ring-cr-accent"
                   />
                   <button
                     type="button"
                     @click="row.revealed = !row.revealed"
-                    class="shrink-0 px-2 py-1 rounded text-xs text-slate-400 hover:text-emerald-400 hover:bg-slate-700"
+                    class="shrink-0 px-2 py-1 rounded text-xs text-cr-muted hover:text-cr-accent hover:bg-cr-navHover"
                     x-text="row.revealed ? 'Nascondi' : 'Rivela'"
                   ></button>
                 </div>
               </template>
               <template x-if="row.type === 'comment'">
-                <div class="w-full text-slate-500" x-text="row.raw"></div>
+                <div class="w-full text-cr-muted" x-text="row.raw"></div>
               </template>
               <template x-if="row.type === 'empty'">
-                <div class="w-full h-2 text-slate-600">&nbsp;</div>
+                <div class="w-full h-2 text-cr-border">&nbsp;</div>
               </template>
             </div>
           </template>
-          <p x-show="variables.length === 0 && !loading" class="text-slate-500 py-4">Nessuna variabile. Carica un file .env esistente o aggiungi manualmente.</p>
+          <p x-show="variables.length === 0 && !loading" class="text-cr-muted py-4">Nessuna variabile. Carica un file .env esistente o aggiungi manualmente.</p>
         </div>
       </template>
-      <p x-show="loading" class="text-slate-400 py-4">Caricamento...</p>
+      <p x-show="loading" class="text-cr-muted py-4">Caricamento...</p>
     </div>
-    <div class="flex gap-2 p-4 border-t border-slate-700 shrink-0">
-      <label class="inline-flex items-center gap-2 text-sm text-slate-300">
-        <input type="checkbox" x-model="restartAfterSave" class="rounded border-slate-600 bg-slate-700" />
+    <div class="flex flex-wrap gap-2 p-4 border-t border-cr-border shrink-0 bg-cr-nav">
+      <label class="inline-flex items-center gap-2 text-sm text-cr-text">
+        <input type="checkbox" x-model="restartAfterSave" class="rounded border-cr-inputBorder bg-cr-input text-cr-accent focus:ring-cr-accent" />
         Riavvia processo dopo il salvataggio
       </label>
       <button
+        type="button"
         @click="loadEnv()"
         :disabled="loading"
-        class="px-4 py-2 rounded-lg bg-slate-600 hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-emerald-500"
+        class="px-4 py-2 rounded-lg bg-cr-surface2 hover:bg-cr-navHover text-cr-text text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-surface border border-cr-border"
       >
         Carica .env
       </button>
       <button
+        type="button"
         @click="validateEnv()"
         :disabled="loading"
-        class="px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-blue-500"
+        class="px-4 py-2 rounded-lg bg-cr-info hover:opacity-90 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cr-info focus:ring-offset-2 focus:ring-offset-cr-surface"
       >
         Valida
       </button>
       <button
+        type="button"
         @click="saveEnv()"
         :disabled="saving || loading"
-        class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-emerald-500"
+        class="px-4 py-2 rounded-lg bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-surface"
       >
-        Salva Modifiche
+        Salva modifiche
       </button>
     </div>
   </div>

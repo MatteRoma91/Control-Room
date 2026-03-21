@@ -1,40 +1,40 @@
 <section class="space-y-6" aria-labelledby="automation-heading">
-  <h1 id="automation-heading" class="text-2xl font-bold text-slate-100">Automation Suite</h1>
+  <h1 id="automation-heading" class="text-2xl font-bold text-cr-text">Automation Suite</h1>
 
-  <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+  <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
     <h2 class="text-lg font-semibold mb-3">Runbook batch</h2>
     <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-      <select id="batchMode" class="rounded bg-slate-700 border border-slate-600 px-3 py-2">
+      <select id="batchMode" class="rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2">
         <option value="soft_recover">soft_recover</option>
         <option value="full_recover" selected>full_recover</option>
         <option value="safe_rollback">safe_rollback</option>
       </select>
-      <label class="text-sm text-slate-300 flex items-center gap-2"><input id="batchStopOnFail" type="checkbox" checked /> stop on fail</label>
-      <label class="text-sm text-slate-300 flex items-center gap-2"><input id="batchDryRun" type="checkbox" /> dry-run</label>
-      <button id="btnRunBatch" class="rounded bg-purple-700 hover:bg-purple-600 px-3 py-2">Esegui batch</button>
+      <label class="text-sm text-cr-text flex items-center gap-2"><input id="batchStopOnFail" type="checkbox" checked /> stop on fail</label>
+      <label class="text-sm text-cr-text flex items-center gap-2"><input id="batchDryRun" type="checkbox" /> dry-run</label>
+      <button id="btnRunBatch" class="rounded-lg bg-purple-700 hover:bg-purple-600 px-3 py-2 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-cr-canvas">Esegui batch</button>
     </div>
     <div id="batchApps" class="mt-3 flex flex-wrap gap-2"></div>
   </div>
 
-  <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+  <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
     <h2 class="text-lg font-semibold mb-3">Storico runbook</h2>
-    <div id="runbookHistory" class="text-sm text-slate-300"></div>
+    <div id="runbookHistory" class="text-sm text-cr-text"></div>
   </div>
 
-  <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+  <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
     <h2 class="text-lg font-semibold mb-3">Scheduled remediation</h2>
     <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
-      <input id="autoName" class="rounded bg-slate-700 border border-slate-600 px-3 py-2" placeholder="nome regola" />
-      <input id="autoProcess" class="rounded bg-slate-700 border border-slate-600 px-3 py-2" placeholder="process (es. padel-tour)" />
-      <input id="autoSchedule" class="rounded bg-slate-700 border border-slate-600 px-3 py-2" placeholder="cron expr (es. */20 * * * *)" />
-      <select id="autoMode" class="rounded bg-slate-700 border border-slate-600 px-3 py-2">
+      <input id="autoName" class="rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2" placeholder="nome regola" />
+      <input id="autoProcess" class="rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2" placeholder="process (es. padel-tour)" />
+      <input id="autoSchedule" class="rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2" placeholder="cron expr (es. */20 * * * *)" />
+      <select id="autoMode" class="rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2">
         <option value="soft_recover">soft_recover</option>
         <option value="full_recover">full_recover</option>
         <option value="safe_rollback">safe_rollback</option>
       </select>
-      <button id="btnSaveAutoRule" class="rounded bg-emerald-700 hover:bg-emerald-600 px-3 py-2">Aggiungi regola</button>
+      <button id="btnSaveAutoRule" class="rounded bg-cr-accent hover:bg-cr-accent px-3 py-2">Aggiungi regola</button>
     </div>
-    <div id="autoRules" class="mt-3 text-sm text-slate-300"></div>
+    <div id="autoRules" class="mt-3 text-sm text-cr-text"></div>
   </div>
 </section>
 
@@ -46,7 +46,7 @@
     const res = await fetch('/api/runbook/apps');
     const data = await res.json();
     root.innerHTML = (data.apps || []).map((a) => `
-      <label class="px-2 py-1 rounded border border-slate-600 bg-slate-700 text-sm">
+      <label class="px-2 py-1 rounded border border-cr-inputBorder bg-cr-surface2 text-sm">
         <input type="checkbox" value="${a.name}" class="mr-1" onchange="toggleBatchApp(this)" />
         ${a.name}
       </label>
@@ -85,11 +85,11 @@
     const data = await res.json();
     const rows = data.reports || [];
     root.innerHTML = rows.length ? rows.slice(0, 25).map((r) => `
-      <div class="py-1 border-b border-slate-700">
-        <span class="${r.ok ? 'text-emerald-300' : 'text-red-300'}">${r.ok ? 'OK' : 'FAIL'}</span>
+      <div class="py-1 border-b border-cr-border">
+        <span class="${r.ok ? 'text-cr-accent' : 'text-cr-danger'}">${r.ok ? 'OK' : 'FAIL'}</span>
         · ${r.process} · ${r.mode} · ${r.durationMs}ms · ${r.finishedAt || '-'}
       </div>
-    `).join('') : '<span class="text-slate-500">Nessuno storico disponibile.</span>';
+    `).join('') : '<span class="text-cr-muted">Nessuno storico disponibile.</span>';
   }
 
   document.getElementById('btnRunBatch').addEventListener('click', runBatch);
@@ -105,11 +105,11 @@
   function renderAutoRules() {
     const root = document.getElementById('autoRules');
     root.innerHTML = autoRules.length ? autoRules.map((r) => `
-      <div class="py-1 border-b border-slate-700 flex items-center justify-between gap-2">
+      <div class="py-1 border-b border-cr-border flex items-center justify-between gap-2">
         <span>${r.name} · ${r.process} · ${r.schedule} · ${r.mode}</span>
-        <button class="px-2 py-1 rounded bg-red-700 hover:bg-red-600 text-xs" onclick="removeAutoRule('${r.id}')">Rimuovi</button>
+        <button class="px-2 py-1 rounded bg-cr-danger hover:opacity-90 text-white text-xs font-medium" onclick="removeAutoRule('${r.id}')">Rimuovi</button>
       </div>
-    `).join('') : '<span class="text-slate-500">Nessuna regola.</span>';
+    `).join('') : '<span class="text-cr-muted">Nessuna regola.</span>';
   }
 
   async function persistAutoRules() {
