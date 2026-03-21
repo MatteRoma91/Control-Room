@@ -63,9 +63,24 @@
   }
 
   async function processAction(action, btn) {
+    let confirmPhrase = '';
+    if (action === 'stop' || action === 'restart') {
+      const expected = `${action.toUpperCase()}:${processName}`;
+      const confirm = await requestStrongConfirm({
+        title: 'Conferma azione ad alto rischio',
+        message: `Stai per eseguire ${action.toUpperCase()} su ${processName}.`,
+        expectedPhrase: expected,
+      });
+      if (!confirm || !confirm.ok) return;
+      confirmPhrase = confirm.confirmPhrase;
+    }
     setBtnLoading(btn, true);
     try {
-      const res = await fetch(`/api/process/${action}/${encodeURIComponent(processName)}`, { method: 'POST' });
+      const res = await fetch(`/api/process/${action}/${encodeURIComponent(processName)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmPhrase }),
+      });
       const data = await res.json();
       if (data.ok) {
         showToast('Operazione completata', 'success');

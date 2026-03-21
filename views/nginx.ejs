@@ -25,8 +25,14 @@
       <button type="submit" id="btnNginxGenerate" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500">
         Genera e applica
       </button>
+      <button type="button" id="btnNginxPreview" class="px-4 py-2 rounded-lg bg-slate-600 hover:bg-slate-500 ml-2">
+        Preview config
+      </button>
     </form>
     <div id="nginxOutput" class="mt-4 p-4 bg-slate-900 rounded-lg font-mono text-sm text-slate-300 hidden"></div>
+    <div id="nginxRollbackWrap" class="mt-3 hidden">
+      <button type="button" id="btnNginxRollback" class="px-4 py-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-amber-100">Rollback ultima config</button>
+    </div>
   </div>
 
   <div class="mt-6 p-4 bg-amber-900/30 border border-amber-700/50 rounded-lg text-sm text-amber-200 max-w-xl">
@@ -40,6 +46,30 @@ ubuntu ALL=(ALL) NOPASSWD: /usr/bin/certbot certonly --nginx -d *</pre>
 </section>
 
 <script>
+  let lastRollbackHint = '';
+
+  document.getElementById('btnNginxPreview').addEventListener('click', async function() {
+    const domain = document.getElementById('nginxDomain').value.trim();
+    const port = parseInt(document.getElementById('nginxPort').value || '3000', 10);
+    const output = document.getElementById('nginxOutput');
+    output.classList.remove('hidden');
+    output.textContent = 'Generazione preview...';
+    try {
+      const res = await fetch('/api/nginx-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain, port })
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'Preview fallita');
+      output.textContent = json.config;
+      output.className = 'mt-4 p-4 bg-slate-900 rounded-lg font-mono text-sm text-slate-300';
+    } catch (err) {
+      output.textContent = 'Errore preview: ' + err.message;
+      output.className = 'mt-4 p-4 bg-slate-900 rounded-lg font-mono text-sm text-red-400';
+    }
+  });
+
   document.getElementById('nginxForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const domain = document.getElementById('nginxDomain').value.trim();
@@ -59,6 +89,8 @@ ubuntu ALL=(ALL) NOPASSWD: /usr/bin/certbot certonly --nginx -d *</pre>
       output.textContent = (json.output || '') + (json.error ? '\n\nErrore: ' + json.error : '');
       output.className = 'mt-4 p-4 bg-slate-900 rounded-lg font-mono text-sm ' + (json.ok ? 'text-emerald-300' : 'text-red-400');
       if (json.ok) {
+        lastRollbackHint = json.rollbackHint || '';
+        document.getElementById('nginxRollbackWrap').classList.toggle('hidden', !lastRollbackHint);
         window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Configurazione Nginx applicata', type: 'success' } }));
       }
     } catch (err) {
@@ -66,5 +98,25 @@ ubuntu ALL=(ALL) NOPASSWD: /usr/bin/certbot certonly --nginx -d *</pre>
       output.className = 'mt-4 p-4 bg-slate-900 rounded-lg font-mono text-sm text-red-400';
     }
     document.getElementById('btnNginxGenerate').disabled = false;
+  });
+
+  document.getElementById('btnNginxRollback').addEventListener('click', async function() {
+    const domain = document.getElementById('nginxDomain').value.trim();
+    if (!lastRollbackHint || !domain) {
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Rollback non disponibile', type: 'error' } }));
+      return;
+    }
+    try {
+      const res = await fetch('/api/nginx-rollback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ backupPath: lastRollbackHint, domain })
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'Rollback fallito');
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Rollback Nginx completato', type: 'success' } }));
+    } catch (err) {
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Errore rollback: ' + err.message, type: 'error' } }));
+    }
   });
 </script>

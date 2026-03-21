@@ -78,6 +78,124 @@ const PORT = process.env.PORT || 3005;
 const AUTH_USER = process.env.AUTH_USER || 'Matt91';
 const AUTH_PASSWORD = process.env.AUTH_PASSWORD || 'MattCONTROL1!';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change-me-in-production';
+const SESSION_IDLE_MINUTES = parseInt(process.env.SESSION_IDLE_MINUTES || '120', 10);
+const SESSION_IDLE_MS = Math.max(5, SESSION_IDLE_MINUTES) * 60 * 1000;
+const AUDIT_LOG_PATH = path.join(__dirname, 'logs', 'audit-events.log');
+const DEFAULT_PANIC_DURATION_MIN = parseInt(process.env.PANIC_MODE_DURATION_MIN || '30', 10);
+
+const HIGH_RISK_PHRASES = Object.freeze({
+  restartAll: 'RESTART-ALL',
+  restoreAll: 'RESTORE-ALL',
+  nginxReload: 'NGINX-RELOAD',
+  panicActivate: 'PANIC-ACTIVATE',
+  panicDisable: 'PANIC-DISABLE',
+  disable2FA: 'DISABLE-2FA',
+});
+
+function normalizeIp(ip) {
+  return String(ip || '').replace(/^::ffff:/, '').trim();
+}
+
+function ipToInt(ip) {
+  const parts = normalizeIp(ip).split('.');
+  if (parts.length !== 4) return null;
+  let out = 0;
+  for (const p of parts) {
+    const n = Number(p);
+    if (!Number.isInteger(n) || n < 0 || n > 255) return null;
+    out = (out << 8) + n;
+  }
+  return out >>> 0;
+}
+
+function isIpInCidr(ip, cidr) {
+  const [base, bitsRaw] = String(cidr).split('/');
+  const bits = Number(bitsRaw);
+  const ipNum = ipToInt(ip);
+  const baseNum = ipToInt(base);
+  if (ipNum === null || baseNum === null || !Number.isInteger(bits) || bits < 0 || bits > 32) return false;
+  if (bits === 0) return true;
+  const mask = bits === 32 ? 0xffffffff : (0xffffffff << (32 - bits)) >>> 0;
+  return (ipNum & mask) === (baseNum & mask);
+}
+
+function isIpAllowedByEntries(ip, entries) {
+  const normalizedIp = normalizeIp(ip);
+  if (!normalizedIp) return false;
+  for (const raw of entries || []) {
+    const entry = String(raw || '').trim();
+    if (!entry) continue;
+    if (entry.includes('/')) {
+      if (isIpInCidr(normalizedIp, entry)) return true;
+      continue;
+    }
+    if (normalizeIp(entry) === normalizedIp) return true;
+  }
+  return false;
+}
+
+function sanitizeSettings(raw) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const dailyRaw = source.dailyCheck || {};
+  const panicExpiresAt = source.panicExpiresAt ? String(source.panicExpiresAt) : '';
+  const safe = {
+    schemaVersion: 1,
+    ipWhitelistEnabled: source.ipWhitelistEnabled === true,
+    ipWhitelist: Array.isArray(source.ipWhitelist) ? source.ipWhitelist.map((s) => String(s).trim()).filter(Boolean) : [],
+    ipWhitelistTemporary: Array.isArray(source.ipWhitelistTemporary)
+      ? source.ipWhitelistTemporary
+          .map((e) => ({ ip: String(e?.ip || '').trim(), expiresAt: String(e?.expiresAt || '') }))
+          .filter((e) => e.ip && e.expiresAt)
+      : [],
+    webhookType: ['discord', 'slack', 'telegram'].includes(source.webhookType) ? source.webhookType : 'discord',
+    webhookUrl: String(source.webhookUrl || ''),
+    telegramBotToken: String(source.telegramBotToken || ''),
+    telegramChatId: String(source.telegramChatId || ''),
+    notifyOnCrash: source.notifyOnCrash !== false,
+    notifyOnRestart: source.notifyOnRestart !== false,
+    notifyOnException: source.notifyOnException === true || (source.notifyOnException !== false && source.notifyOnCrash !== false),
+    notifyOnLogErr: source.notifyOnLogErr === true,
+    sshProfiles: Array.isArray(source.sshProfiles) ? source.sshProfiles : [],
+    totpSecret: String(source.totpSecret || ''),
+    totpEnabled: source.totpEnabled === true,
+    cronJobs: Array.isArray(source.cronJobs) ? source.cronJobs : [],
+    panicMode: source.panicMode === true,
+    panicModeIp: String(source.panicModeIp || ''),
+    panicExpiresAt,
+    dailyCheck: {
+      enabled: dailyRaw.enabled !== false,
+      time: typeof dailyRaw.time === 'string' && /^\d{2}:\d{2}$/.test(dailyRaw.time) ? dailyRaw.time : '00:00',
+    },
+  };
+  return safe;
+}
+
+async function appendAuditEvent(event, payload = {}) {
+  const line = JSON.stringify({ ts: new Date().toISOString(), event, ...payload });
+  await fs.mkdir(path.dirname(AUDIT_LOG_PATH), { recursive: true });
+  await fs.appendFile(AUDIT_LOG_PATH, line + '\n', 'utf8');
+}
+
+async function audit(event, payload = {}) {
+  logEvent(event, payload);
+  try {
+    await appendAuditEvent(event, payload);
+  } catch (err) {
+    console.error('Audit write error:', err.message);
+  }
+}
+
+function getExpectedPhrase(req, kind, name = '') {
+  if (kind === 'process-stop') return `STOP:${name}`;
+  if (kind === 'process-restart') return `RESTART:${name}`;
+  return HIGH_RISK_PHRASES[kind] || kind;
+}
+
+function hasStrongConfirmation(req, kind, name = '') {
+  const expected = getExpectedPhrase(req, kind, name);
+  const supplied = String(req.body?.confirmPhrase || req.headers['x-cr-confirm'] || '').trim();
+  return supplied === expected;
+}
 
 // DB credentials per backup (opzionale)
 const DB_HOST = process.env.DB_HOST || process.env.MYSQL_HOST;
@@ -107,12 +225,14 @@ const SESSION_MAX_AGE_DAYS = parseInt(process.env.SESSION_MAX_AGE_DAYS || '7', 1
 const SESSION_MAX_AGE_MS = SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 
 const sessionMiddleware = session({
+  name: 'controlroom.sid',
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
     maxAge: SESSION_MAX_AGE_MS,
   },
 });
@@ -138,6 +258,14 @@ const login2FALimiter = rateLimit({
 // Auth middleware - redirect to login if not authenticated
 function requireAuth(req, res, next) {
   if (req.session?.user) {
+    const lastAccess = req.session._lastAccess || 0;
+    if (lastAccess && Date.now() - lastAccess > SESSION_IDLE_MS) {
+      const user = req.session.user;
+      req.session.destroy(() => {
+        audit('session_expired', { user, reason: 'idle_timeout' });
+      });
+      return res.redirect('/login?error=1');
+    }
     req.session._lastAccess = Date.now();
     return next();
   }
@@ -149,10 +277,24 @@ function requireAuth(req, res, next) {
 async function ipWhitelistMiddleware(req, res, next) {
   try {
     const settings = await loadSettings();
-    const clientIp = (req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.connection?.remoteAddress || '').replace(/^::ffff:/, '');
+    const clientIp = normalizeIp(req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.connection?.remoteAddress || '');
+    const nowIso = new Date().toISOString();
+
+    const tempEntries = (settings.ipWhitelistTemporary || []).filter((e) => e.expiresAt > nowIso);
+    if (tempEntries.length !== (settings.ipWhitelistTemporary || []).length) {
+      settings.ipWhitelistTemporary = tempEntries;
+      await saveSettings(settings);
+    }
 
     // Panic Mode: only panicModeIp can access
     if (settings.panicMode && settings.panicModeIp) {
+      if (settings.panicExpiresAt && settings.panicExpiresAt <= nowIso) {
+        settings.panicMode = false;
+        settings.panicModeIp = '';
+        settings.panicExpiresAt = '';
+        await saveSettings(settings);
+        return next();
+      }
       if (clientIp === settings.panicModeIp) return next();
       res.status(403).send('Accesso negato. Panic Mode attivo.');
       return;
@@ -164,11 +306,9 @@ async function ipWhitelistMiddleware(req, res, next) {
     }
 
     // Check if IP is in whitelist (exact match for MVP)
-    const allowed = settings.ipWhitelist.some((entry) => {
-      const ip = String(entry).trim();
-      if (!ip) return false;
-      return clientIp === ip;
-    });
+    const whitelist = settings.ipWhitelist || [];
+    const temporary = tempEntries.map((e) => e.ip);
+    const allowed = isIpAllowedByEntries(clientIp, [...whitelist, ...temporary]);
 
     if (allowed) return next();
     res.status(403).send('Accesso negato. IP non autorizzato.');
@@ -202,10 +342,10 @@ app.post('/login', loginLimiter, async (req, res) => {
       return res.redirect('/login/2fa');
     }
     req.session.user = username;
-    logEvent('login', { user: username });
+    await audit('login', { user: username });
     return res.redirect('/');
   }
-  logEvent('login_fail', { reason: 'invalid_credentials' });
+  await audit('login_fail', { reason: 'invalid_credentials' });
   res.redirect('/login?error=1');
 });
 
@@ -238,10 +378,10 @@ app.post('/login/2fa', login2FALimiter, async (req, res) => {
     req.session.user = username;
     delete req.session.pending2FA;
     delete req.session.pending2FATime;
-    logEvent('login', { user: username, mfa: true });
+    await audit('login', { user: username, mfa: true });
     return res.redirect('/');
   }
-  logEvent('login_fail', { reason: 'invalid_2fa' });
+  await audit('login_fail', { reason: 'invalid_2fa' });
   res.redirect('/login/2fa?error=1');
 });
 
@@ -249,7 +389,7 @@ app.post('/login/2fa', login2FALimiter, async (req, res) => {
 app.post('/logout', (req, res) => {
   const user = req.session?.user;
   req.session.destroy(() => {
-    if (user) logEvent('logout', { user });
+    if (user) audit('logout', { user });
     res.redirect('/login');
   });
 });
@@ -281,6 +421,10 @@ app.get('/process/:name', requireAuth, async (req, res) => {
     console.error('Process detail error:', err);
     res.redirect('/');
   }
+});
+
+app.get('/audit', requireAuth, async (req, res) => {
+  res.render('layout', { contentPartial: 'audit', title: 'Audit log' });
 });
 
 // ============ API ROUTES ============
@@ -344,12 +488,15 @@ app.post('/api/process/:action/:name', requireAuth, async (req, res) => {
   if (!['restart', 'stop', 'start'].includes(action)) {
     return res.status(400).json({ ok: false, error: 'Invalid action' });
   }
+  if ((action === 'stop' || action === 'restart') && !hasStrongConfirmation(req, `process-${action}`, name)) {
+    return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${getExpectedPhrase(req, `process-${action}`, name)}` });
+  }
   try {
     await pm2Action(action, name);
-    logEvent('process_action', { action, process: name, user: req.session?.user });
+    await audit('process_action', { action, process: name, user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
-    logEvent('process_action_error', { action, process: name, user: req.session?.user, error: err.message });
+    await audit('process_action_error', { action, process: name, user: req.session?.user, error: err.message });
     console.error(`PM2 ${action} error:`, err);
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -521,12 +668,15 @@ app.get('/api/system/stats', requireAuth, async (req, res) => {
 // API: restart all webapps
 app.post('/api/process/restart-all', requireAuth, async (req, res) => {
   const apps = ['padel-tour', 'roma-buche', 'gestione-veicoli'];
+  if (!hasStrongConfirmation(req, 'restartAll')) {
+    return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.restartAll}` });
+  }
   try {
     await Promise.all(apps.map((name) => pm2Action('restart', name)));
-    logEvent('restart_all', { processes: apps, user: req.session?.user });
+    await audit('restart_all', { processes: apps, user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
-    logEvent('restart_all_error', { user: req.session?.user, error: err.message });
+    await audit('restart_all_error', { user: req.session?.user, error: err.message });
     console.error('Restart-all error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -534,6 +684,9 @@ app.post('/api/process/restart-all', requireAuth, async (req, res) => {
 
 // API: restore all processes
 app.post('/api/process/restore-all', requireAuth, async (req, res) => {
+  if (!hasStrongConfirmation(req, 'restoreAll')) {
+    return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.restoreAll}` });
+  }
   try {
     const list = await pm2ListRaw();
     for (const { path: cfgPath, name } of ECOSYSTEMS) {
@@ -545,11 +698,39 @@ app.post('/api/process/restore-all', requireAuth, async (req, res) => {
         await pm2Action('restart', name);
       }
     }
-    logEvent('restore_all', { user: req.session?.user });
+    await audit('restore_all', { user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
-    logEvent('restore_all_error', { user: req.session?.user, error: err.message });
+    await audit('restore_all_error', { user: req.session?.user, error: err.message });
     console.error('Restore-all error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/runbook/recover-app/:name', requireAuth, async (req, res) => {
+  const { name } = req.params;
+  const allowed = new Set(['padel-tour', 'roma-buche', 'gestione-veicoli', 'control-room']);
+  if (!allowed.has(name)) return res.status(400).json({ ok: false, error: 'Processo non supportato' });
+  try {
+    const steps = [];
+    const before = await fetchStatusCode(`http://127.0.0.1:${WEB_SITES.find((s) => s.pm2 === name)?.port || 0}/`, 5000);
+    steps.push({ step: 'local_health_before', status: before });
+    await pm2Action('restart', name);
+    steps.push({ step: 'pm2_restart', ok: true });
+    try {
+      execSync('sudo /bin/systemctl reload nginx 2>/dev/null', { encoding: 'utf8' });
+      steps.push({ step: 'nginx_reload', ok: true });
+    } catch (err) {
+      steps.push({ step: 'nginx_reload', ok: false, error: err.message });
+    }
+    await new Promise((r) => setTimeout(r, 1500));
+    const after = await fetchStatusCode(`http://127.0.0.1:${WEB_SITES.find((s) => s.pm2 === name)?.port || 0}/`, 5000);
+    steps.push({ step: 'local_health_after', status: after });
+    const ok = parseCheckResponseOk(after);
+    await audit('runbook_recover_app', { user: req.session?.user, process: name, ok, steps });
+    res.json({ ok, steps });
+  } catch (err) {
+    await audit('runbook_recover_app_error', { user: req.session?.user, process: name, error: err.message });
     res.status(500).json({ ok: false, error: err.message });
   }
 });
@@ -569,6 +750,104 @@ app.get('/api/health', requireAuth, async (req, res) => {
     }
   }
   res.json({ results });
+});
+
+app.get('/api/health/summary', requireAuth, async (req, res) => {
+  try {
+    const [healthRes, processList] = await Promise.all([
+      (async () => {
+        const out = [];
+        for (const site of WEB_SITES) {
+          if (!site.url) continue;
+          const start = Date.now();
+          try {
+            const resp = await fetch(site.url, { method: 'GET', signal: AbortSignal.timeout(6000) });
+            out.push({ name: site.name, ok: resp.ok, status: resp.status, elapsed: Date.now() - start });
+          } catch (err) {
+            out.push({ name: site.name, ok: false, status: 0, elapsed: Date.now() - start, error: err.message });
+          }
+        }
+        return out;
+      })(),
+      pm2List(),
+    ]);
+
+    const offline = processList.filter((p) => p.status !== 'online');
+    const failing = healthRes.filter((h) => !h.ok);
+    const severity = offline.length > 0 || failing.length > 0 ? 'critical' : 'ok';
+    const incidents = [];
+    for (const p of offline) incidents.push(`Processo ${p.name} in stato ${p.status}`);
+    for (const h of failing) incidents.push(`Health check fallito: ${h.name} (${h.status || 'no-response'})`);
+
+    res.json({
+      severity,
+      incidents,
+      processSummary: { total: processList.length, offline: offline.length },
+      healthSummary: { total: healthRes.length, failing: failing.length },
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/quality-gates', requireAuth, async (req, res) => {
+  try {
+    const [summaryRes, auditsRes] = await Promise.all([
+      (async () => {
+        const r = await fetch(`http://127.0.0.1:${PORT}/api/health/summary`, {
+          headers: { cookie: req.headers.cookie || '' },
+          signal: AbortSignal.timeout(3000),
+        });
+        return r.json();
+      })(),
+      (async () => {
+        const content = await fs.readFile(AUDIT_LOG_PATH, 'utf8').catch(() => '');
+        return content.split('\n').filter(Boolean).slice(-500);
+      })(),
+    ]);
+    const parsed = auditsRes.map((l) => {
+      try { return JSON.parse(l); } catch { return null; }
+    }).filter(Boolean);
+    const criticalActions = parsed.filter((e) => ['restart_all', 'restore_all', 'nginx_reload', 'panic_activate', 'panic_disable'].includes(e.event));
+    const withUser = criticalActions.filter((e) => !!e.user);
+    res.json({
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      healthSeverity: summaryRes.severity || 'unknown',
+      failingHealthChecks: summaryRes.healthSummary?.failing ?? null,
+      offlineProcesses: summaryRes.processSummary?.offline ?? null,
+      auditCoverageCriticalActions: criticalActions.length ? Math.round((withUser.length / criticalActions.length) * 100) : 100,
+      smokeChecks: {
+        dashboard: true,
+        processApi: true,
+        settingsApi: true,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/audit/events', requireAuth, async (req, res) => {
+  try {
+    const limit = Math.min(500, Math.max(1, parseInt(req.query.limit || '200', 10)));
+    const content = await fs.readFile(AUDIT_LOG_PATH, 'utf8').catch(() => '');
+    const lines = content.split('\n').filter(Boolean).slice(-limit);
+    const events = lines
+      .map((l) => {
+        try {
+          return JSON.parse(l);
+        } catch (_) {
+          return null;
+        }
+      })
+      .filter(Boolean)
+      .reverse();
+    res.json({ events });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 // API: porte siti (config + verifica `ss` sul server)
@@ -610,12 +889,15 @@ app.get('/api/nginx-status', requireAuth, (req, res) => {
 
 // API: nginx reload
 app.post('/api/nginx-reload', requireAuth, (req, res) => {
+  if (!hasStrongConfirmation(req, 'nginxReload')) {
+    return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.nginxReload}` });
+  }
   try {
     execSync('sudo /bin/systemctl reload nginx 2>/dev/null', { encoding: 'utf8' });
-    logEvent('nginx_reload', { user: req.session?.user });
+    audit('nginx_reload', { user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
-    logEvent('nginx_reload_error', { user: req.session?.user, error: err.message });
+    audit('nginx_reload_error', { user: req.session?.user, error: err.message });
     console.error('Nginx reload error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -659,10 +941,15 @@ server {
 `;
     const tmpPath = `/tmp/controlroom-nginx-${safeDomain}.conf`;
     const destPath = `/etc/nginx/sites-available/${domain}.conf`;
+    const backupPath = `/tmp/controlroom-nginx-backup-${safeDomain}-${Date.now()}.conf`;
 
     await fs.writeFile(tmpPath, httpBlock, 'utf8');
     output.push('File generato: ' + tmpPath);
 
+    try {
+      execSync(`sudo cp ${destPath} ${backupPath}`, { encoding: 'utf8' });
+      output.push('Backup config esistente: ' + backupPath);
+    } catch (_) {}
     execSync(`sudo cp ${tmpPath} ${destPath}`, { encoding: 'utf8' });
     output.push('Copiato in: ' + destPath);
 
@@ -709,10 +996,49 @@ server {
     execSync('sudo /bin/systemctl reload nginx 2>&1', { encoding: 'utf8' });
     output.push('Nginx ricaricato');
 
-    res.json({ ok: true, output: output.join('\n') });
+    await audit('nginx_generate', { user: req.session?.user, domain, port: portNum, ssl: !!ssl });
+    res.json({ ok: true, output: output.join('\n'), rollbackHint: backupPath });
   } catch (err) {
     console.error('Nginx generate error:', err);
     res.status(500).json({ ok: false, error: err.message, output: output.join('\n') });
+  }
+});
+
+app.post('/api/nginx-preview', requireAuth, async (req, res) => {
+  try {
+    const { domain, port } = req.body || {};
+    if (!domain || typeof domain !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$/.test(domain.trim())) {
+      return res.status(400).json({ ok: false, error: 'Dominio non valido' });
+    }
+    const portNum = parseInt(port || 3000, 10);
+    if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+      return res.status(400).json({ ok: false, error: 'Porta non valida' });
+    }
+    const config = `server {\n    listen 80;\n    listen [::]:80;\n    server_name ${domain.trim()};\n    location / {\n        proxy_pass http://127.0.0.1:${portNum};\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection "upgrade";\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n}\n`;
+    res.json({ ok: true, config });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/nginx-rollback', requireAuth, async (req, res) => {
+  try {
+    const backupPath = String(req.body?.backupPath || '').trim();
+    const domain = String(req.body?.domain || '').trim();
+    if (!backupPath.startsWith('/tmp/controlroom-nginx-backup-')) {
+      return res.status(400).json({ ok: false, error: 'Backup non valido' });
+    }
+    if (!domain || !/^[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$/.test(domain)) {
+      return res.status(400).json({ ok: false, error: 'Dominio non valido' });
+    }
+    const destPath = `/etc/nginx/sites-available/${domain}.conf`;
+    execSync(`sudo cp ${backupPath} ${destPath}`, { encoding: 'utf8' });
+    execSync('sudo nginx -t 2>&1', { encoding: 'utf8' });
+    execSync('sudo /bin/systemctl reload nginx 2>&1', { encoding: 'utf8' });
+    await audit('nginx_rollback', { user: req.session?.user, domain, backupPath });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
@@ -766,7 +1092,7 @@ const SETTINGS_PATH = path.join(__dirname, 'settings.json');
 async function loadSettings() {
   try {
     const data = await fs.readFile(SETTINGS_PATH, 'utf8');
-    const s = JSON.parse(data);
+    const s = sanitizeSettings(JSON.parse(data));
     if (s.sshHost && (!s.sshProfiles || s.sshProfiles.length === 0)) {
       s.sshProfiles = [{
         id: 'migrated',
@@ -780,12 +1106,13 @@ async function loadSettings() {
     }
     return s;
   } catch {
-    return {};
+    return sanitizeSettings({});
   }
 }
 
 async function saveSettings(obj) {
-  await fs.writeFile(SETTINGS_PATH, JSON.stringify(obj, null, 2), 'utf8');
+  const validated = sanitizeSettings(obj);
+  await fs.writeFile(SETTINGS_PATH, JSON.stringify(validated, null, 2), 'utf8');
   try {
     await fs.chmod(SETTINGS_PATH, 0o600);
   } catch (_) {}
@@ -827,17 +1154,19 @@ app.get('/api/settings', requireAuth, async (req, res) => {
 // API: POST settings (salva)
 app.post('/api/settings', requireAuth, async (req, res) => {
   try {
-    const body = { ...(req.body || {}) };
+    const body = sanitizeSettings({ ...(req.body || {}) });
     const current = await loadSettings();
     body.totpSecret = current.totpSecret;
     body.totpEnabled = current.totpEnabled;
     body.panicMode = current.panicMode;
     body.panicModeIp = current.panicModeIp;
+    body.panicExpiresAt = current.panicExpiresAt;
     body.dailyCheck = current.dailyCheck;
     if (!Array.isArray(body.sshProfiles)) body.sshProfiles = current.sshProfiles || [];
     if (!Array.isArray(body.cronJobs)) body.cronJobs = current.cronJobs || [];
     if (!Array.isArray(body.ipWhitelist)) body.ipWhitelist = current.ipWhitelist || [];
     await saveSettings(body);
+    await audit('settings_saved', { user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
     console.error('Settings save error:', err);
@@ -848,13 +1177,19 @@ app.post('/api/settings', requireAuth, async (req, res) => {
 // API: Attiva Panic Mode (solo IP corrente)
 app.post('/api/settings/panic-activate', requireAuth, async (req, res) => {
   try {
-    const clientIp = (req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || '').replace(/^::ffff:/, '');
+    if (!hasStrongConfirmation(req, 'panicActivate')) {
+      return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.panicActivate}` });
+    }
+    const clientIp = normalizeIp(req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || '');
+    const durationMin = Math.max(5, Math.min(240, parseInt(req.body?.durationMin || String(DEFAULT_PANIC_DURATION_MIN), 10)));
+    const expiresAt = new Date(Date.now() + durationMin * 60 * 1000).toISOString();
     const current = await loadSettings();
     current.panicMode = true;
     current.panicModeIp = clientIp;
+    current.panicExpiresAt = expiresAt;
     await saveSettings(current);
-    logEvent('panic_activate', { user: req.session?.user, ip: clientIp });
-    res.json({ ok: true, panicModeIp: clientIp });
+    await audit('panic_activate', { user: req.session?.user, ip: clientIp, expiresAt });
+    res.json({ ok: true, panicModeIp: clientIp, expiresAt });
   } catch (err) {
     console.error('Panic activate error:', err);
     res.status(500).json({ ok: false, error: err.message });
@@ -864,11 +1199,15 @@ app.post('/api/settings/panic-activate', requireAuth, async (req, res) => {
 // API: Disattiva Panic Mode
 app.post('/api/settings/panic-disable', requireAuth, async (req, res) => {
   try {
+    if (!hasStrongConfirmation(req, 'panicDisable')) {
+      return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.panicDisable}` });
+    }
     const current = await loadSettings();
     current.panicMode = false;
     current.panicModeIp = '';
+    current.panicExpiresAt = '';
     await saveSettings(current);
-    logEvent('panic_disable', { user: req.session?.user });
+    await audit('panic_disable', { user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
     console.error('Panic disable error:', err);
@@ -933,7 +1272,10 @@ app.post('/api/2fa/verify-setup', requireAuth, async (req, res) => {
 // API: disattiva 2FA
 app.post('/api/2fa/disable', requireAuth, async (req, res) => {
   try {
-    const { password } = req.body || {};
+    const { password, confirmPhrase } = req.body || {};
+    if (String(confirmPhrase || '').trim() !== HIGH_RISK_PHRASES.disable2FA) {
+      return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.disable2FA}` });
+    }
     if (password !== AUTH_PASSWORD) {
       return res.status(401).json({ ok: false, error: 'Password non valida' });
     }
@@ -941,6 +1283,7 @@ app.post('/api/2fa/disable', requireAuth, async (req, res) => {
     current.totpEnabled = false;
     current.totpSecret = '';
     await saveSettings(current);
+    await audit('2fa_disabled', { user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
     console.error('2FA disable error:', err);
@@ -953,6 +1296,7 @@ app.post('/api/2fa/disable', requireAuth, async (req, res) => {
 const cronJobHandles = new Map(); // id -> schedule.Job
 let dailyCheckHandle = null;
 let dailyCheckRunning = false;
+const cronRunHistory = [];
 
 function parseCheckResponseOk(status) {
   return Number.isFinite(status) && status >= 200 && status < 400;
@@ -1100,6 +1444,9 @@ async function registerDailyCheckFromSettings() {
 }
 
 async function executeCronJob(job) {
+  const startedAt = new Date().toISOString();
+  let success = true;
+  let message = 'OK';
   try {
     if (job.action === 'pm2-restart' && job.target) {
       await pm2Action('restart', job.target);
@@ -1133,7 +1480,20 @@ async function executeCronJob(job) {
       console.log(`[Cron] Backup DB salvato in ${outPath}`);
     }
   } catch (err) {
+    success = false;
+    message = err.message;
     console.error(`[Cron] Errore job ${job.name}:`, err.message);
+  } finally {
+    cronRunHistory.unshift({
+      id: job.id || '',
+      name: job.name || '',
+      action: job.action || '',
+      startedAt,
+      success,
+      message,
+    });
+    if (cronRunHistory.length > 200) cronRunHistory.length = 200;
+    audit('cron_job_run', { user: 'system', jobId: job.id, name: job.name, action: job.action, success, message });
   }
 }
 
@@ -1173,6 +1533,25 @@ app.get('/cron', requireAuth, async (req, res) => {
 app.get('/api/cron-jobs', requireAuth, async (req, res) => {
   const settings = await loadSettings();
   res.json(settings.cronJobs || []);
+});
+
+app.get('/api/cron-jobs/history', requireAuth, async (req, res) => {
+  res.json({ history: cronRunHistory.slice(0, 50) });
+});
+
+app.post('/api/cron-jobs/preview', requireAuth, async (req, res) => {
+  try {
+    const scheduleExpr = String(req.body?.schedule || '').trim();
+    if (!scheduleExpr) return res.status(400).json({ ok: false, error: 'Schedule mancante' });
+    const tmpJob = schedule.scheduleJob(scheduleExpr, () => {});
+    if (!tmpJob) return res.status(400).json({ ok: false, error: 'Schedule non valido' });
+    const next = tmpJob.nextInvocation();
+    const nextRuns = next ? [next.toDate().toISOString()] : [];
+    tmpJob.cancel();
+    res.json({ ok: true, nextRuns });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: `Schedule non valido: ${err.message}` });
+  }
 });
 
 // API: POST cron jobs (salva tutti)
@@ -1273,10 +1652,33 @@ app.get('/api/env/:name', requireAuth, async (req, res) => {
   }
 });
 
+app.post('/api/env/validate/:name', requireAuth, async (req, res) => {
+  try {
+    const content = String(req.body?.content || '');
+    const requiredKeys = Array.isArray(req.body?.requiredKeys) ? req.body.requiredKeys.map(String) : [];
+    const map = new Map();
+    for (const line of content.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const idx = trimmed.indexOf('=');
+      if (idx <= 0) continue;
+      const key = trimmed.slice(0, idx).trim();
+      const value = trimmed.slice(idx + 1);
+      map.set(key, value);
+    }
+    const missing = requiredKeys.filter((k) => !map.has(k) || String(map.get(k)).trim() === '');
+    const warnings = [];
+    if (map.has('SESSION_SECRET') && String(map.get('SESSION_SECRET')).length < 32) warnings.push('SESSION_SECRET dovrebbe essere lungo almeno 32 caratteri.');
+    res.json({ ok: true, parsedKeys: map.size, missing, warnings });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // API: POST .env (salva con backup)
 app.post('/api/env/:name', requireAuth, async (req, res) => {
   const { name } = req.params;
-  const { content } = req.body || {};
+  const { content, restartProcess } = req.body || {};
   if (typeof content !== 'string' || content.trim() === '') {
     return res.status(400).json({ ok: false, error: 'Contenuto non valido' });
   }
@@ -1289,10 +1691,11 @@ app.post('/api/env/:name', requireAuth, async (req, res) => {
       await fs.copyFile(envPath, bakPath);
     } catch (_) {}
     await fs.writeFile(envPath, content, 'utf8');
-    logEvent('env_save', { process: name, user: req.session?.user });
-    res.json({ ok: true });
+    if (restartProcess === true) await pm2Action('restart', name);
+    await audit('env_save', { process: name, user: req.session?.user, restartProcess: restartProcess === true });
+    res.json({ ok: true, restarted: restartProcess === true });
   } catch (err) {
-    logEvent('env_save_error', { process: name, user: req.session?.user, error: err.message });
+    await audit('env_save_error', { process: name, user: req.session?.user, error: err.message });
     console.error('Env save error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }

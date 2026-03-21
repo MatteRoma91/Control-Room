@@ -4,6 +4,18 @@
   </div>
 <% } %>
 
+<section class="mb-6" aria-labelledby="incident-heading">
+  <div id="incidentBanner" class="hidden rounded-lg border p-4">
+    <div class="flex items-center justify-between gap-2">
+      <div>
+        <h2 id="incident-heading" class="text-lg font-semibold">Incident center</h2>
+        <p id="incidentText" class="text-sm text-slate-300 mt-1"></p>
+      </div>
+      <a href="/audit" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-sm">Apri audit</a>
+    </div>
+  </div>
+</section>
+
 <!-- Grafici CPU e RAM (scala 0-100%) -->
 <section class="mb-8" aria-labelledby="charts-heading">
   <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
@@ -81,6 +93,12 @@
       class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Ripristina tutti i processi
+    </button>
+    <button
+      onclick="runRecoverRunbook('padel-tour', this)"
+      class="px-4 py-2 rounded-lg bg-purple-700 hover:bg-purple-600 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      Runbook Recovery (padel-tour)
     </button>
   </div>
 </section>
@@ -167,6 +185,11 @@
       </table>
     </div>
   </div>
+</section>
+
+<section class="mb-8" aria-labelledby="quality-heading">
+  <h2 id="quality-heading" class="text-lg font-semibold text-slate-200 mb-3">Quality gates</h2>
+  <div id="qualityGatesBox" class="rounded-lg border border-slate-700 bg-slate-800 p-4 text-sm text-slate-300">Caricamento KPI operativi...</div>
 </section>
 
 <!-- Processi PM2 (aggiornamento live ogni 3s) -->
@@ -309,14 +332,35 @@
     }
   }
 
+  async function getConfirmPhrase(title, message, expectedPhrase) {
+    const result = await requestStrongConfirm({ title, message, expectedPhrase });
+    if (!result || !result.ok) return null;
+    return result.confirmPhrase;
+  }
+
   async function processAction(name, action, btn) {
+    let confirmPhrase = '';
+    if (action === 'stop' || action === 'restart') {
+      const expected = `${action.toUpperCase()}:${name}`;
+      const phrase = await getConfirmPhrase(
+        'Conferma azione ad alto rischio',
+        `Stai per eseguire ${action.toUpperCase()} su ${name}.`,
+        expected
+      );
+      if (!phrase) return;
+      confirmPhrase = phrase;
+    }
     setBtnLoading(btn, true);
     try {
-      const res = await fetch(`/api/process/${action}/${encodeURIComponent(name)}`, { method: 'POST' });
+      const res = await fetch(`/api/process/${action}/${encodeURIComponent(name)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmPhrase }),
+      });
       const data = await res.json();
       if (data.ok) {
         showToast('Operazione completata', 'success');
-        setTimeout(() => location.reload(), 500);
+        await loadProcessesLive();
       } else {
         showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
         setBtnLoading(btn, false);
@@ -477,13 +521,15 @@
   }
 
   async function restartAllWebapps(btn) {
+    const phrase = await getConfirmPhrase('Conferma riavvio globale', 'Questa azione riavvia tutte le webapp gestite.', 'RESTART-ALL');
+    if (!phrase) return;
     setBtnLoading(btn, true);
     try {
-      const res = await fetch('/api/process/restart-all', { method: 'POST' });
+      const res = await fetch('/api/process/restart-all', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmPhrase: phrase }) });
       const data = await res.json();
       if (data.ok) {
         showToast('Webapp riavviate', 'success');
-        setTimeout(() => location.reload(), 500);
+        await refreshAllTables();
       } else {
         showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
         setBtnLoading(btn, false);
@@ -495,13 +541,15 @@
   }
 
   async function restoreAll(btn) {
+    const phrase = await getConfirmPhrase('Conferma ripristino globale', 'Questa azione avvia/ripristina tutti i processi.', 'RESTORE-ALL');
+    if (!phrase) return;
     setBtnLoading(btn, true);
     try {
-      const res = await fetch('/api/process/restore-all', { method: 'POST' });
+      const res = await fetch('/api/process/restore-all', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmPhrase: phrase }) });
       const data = await res.json();
       if (data.ok) {
         showToast('Processi ripristinati', 'success');
-        setTimeout(() => location.reload(), 500);
+        await refreshAllTables();
       } else {
         showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
         setBtnLoading(btn, false);
@@ -540,9 +588,11 @@
   }
 
   async function nginxReload(btn) {
+    const phrase = await getConfirmPhrase('Conferma reload Nginx', 'Stai per ricaricare Nginx.', 'NGINX-RELOAD');
+    if (!phrase) return;
     setBtnLoading(btn, true);
     try {
-      const res = await fetch('/api/nginx-reload', { method: 'POST' });
+      const res = await fetch('/api/nginx-reload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmPhrase: phrase }) });
       const data = await res.json();
       if (data.ok) {
         showToast('Nginx ricaricato', 'success');
@@ -682,6 +732,55 @@
       showToast('Errore: ' + e.message, 'error');
     }
     setBtnLoading(btn, false);
+  }
+
+  async function runRecoverRunbook(processName, btn) {
+    setBtnLoading(btn, true);
+    try {
+      const res = await fetch(`/api/runbook/recover-app/${encodeURIComponent(processName)}`, { method: 'POST' });
+      const json = await res.json();
+      if (json.ok) showToast('Runbook completato con successo', 'success');
+      else showToast('Runbook parziale/fallito', 'error');
+      await refreshAllTables();
+    } catch (e) {
+      showToast('Errore runbook: ' + e.message, 'error');
+    }
+    setBtnLoading(btn, false);
+  }
+
+  async function loadIncidentSummary() {
+    try {
+      const res = await fetch('/api/health/summary');
+      const data = await res.json();
+      const banner = document.getElementById('incidentBanner');
+      const text = document.getElementById('incidentText');
+      if (!banner || !text) return;
+      banner.classList.remove('hidden', 'border-red-700', 'bg-red-900/40', 'border-emerald-700', 'bg-emerald-900/30');
+      if (data.severity === 'critical') {
+        banner.classList.add('border-red-700', 'bg-red-900/40');
+        text.textContent = (data.incidents && data.incidents.length) ? data.incidents.slice(0, 3).join(' | ') : 'Sono presenti anomalie operative.';
+      } else {
+        banner.classList.add('border-emerald-700', 'bg-emerald-900/30');
+        text.textContent = 'Nessun incidente critico rilevato. Tutti i servizi principali risultano stabili.';
+      }
+    } catch (_) {}
+  }
+
+  async function loadQualityGates() {
+    try {
+      const res = await fetch('/api/quality-gates');
+      const q = await res.json();
+      if (!q.ok) throw new Error(q.error || 'Errore');
+      const text = [
+        `Severity: ${q.healthSeverity}`,
+        `Health failing: ${q.failingHealthChecks}`,
+        `Processi offline: ${q.offlineProcesses}`,
+        `Audit coverage (azioni critiche): ${q.auditCoverageCriticalActions}%`,
+      ].join(' | ');
+      document.getElementById('qualityGatesBox').textContent = text;
+    } catch (e) {
+      document.getElementById('qualityGatesBox').textContent = 'Errore quality gates: ' + e.message;
+    }
   }
 
   function statusClass(status) {
@@ -845,9 +944,13 @@
   }
 
   loadSystem();
+  loadIncidentSummary();
   loadSitePorts();
+  loadQualityGates();
   fetchStats();
   loadProcessesLive();
   setInterval(fetchStats, 3000);
   setInterval(loadProcessesLive, 3000);
+  setInterval(loadIncidentSummary, 10000);
+  setInterval(loadQualityGates, 20000);
 </script>

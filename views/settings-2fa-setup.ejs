@@ -130,10 +130,16 @@
       return;
     }
     try {
+      const confirm = await requestStrongConfirm({
+        title: 'Conferma disattivazione 2FA',
+        message: 'Stai per disattivare la protezione a due fattori.',
+        expectedPhrase: 'DISABLE-2FA',
+      });
+      if (!confirm || !confirm.ok) return;
       const res = await fetch('/api/2fa/disable', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password, confirmPhrase: confirm.confirmPhrase }),
       });
       const data = await res.json();
       if (data.ok) {

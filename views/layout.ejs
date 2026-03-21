@@ -16,6 +16,11 @@
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="/socket.io/socket.io.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .cr-card { border: 1px solid rgb(51 65 85); background: rgb(30 41 59 / 0.9); border-radius: 0.75rem; }
+    .cr-title { color: rgb(226 232 240); font-weight: 700; letter-spacing: 0.01em; }
+  </style>
   <%- typeof headExtra !== 'undefined' ? headExtra : '' %>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200" x-data="{ sidebarOpen: false }">
@@ -36,6 +41,7 @@
       <a href="/settings" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Impostazioni">Impostazioni</a>
       <a href="/cron" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Cron Jobs">Cron</a>
       <a href="/nginx" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Nginx">Nginx</a>
+      <a href="/audit" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Audit">Audit</a>
       <form method="POST" action="/logout" class="inline">
         <button type="submit" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800">Logout</button>
       </form>
@@ -64,6 +70,7 @@
   <main class="pt-16 md:pl-64 min-h-screen overflow-x-hidden">
     <div class="p-4 md:p-6 max-w-7xl mx-auto">
       <%- include('partials/toast') %>
+      <%- include('partials/confirm-modal') %>
       <%- include('partials/git-pull-modal') %>
       <%- include('partials/env-editor-modal') -%>
       <%- include(contentPartial || 'dashboard') %>

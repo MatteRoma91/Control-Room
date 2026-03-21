@@ -59,12 +59,23 @@
       <p x-show="loading" class="text-slate-400 py-4">Caricamento...</p>
     </div>
     <div class="flex gap-2 p-4 border-t border-slate-700 shrink-0">
+      <label class="inline-flex items-center gap-2 text-sm text-slate-300">
+        <input type="checkbox" x-model="restartAfterSave" class="rounded border-slate-600 bg-slate-700" />
+        Riavvia processo dopo il salvataggio
+      </label>
       <button
         @click="loadEnv()"
         :disabled="loading"
         class="px-4 py-2 rounded-lg bg-slate-600 hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-emerald-500"
       >
         Carica .env
+      </button>
+      <button
+        @click="validateEnv()"
+        :disabled="loading"
+        class="px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-blue-500"
+      >
+        Valida
       </button>
       <button
         @click="saveEnv()"
@@ -116,6 +127,8 @@
       variables: [],
       loading: false,
       saving: false,
+      restartAfterSave: false,
+      originalContent: '',
       error: '',
       loadEnv() {
         const name = this.processName;
@@ -127,6 +140,7 @@
           .then(d => {
             const content = d.content ?? '';
             this.variables = content ? parseEnvContent(content) : [];
+            this.originalContent = content ? content.replace(/\r\n/g, '\n').trimEnd() : '';
             this.loading = false;
             if (d.exists === false && !content) this.variables = [];
           })
@@ -148,13 +162,14 @@
         fetch(`/api/env/${encodeURIComponent(name)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: content + '\n' }),
+          body: JSON.stringify({ content: content + '\n', restartProcess: this.restartAfterSave }),
         })
           .then(r => r.json())
           .then(d => {
             this.saving = false;
             if (d.ok) {
-              window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Modifiche salvate (backup in .env.bak)', type: 'success' } }));
+              const msg = d.restarted ? 'Modifiche salvate e processo riavviato' : 'Modifiche salvate (backup in .env.bak)';
+              window.dispatchEvent(new CustomEvent('toast', { detail: { message: msg, type: 'success' } }));
               this.$dispatch('env-editor-hide');
             } else {
               this.error = d.error || 'Errore salvataggio';
@@ -163,6 +178,28 @@
           .catch(e => {
             this.error = e.message || 'Errore salvataggio';
             this.saving = false;
+          });
+      },
+      validateEnv() {
+        const name = this.processName;
+        const content = buildEnvContent(this.variables);
+        fetch(`/api/env/validate/${encodeURIComponent(name)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, requiredKeys: ['SESSION_SECRET'] }),
+        })
+          .then((r) => r.json())
+          .then((d) => {
+            if (!d.ok) throw new Error(d.error || 'Validazione fallita');
+            const diffs = this.originalContent !== content.trimEnd();
+            const parts = [`Chiavi parse: ${d.parsedKeys}`];
+            if (d.missing?.length) parts.push(`Mancanti: ${d.missing.join(', ')}`);
+            if (d.warnings?.length) parts.push(`Warning: ${d.warnings.join(' | ')}`);
+            parts.push(`Diff: ${diffs ? 'presente' : 'nessuna modifica'}`);
+            window.dispatchEvent(new CustomEvent('toast', { detail: { message: parts.join(' • '), type: d.missing?.length ? 'error' : 'info' } }));
+          })
+          .catch((e) => {
+            window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Errore validazione: ' + e.message, type: 'error' } }));
           });
       },
     };
