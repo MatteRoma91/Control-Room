@@ -429,11 +429,28 @@
   async function resetRestartCount(name, btn) {
     setBtnLoading(btn, true);
     try {
-      const res = await fetch(`/api/process/reset/${encodeURIComponent(name)}`, { method: 'POST' });
-      const data = await res.json();
+      const res = await fetch(`/api/process/reset/${encodeURIComponent(name)}`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      const text = await res.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (_) {
+        const hint =
+          /login/i.test(text.slice(0, 200)) || res.status === 401
+            ? 'Sessione scaduta: effettua di nuovo il login.'
+            : 'Risposta non valida dal server (HTTP ' + res.status + ').';
+        showToast(hint, 'error');
+        setBtnLoading(btn, false);
+        return;
+      }
       if (data.ok) {
         showToast('Contatore restart azzerato', 'success');
-        setTimeout(() => location.reload(), 500);
+        await loadProcessesLive();
+        setBtnLoading(btn, false);
       } else {
         showToast('Errore: ' + (data.error || 'Operazione fallita'), 'error');
         setBtnLoading(btn, false);

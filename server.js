@@ -541,21 +541,21 @@ app.post('/api/process/flush/:name', requireAuth, (req, res) => {
   });
 });
 
-// API: reset restart counter
+// API: reset restart counter (usa daemon PM2 come flush, non CLI — PATH affidabile)
 app.post('/api/process/reset/:name', requireAuth, (req, res) => {
   const { name } = req.params;
   if (!/^[a-zA-Z0-9_.-]+$/.test(name)) {
     return res.status(400).json({ ok: false, error: 'Nome processo non valido' });
   }
-  try {
-    execFileSync('pm2', ['reset', name], { encoding: 'utf8' });
+  pm2.reset(name, (err) => {
+    if (err) {
+      logEvent('process_reset_error', { process: name, user: req.session?.user, error: err.message });
+      console.error('PM2 reset error:', err);
+      return res.status(500).json({ ok: false, error: err.message || String(err) });
+    }
     logEvent('process_reset', { process: name, user: req.session?.user });
     res.json({ ok: true });
-  } catch (err) {
-    logEvent('process_reset_error', { process: name, user: req.session?.user, error: err.message });
-    console.error('PM2 reset error:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
+  });
 });
 
 // API: git pull & restart
