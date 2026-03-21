@@ -35,9 +35,15 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
       </button>
-      <h1 class="text-xl font-bold truncate">Control Room</h1>
+      <div class="min-w-0">
+        <h1 class="text-xl font-bold truncate">Control Room</h1>
+        <p class="hidden md:block text-xs text-slate-400 truncate">Ops Console · Recovery · Incidenti · Sicurezza</p>
+      </div>
     </div>
     <div class="hidden md:flex items-center gap-2 shrink-0">
+      <a href="/incidents" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Incidenti">Incidenti</a>
+      <a href="/automation" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Automation">Automation</a>
+      <a href="/analytics" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Analytics">Analytics</a>
       <a href="/settings" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Impostazioni">Impostazioni</a>
       <a href="/cron" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Cron Jobs">Cron</a>
       <a href="/nginx" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Nginx">Nginx</a>

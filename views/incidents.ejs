@@ -1,0 +1,85 @@
+<section class="space-y-6" aria-labelledby="incidents-heading">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 id="incidents-heading" class="text-2xl font-bold text-slate-100">Incident Center</h1>
+    <button id="btnRefreshIncidents" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-sm">Aggiorna</button>
+  </div>
+
+  <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+    <h2 class="text-lg font-semibold mb-3">Nuovo incidente</h2>
+    <form id="incidentCreateForm" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <input id="incidentTitle" class="md:col-span-2 rounded bg-slate-700 border border-slate-600 px-3 py-2" placeholder="Titolo incidente" />
+      <select id="incidentSeverity" class="rounded bg-slate-700 border border-slate-600 px-3 py-2">
+        <option value="medium">medium</option>
+        <option value="high">high</option>
+        <option value="critical">critical</option>
+        <option value="low">low</option>
+      </select>
+      <button class="rounded bg-emerald-700 hover:bg-emerald-600 px-3 py-2">Crea</button>
+    </form>
+  </div>
+
+  <div id="incidentsList" class="space-y-3"></div>
+</section>
+
+<script>
+  async function loadIncidents() {
+    const root = document.getElementById('incidentsList');
+    try {
+      const res = await fetch('/api/incidents');
+      const data = await res.json();
+      const incidents = data.incidents || [];
+      if (!incidents.length) {
+        root.innerHTML = '<div class="text-slate-400">Nessun incidente registrato.</div>';
+        return;
+      }
+      root.innerHTML = incidents.map((i) => `
+        <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p class="font-semibold">${i.title}</p>
+              <p class="text-xs text-slate-400">severity=${i.severity} · status=${i.status} · updated=${i.updatedAt || '-'}</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="updateIncidentStatus('${i.id}','ack')" class="px-2 py-1 rounded bg-amber-700 hover:bg-amber-600 text-xs">ACK</button>
+              <button onclick="updateIncidentStatus('${i.id}','resolved')" class="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-xs">Resolve</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      root.innerHTML = `<div class="text-red-300">Errore: ${err.message}</div>`;
+    }
+  }
+
+  async function updateIncidentStatus(id, status) {
+    const res = await fetch(`/api/incidents/${encodeURIComponent(id)}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    const json = await res.json();
+    if (!json.ok) window.dispatchEvent(new CustomEvent('toast', { detail: { message: json.error || 'Errore aggiornamento incidente', type: 'error' } }));
+    loadIncidents();
+  }
+
+  document.getElementById('incidentCreateForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = document.getElementById('incidentTitle').value.trim();
+    const severity = document.getElementById('incidentSeverity').value;
+    const res = await fetch('/api/incidents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, severity }),
+    });
+    const json = await res.json();
+    if (!json.ok) {
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: json.error || 'Errore creazione incidente', type: 'error' } }));
+      return;
+    }
+    document.getElementById('incidentTitle').value = '';
+    loadIncidents();
+  });
+
+  document.getElementById('btnRefreshIncidents').addEventListener('click', loadIncidents);
+  loadIncidents();
+</script>

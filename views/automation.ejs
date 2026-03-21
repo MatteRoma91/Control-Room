@@ -1,0 +1,150 @@
+<section class="space-y-6" aria-labelledby="automation-heading">
+  <h1 id="automation-heading" class="text-2xl font-bold text-slate-100">Automation Suite</h1>
+
+  <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+    <h2 class="text-lg font-semibold mb-3">Runbook batch</h2>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <select id="batchMode" class="rounded bg-slate-700 border border-slate-600 px-3 py-2">
+        <option value="soft_recover">soft_recover</option>
+        <option value="full_recover" selected>full_recover</option>
+        <option value="safe_rollback">safe_rollback</option>
+      </select>
+      <label class="text-sm text-slate-300 flex items-center gap-2"><input id="batchStopOnFail" type="checkbox" checked /> stop on fail</label>
+      <label class="text-sm text-slate-300 flex items-center gap-2"><input id="batchDryRun" type="checkbox" /> dry-run</label>
+      <button id="btnRunBatch" class="rounded bg-purple-700 hover:bg-purple-600 px-3 py-2">Esegui batch</button>
+    </div>
+    <div id="batchApps" class="mt-3 flex flex-wrap gap-2"></div>
+  </div>
+
+  <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+    <h2 class="text-lg font-semibold mb-3">Storico runbook</h2>
+    <div id="runbookHistory" class="text-sm text-slate-300"></div>
+  </div>
+
+  <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+    <h2 class="text-lg font-semibold mb-3">Scheduled remediation</h2>
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
+      <input id="autoName" class="rounded bg-slate-700 border border-slate-600 px-3 py-2" placeholder="nome regola" />
+      <input id="autoProcess" class="rounded bg-slate-700 border border-slate-600 px-3 py-2" placeholder="process (es. padel-tour)" />
+      <input id="autoSchedule" class="rounded bg-slate-700 border border-slate-600 px-3 py-2" placeholder="cron expr (es. */20 * * * *)" />
+      <select id="autoMode" class="rounded bg-slate-700 border border-slate-600 px-3 py-2">
+        <option value="soft_recover">soft_recover</option>
+        <option value="full_recover">full_recover</option>
+        <option value="safe_rollback">safe_rollback</option>
+      </select>
+      <button id="btnSaveAutoRule" class="rounded bg-emerald-700 hover:bg-emerald-600 px-3 py-2">Aggiungi regola</button>
+    </div>
+    <div id="autoRules" class="mt-3 text-sm text-slate-300"></div>
+  </div>
+</section>
+
+<script>
+  let selectedApps = new Set();
+
+  async function loadBatchApps() {
+    const root = document.getElementById('batchApps');
+    const res = await fetch('/api/runbook/apps');
+    const data = await res.json();
+    root.innerHTML = (data.apps || []).map((a) => `
+      <label class="px-2 py-1 rounded border border-slate-600 bg-slate-700 text-sm">
+        <input type="checkbox" value="${a.name}" class="mr-1" onchange="toggleBatchApp(this)" />
+        ${a.name}
+      </label>
+    `).join('');
+  }
+
+  function toggleBatchApp(el) {
+    if (el.checked) selectedApps.add(el.value);
+    else selectedApps.delete(el.value);
+  }
+
+  async function runBatch() {
+    const apps = Array.from(selectedApps);
+    if (!apps.length) {
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Seleziona almeno una app', type: 'error' } }));
+      return;
+    }
+    const res = await fetch('/api/runbook/recover-batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apps,
+        mode: document.getElementById('batchMode').value,
+        stopOnFail: document.getElementById('batchStopOnFail').checked,
+        dryRun: document.getElementById('batchDryRun').checked,
+      }),
+    });
+    const json = await res.json();
+    window.dispatchEvent(new CustomEvent('toast', { detail: { message: json.ok ? 'Batch completato' : 'Batch con errori', type: json.ok ? 'success' : 'error' } }));
+    loadRunbookHistory();
+  }
+
+  async function loadRunbookHistory() {
+    const root = document.getElementById('runbookHistory');
+    const res = await fetch('/api/runbook/history');
+    const data = await res.json();
+    const rows = data.reports || [];
+    root.innerHTML = rows.length ? rows.slice(0, 25).map((r) => `
+      <div class="py-1 border-b border-slate-700">
+        <span class="${r.ok ? 'text-emerald-300' : 'text-red-300'}">${r.ok ? 'OK' : 'FAIL'}</span>
+        · ${r.process} · ${r.mode} · ${r.durationMs}ms · ${r.finishedAt || '-'}
+      </div>
+    `).join('') : '<span class="text-slate-500">Nessuno storico disponibile.</span>';
+  }
+
+  document.getElementById('btnRunBatch').addEventListener('click', runBatch);
+  let autoRules = [];
+
+  async function loadAutoRules() {
+    const res = await fetch('/api/automation/remediations');
+    const data = await res.json();
+    autoRules = data.items || [];
+    renderAutoRules();
+  }
+
+  function renderAutoRules() {
+    const root = document.getElementById('autoRules');
+    root.innerHTML = autoRules.length ? autoRules.map((r) => `
+      <div class="py-1 border-b border-slate-700 flex items-center justify-between gap-2">
+        <span>${r.name} · ${r.process} · ${r.schedule} · ${r.mode}</span>
+        <button class="px-2 py-1 rounded bg-red-700 hover:bg-red-600 text-xs" onclick="removeAutoRule('${r.id}')">Rimuovi</button>
+      </div>
+    `).join('') : '<span class="text-slate-500">Nessuna regola.</span>';
+  }
+
+  async function persistAutoRules() {
+    await fetch('/api/automation/remediations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: autoRules }),
+    });
+    await loadAutoRules();
+  }
+
+  function removeAutoRule(id) {
+    autoRules = autoRules.filter((r) => r.id !== id);
+    persistAutoRules();
+  }
+  window.removeAutoRule = removeAutoRule;
+
+  document.getElementById('btnSaveAutoRule').addEventListener('click', async () => {
+    const item = {
+      id: `arm_${Date.now()}`,
+      name: document.getElementById('autoName').value.trim() || 'remediation',
+      process: document.getElementById('autoProcess').value.trim(),
+      schedule: document.getElementById('autoSchedule').value.trim(),
+      mode: document.getElementById('autoMode').value,
+      enabled: true,
+    };
+    if (!item.process || !item.schedule) {
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Process e schedule obbligatori', type: 'error' } }));
+      return;
+    }
+    autoRules.push(item);
+    await persistAutoRules();
+  });
+
+  loadBatchApps();
+  loadRunbookHistory();
+  loadAutoRules();
+</script>

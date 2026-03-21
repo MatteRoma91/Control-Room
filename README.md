@@ -146,6 +146,10 @@ Per Certbot, opzionalmente imposta `CR_CONTACT_EMAIL` nel `.env` (email per Let'
 - **Notifiche**: Discord, Slack o Telegram su crash/restart dei processi
 - **Firewall IP**: Whitelist e Panic Mode per restringere l'accesso
 - **Nginx Generator**: Form per generare e applicare config per nuovi domini
+- **Incident Center**: Gestione incidenti con stato open/ack/resolved e timeline operativa
+- **Automation Suite**: Runbook multi-app (soft/full/safe-rollback), batch mode e storico esecuzioni
+- **Analytics & Capacity**: KPI operativi, runbook success rate, capacity risk
+- **Maintenance & Security**: Session inventory/revoke, log explorer e diagnostica guidata
 
 ## Sicurezza
 
@@ -153,3 +157,4 @@ Per Certbot, opzionalmente imposta `CR_CONTACT_EMAIL` nel `.env` (email per Let'
 - Non usare credenziali di esempio in produzione
 - SSL obbligatorio in produzione
 - Sessioni in produzione su Redis (`connect-redis`), non su MemoryStore
+- Notifiche Discord avanzate con routing per canale (ops/incidents/security), retry e dead-letter log locale

@@ -102,6 +102,22 @@
       Runbook Recovery (padel-tour)
     </button>
   </div>
+  <div class="mt-4 rounded-lg border border-slate-700 bg-slate-800 p-4">
+    <div class="flex flex-wrap items-end gap-3 mb-3">
+      <label class="text-sm text-slate-300">Modalita runbook
+        <select id="runbookMode" class="ml-2 rounded bg-slate-700 border border-slate-600 px-2 py-1">
+          <option value="soft_recover">soft_recover</option>
+          <option value="full_recover" selected>full_recover</option>
+          <option value="safe_rollback">safe_rollback</option>
+        </select>
+      </label>
+      <label class="text-sm text-slate-300">
+        <input id="runbookDryRun" type="checkbox" class="mr-1 align-middle" />
+        dry-run
+      </label>
+    </div>
+    <div id="runbookApps" class="flex flex-wrap gap-2"></div>
+  </div>
 </section>
 
 <!-- Porte siti -->
@@ -743,15 +759,41 @@
   async function runRecoverRunbook(processName, btn) {
     setBtnLoading(btn, true);
     try {
-      const res = await fetch(`/api/runbook/recover-app/${encodeURIComponent(processName)}`, { method: 'POST' });
+      const mode = document.getElementById('runbookMode')?.value || 'full_recover';
+      const dryRun = document.getElementById('runbookDryRun')?.checked === true;
+      const res = await fetch(`/api/runbook/recover-app/${encodeURIComponent(processName)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, dryRun }),
+      });
       const json = await res.json();
-      if (json.ok) showToast('Runbook completato con successo', 'success');
+      if (json.ok) showToast(`Runbook ${processName} completato`, 'success');
       else showToast('Runbook parziale/fallito', 'error');
       await refreshAllTables();
     } catch (e) {
       showToast('Errore runbook: ' + e.message, 'error');
     }
     setBtnLoading(btn, false);
+  }
+
+  async function loadRunbookApps() {
+    const root = document.getElementById('runbookApps');
+    if (!root) return;
+    root.innerHTML = '<span class="text-sm text-slate-400">Caricamento app...</span>';
+    try {
+      const res = await fetch('/api/runbook/apps');
+      const json = await res.json();
+      root.innerHTML = '';
+      (json.apps || []).forEach((app) => {
+        const b = document.createElement('button');
+        b.className = 'px-3 py-1.5 rounded bg-purple-700 hover:bg-purple-600 text-sm';
+        b.textContent = `Recover ${app.name}`;
+        b.onclick = () => runRecoverRunbook(app.name, b);
+        root.appendChild(b);
+      });
+    } catch (err) {
+      root.innerHTML = `<span class="text-sm text-red-300">Errore caricamento app: ${err.message}</span>`;
+    }
   }
 
   async function loadIncidentSummary() {
@@ -953,6 +995,7 @@
   loadIncidentSummary();
   loadSitePorts();
   loadQualityGates();
+  loadRunbookApps();
   fetchStats();
   loadProcessesLive();
   setInterval(fetchStats, 3000);

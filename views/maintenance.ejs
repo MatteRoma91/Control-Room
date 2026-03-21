@@ -1,0 +1,83 @@
+<section class="space-y-6" aria-labelledby="maintenance-heading">
+  <h1 id="maintenance-heading" class="text-2xl font-bold text-slate-100">Maintenance & Security</h1>
+
+  <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+    <h2 class="text-lg font-semibold mb-3">Sessioni attive</h2>
+    <div class="flex gap-2 mb-3">
+      <button id="btnRefreshSessions" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-sm">Aggiorna sessioni</button>
+      <button id="btnRevokeAllSessions" class="px-3 py-1.5 rounded bg-red-700 hover:bg-red-600 text-sm">Revoca tutte</button>
+    </div>
+    <div id="sessionsList" class="text-sm text-slate-300"></div>
+  </div>
+
+  <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+    <h2 class="text-lg font-semibold mb-3">Log Explorer</h2>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
+      <input id="logProcess" class="rounded bg-slate-700 border border-slate-600 px-3 py-2" placeholder="process (es. control-room)" value="control-room" />
+      <select id="logSource" class="rounded bg-slate-700 border border-slate-600 px-3 py-2"><option value="out">out</option><option value="error">error</option></select>
+      <input id="logQuery" class="rounded bg-slate-700 border border-slate-600 px-3 py-2" placeholder="filtro testo" />
+      <button id="btnLoadLogs" class="rounded bg-slate-700 hover:bg-slate-600 px-3 py-2">Carica log</button>
+    </div>
+    <pre id="logOutput" class="text-xs bg-slate-900 border border-slate-700 rounded p-3 max-h-80 overflow-auto"></pre>
+  </div>
+
+  <div class="rounded-lg border border-slate-700 bg-slate-800 p-4">
+    <h2 class="text-lg font-semibold mb-3">Diagnostica guidata</h2>
+    <button id="btnDiagnostics" class="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm">Esegui diagnostica</button>
+    <pre id="diagOutput" class="mt-3 text-xs bg-slate-900 border border-slate-700 rounded p-3 max-h-80 overflow-auto"></pre>
+  </div>
+</section>
+
+<script>
+  async function loadSessions() {
+    const root = document.getElementById('sessionsList');
+    const res = await fetch('/api/security/sessions');
+    const data = await res.json();
+    const rows = data.sessions || [];
+    root.innerHTML = rows.length ? rows.map((s) => `
+      <div class="py-1 border-b border-slate-700 flex items-center justify-between gap-2">
+        <span>${s.user || 'anon'} · ${s.key} · last=${s.lastAccess || '-'}</span>
+        <button class="px-2 py-1 rounded bg-red-700 hover:bg-red-600 text-xs" onclick="revokeSession('${s.key}')">Revoke</button>
+      </div>
+    `).join('') : '<span class="text-slate-500">Nessuna sessione disponibile.</span>';
+  }
+
+  async function revokeSession(key) {
+    const res = await fetch('/api/security/sessions/revoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+    const json = await res.json();
+    if (!json.ok) window.dispatchEvent(new CustomEvent('toast', { detail: { message: json.error || 'Errore revoke', type: 'error' } }));
+    loadSessions();
+  }
+
+  async function loadLogs() {
+    const process = document.getElementById('logProcess').value.trim();
+    const source = document.getElementById('logSource').value;
+    const q = document.getElementById('logQuery').value.trim();
+    const url = `/api/maintenance/logs?process=${encodeURIComponent(process)}&source=${encodeURIComponent(source)}&q=${encodeURIComponent(q)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    document.getElementById('logOutput').textContent = (data.lines || []).join('\n');
+  }
+
+  async function runDiagnostics() {
+    const res = await fetch('/api/maintenance/diagnostics');
+    const data = await res.json();
+    document.getElementById('diagOutput').textContent = JSON.stringify(data, null, 2);
+  }
+
+  document.getElementById('btnRefreshSessions').addEventListener('click', loadSessions);
+  document.getElementById('btnRevokeAllSessions').addEventListener('click', async () => {
+    const res = await fetch('/api/security/sessions/revoke-all', { method: 'POST' });
+    const json = await res.json();
+    window.dispatchEvent(new CustomEvent('toast', { detail: { message: json.ok ? `Revocate ${json.revoked}` : (json.error || 'Errore revoke all'), type: json.ok ? 'success' : 'error' } }));
+    loadSessions();
+  });
+  document.getElementById('btnLoadLogs').addEventListener('click', loadLogs);
+  document.getElementById('btnDiagnostics').addEventListener('click', runDiagnostics);
+  loadSessions();
+  loadLogs();
+</script>

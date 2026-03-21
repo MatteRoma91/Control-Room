@@ -49,6 +49,9 @@ const WEB_SITES = [
 const DAILY_CHECK_SITES = WEB_SITES.filter((s) => s.kind === 'app' && s.pm2 && s.url);
 const DAILY_CHECK_STATE_PATH = path.join(__dirname, 'data', 'daily-check-state.json');
 const DAILY_CHECK_HISTORY_PATH = path.join(__dirname, 'logs', 'daily-check-history.log');
+const INCIDENTS_PATH = path.join(__dirname, 'data', 'incidents.json');
+const RUNBOOK_HISTORY_PATH = path.join(__dirname, 'logs', 'runbook-history.log');
+const NOTIFY_DEAD_LETTER_PATH = path.join(__dirname, 'logs', 'notify-dead-letter.log');
 
 /** Parser output `ss -tlnp`: socket TCP in ascolto */
 function parseSsTcpListen() {
@@ -159,12 +162,18 @@ function sanitizeSettings(raw) {
       : [],
     webhookType: ['discord', 'slack', 'telegram'].includes(source.webhookType) ? source.webhookType : 'discord',
     webhookUrl: String(source.webhookUrl || ''),
+    discordWebhookOps: String(source.discordWebhookOps || process.env.DISCORD_WEBHOOK_OPS || ''),
+    discordWebhookIncidents: String(source.discordWebhookIncidents || process.env.DISCORD_WEBHOOK_INCIDENTS || ''),
+    discordWebhookSecurity: String(source.discordWebhookSecurity || process.env.DISCORD_WEBHOOK_SECURITY || ''),
     telegramBotToken: String(source.telegramBotToken || ''),
     telegramChatId: String(source.telegramChatId || ''),
     notifyOnCrash: source.notifyOnCrash !== false,
     notifyOnRestart: source.notifyOnRestart !== false,
     notifyOnException: source.notifyOnException === true || (source.notifyOnException !== false && source.notifyOnCrash !== false),
     notifyOnLogErr: source.notifyOnLogErr === true,
+    notifyOnRunbook: source.notifyOnRunbook === true,
+    notifyOnIncident: source.notifyOnIncident !== false,
+    notifyOnSecurity: source.notifyOnSecurity === true,
     sshProfiles: Array.isArray(source.sshProfiles) ? source.sshProfiles : [],
     totpSecret: String(source.totpSecret || ''),
     totpEnabled: source.totpEnabled === true,
@@ -176,6 +185,7 @@ function sanitizeSettings(raw) {
       enabled: dailyRaw.enabled !== false,
       time: typeof dailyRaw.time === 'string' && /^\d{2}:\d{2}$/.test(dailyRaw.time) ? dailyRaw.time : '00:00',
     },
+    autoRemediations: Array.isArray(source.autoRemediations) ? source.autoRemediations : [],
   };
   return safe;
 }
@@ -469,6 +479,22 @@ app.get('/audit', requireAuth, async (req, res) => {
   res.render('layout', { contentPartial: 'audit', title: 'Audit log' });
 });
 
+app.get('/incidents', requireAuth, async (req, res) => {
+  res.render('layout', { contentPartial: 'incidents', title: 'Incident Center' });
+});
+
+app.get('/automation', requireAuth, async (req, res) => {
+  res.render('layout', { contentPartial: 'automation', title: 'Automation' });
+});
+
+app.get('/analytics', requireAuth, async (req, res) => {
+  res.render('layout', { contentPartial: 'analytics', title: 'Analytics' });
+});
+
+app.get('/maintenance', requireAuth, async (req, res) => {
+  res.render('layout', { contentPartial: 'maintenance', title: 'Maintenance' });
+});
+
 // ============ API ROUTES ============
 // Route specifiche prima della generica :action/:name (altrimenti "reset" viene interpretato come action)
 
@@ -749,32 +775,139 @@ app.post('/api/process/restore-all', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/runbook/recover-app/:name', requireAuth, async (req, res) => {
-  const { name } = req.params;
-  const allowed = new Set(['padel-tour', 'roma-buche', 'gestione-veicoli', 'control-room']);
-  if (!allowed.has(name)) return res.status(400).json({ ok: false, error: 'Processo non supportato' });
-  try {
-    const steps = [];
-    const before = await fetchStatusCode(`http://127.0.0.1:${WEB_SITES.find((s) => s.pm2 === name)?.port || 0}/`, 5000);
-    steps.push({ step: 'local_health_before', status: before });
-    await pm2Action('restart', name);
+function getManagedApps() {
+  return WEB_SITES.filter((s) => s.kind === 'app' && s.pm2).map((s) => ({
+    name: s.pm2,
+    label: s.name,
+    port: s.port,
+    url: s.url,
+  }));
+}
+
+async function executeRunbook({ processName, mode = 'full_recover', dryRun = false, operator = 'system' }) {
+  const appMeta = getManagedApps().find((a) => a.name === processName);
+  if (!appMeta) throw new Error('Processo non supportato');
+  const startedAt = Date.now();
+  const steps = [];
+  const localUrl = `http://127.0.0.1:${appMeta.port}/`;
+  const before = await fetchStatusCode(localUrl, 5000);
+  steps.push({ step: 'local_health_before', status: before });
+  if (!dryRun) {
+    await pm2Action('restart', processName);
     steps.push({ step: 'pm2_restart', ok: true });
+  } else {
+    steps.push({ step: 'pm2_restart', ok: true, dryRun: true });
+  }
+  if (mode === 'full_recover' || mode === 'safe_rollback') {
     try {
-      execSync('sudo /bin/systemctl reload nginx 2>/dev/null', { encoding: 'utf8' });
-      steps.push({ step: 'nginx_reload', ok: true });
+      if (!dryRun) {
+        execSync('sudo /bin/systemctl reload nginx 2>/dev/null', { encoding: 'utf8' });
+      }
+      steps.push({ step: 'nginx_reload', ok: true, dryRun });
     } catch (err) {
       steps.push({ step: 'nginx_reload', ok: false, error: err.message });
     }
-    await new Promise((r) => setTimeout(r, 1500));
-    const after = await fetchStatusCode(`http://127.0.0.1:${WEB_SITES.find((s) => s.pm2 === name)?.port || 0}/`, 5000);
-    steps.push({ step: 'local_health_after', status: after });
-    const ok = parseCheckResponseOk(after);
-    await audit('runbook_recover_app', { user: req.session?.user, process: name, ok, steps });
-    res.json({ ok, steps });
+  }
+  await new Promise((r) => setTimeout(r, 1500));
+  const after = await fetchStatusCode(localUrl, 5000);
+  steps.push({ step: 'local_health_after', status: after });
+  let ok = parseCheckResponseOk(after);
+  if (!ok && mode === 'safe_rollback' && !dryRun) {
+    await pm2Action('restart', processName);
+    steps.push({ step: 'rollback_restart', ok: true });
+    const rollbackCheck = await fetchStatusCode(localUrl, 5000);
+    steps.push({ step: 'rollback_health', status: rollbackCheck });
+    ok = parseCheckResponseOk(rollbackCheck);
+  }
+  const report = {
+    id: `rb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    process: processName,
+    mode,
+    dryRun,
+    ok,
+    durationMs: Date.now() - startedAt,
+    operator,
+    startedAt: new Date(startedAt).toISOString(),
+    finishedAt: new Date().toISOString(),
+    steps,
+  };
+  await appendLine(RUNBOOK_HISTORY_PATH, report);
+  return report;
+}
+
+app.get('/api/runbook/apps', requireAuth, async (req, res) => {
+  res.json({ apps: getManagedApps() });
+});
+
+app.get('/api/runbook/history', requireAuth, async (req, res) => {
+  const raw = await fs.readFile(RUNBOOK_HISTORY_PATH, 'utf8').catch(() => '');
+  const reports = raw
+    .split('\n')
+    .filter(Boolean)
+    .slice(-200)
+    .map((line) => {
+      try { return JSON.parse(line); } catch { return null; }
+    })
+    .filter(Boolean)
+    .reverse();
+  res.json({ reports });
+});
+
+app.post('/api/runbook/recover-app/:name', requireAuth, async (req, res) => {
+  const { name } = req.params;
+  const mode = ['soft_recover', 'full_recover', 'safe_rollback'].includes(req.body?.mode) ? req.body.mode : 'full_recover';
+  const dryRun = req.body?.dryRun === true;
+  try {
+    const report = await executeRunbook({
+      processName: name,
+      mode,
+      dryRun,
+      operator: req.session?.user || 'unknown',
+    });
+    await audit('runbook_recover_app', { user: req.session?.user, process: name, ok: report.ok, mode, dryRun, steps: report.steps });
+    await sendNotificationEvent('runbook_recover_app', {
+      channel: 'ops',
+      severity: report.ok ? 'low' : 'high',
+      process: name,
+      note: `mode=${mode} dryRun=${dryRun} ok=${report.ok}`,
+      actionHint: report.ok ? 'Nessuna azione richiesta' : 'Verifica logs e incident center',
+    });
+    res.json({ ok: report.ok, report });
   } catch (err) {
     await audit('runbook_recover_app_error', { user: req.session?.user, process: name, error: err.message });
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+app.post('/api/runbook/recover-batch', requireAuth, async (req, res) => {
+  const apps = Array.isArray(req.body?.apps) ? req.body.apps : [];
+  const mode = ['soft_recover', 'full_recover', 'safe_rollback'].includes(req.body?.mode) ? req.body.mode : 'full_recover';
+  const stopOnFail = req.body?.stopOnFail !== false;
+  const dryRun = req.body?.dryRun === true;
+  const results = [];
+  for (const appName of apps) {
+    try {
+      const report = await executeRunbook({
+        processName: appName,
+        mode,
+        dryRun,
+        operator: req.session?.user || 'unknown',
+      });
+      results.push(report);
+      if (!report.ok && stopOnFail) break;
+    } catch (err) {
+      results.push({ process: appName, ok: false, error: err.message });
+      if (stopOnFail) break;
+    }
+  }
+  const ok = results.length > 0 && results.every((r) => r.ok);
+  await audit('runbook_recover_batch', { user: req.session?.user, ok, mode, dryRun, count: results.length });
+  await sendNotificationEvent('runbook_recover_batch', {
+    channel: 'ops',
+    severity: ok ? 'low' : 'high',
+    note: `apps=${results.length} mode=${mode} ok=${ok}`,
+  });
+  res.json({ ok, results });
 });
 
 // API: health check
@@ -831,6 +964,61 @@ app.get('/api/health/summary', requireAuth, async (req, res) => {
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+app.get('/api/incidents', requireAuth, async (req, res) => {
+  const items = await readIncidents();
+  res.json({ incidents: items.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')) });
+});
+
+app.post('/api/incidents', requireAuth, async (req, res) => {
+  const title = String(req.body?.title || '').trim();
+  const severity = ['low', 'medium', 'high', 'critical'].includes(req.body?.severity) ? req.body.severity : 'medium';
+  if (!title) return res.status(400).json({ ok: false, error: 'Titolo richiesto' });
+  const items = await readIncidents();
+  const now = new Date().toISOString();
+  const incident = {
+    id: createIncidentId(),
+    title,
+    severity,
+    status: 'open',
+    source: req.body?.source || 'manual',
+    owner: req.session?.user || 'admin',
+    timeline: [{ ts: now, action: 'created', by: req.session?.user || 'admin', note: String(req.body?.note || '') }],
+    createdAt: now,
+    updatedAt: now,
+  };
+  items.push(incident);
+  await writeIncidents(items);
+  await audit('incident_created', { user: req.session?.user, incidentId: incident.id, severity });
+  await sendNotificationEvent('incident_created', {
+    channel: 'incidents',
+    severity,
+    note: title,
+    actionHint: 'Apri Incident Center e valuta runbook',
+  });
+  res.json({ ok: true, incident });
+});
+
+app.post('/api/incidents/:id/status', requireAuth, async (req, res) => {
+  const status = ['open', 'ack', 'resolved'].includes(req.body?.status) ? req.body.status : null;
+  if (!status) return res.status(400).json({ ok: false, error: 'Status non valido' });
+  const items = await readIncidents();
+  const idx = items.findIndex((x) => x.id === req.params.id);
+  if (idx < 0) return res.status(404).json({ ok: false, error: 'Incidente non trovato' });
+  const now = new Date().toISOString();
+  items[idx].status = status;
+  items[idx].updatedAt = now;
+  items[idx].timeline = Array.isArray(items[idx].timeline) ? items[idx].timeline : [];
+  items[idx].timeline.push({ ts: now, action: status, by: req.session?.user || 'admin', note: String(req.body?.note || '') });
+  await writeIncidents(items);
+  await audit('incident_status_change', { user: req.session?.user, incidentId: req.params.id, status });
+  await sendNotificationEvent('incident_status_change', {
+    channel: 'incidents',
+    severity: items[idx].severity || 'medium',
+    note: `${items[idx].title} -> ${status}`,
+  });
+  res.json({ ok: true, incident: items[idx] });
 });
 
 app.get('/api/redis-health', requireAuth, async (req, res) => {
@@ -902,6 +1090,174 @@ app.get('/api/quality-gates', requireAuth, async (req, res) => {
         processApi: true,
         settingsApi: true,
       },
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/analytics/overview', requireAuth, async (req, res) => {
+  try {
+    const runbookRaw = await fs.readFile(RUNBOOK_HISTORY_PATH, 'utf8').catch(() => '');
+    const runbooks = runbookRaw
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        try { return JSON.parse(line); } catch { return null; }
+      })
+      .filter(Boolean);
+    const incidents = await readIncidents();
+    const cpuAvg = statsHistory.length ? Math.round((statsHistory.reduce((acc, p) => acc + p.cpu, 0) / statsHistory.length) * 10) / 10 : 0;
+    const ramAvg = statsHistory.length ? Math.round((statsHistory.reduce((acc, p) => acc + p.ram, 0) / statsHistory.length) * 10) / 10 : 0;
+    const successRate = runbooks.length ? Math.round((runbooks.filter((r) => r.ok).length / runbooks.length) * 100) : 100;
+    res.json({
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      runbooksTotal: runbooks.length,
+      runbookSuccessRate: successRate,
+      incidentsOpen: incidents.filter((i) => i.status !== 'resolved').length,
+      incidentsCriticalOpen: incidents.filter((i) => i.status !== 'resolved' && i.severity === 'critical').length,
+      cpuAvgPercent: cpuAvg,
+      ramAvgPercent: ramAvg,
+      capacityRisk: cpuAvg > 80 || ramAvg > 85 ? 'high' : cpuAvg > 65 || ramAvg > 70 ? 'medium' : 'low',
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/security/sessions', requireAuth, async (req, res) => {
+  try {
+    if (!redisClient?.isOpen) {
+      return res.json({ sessions: [], warning: 'Redis non disponibile per session inventory' });
+    }
+    const keys = [];
+    for await (const key of redisClient.scanIterator({ MATCH: `${REDIS_PREFIX}*`, COUNT: 200 })) keys.push(key);
+    const sessions = [];
+    for (const key of keys.slice(0, 300)) {
+      const raw = await redisClient.get(key);
+      if (!raw) continue;
+      let parsed = null;
+      try { parsed = JSON.parse(raw); } catch { parsed = null; }
+      sessions.push({
+        key,
+        user: parsed?.user || parsed?.pending2FA || null,
+        hasAuth: !!parsed?.user,
+        lastAccess: parsed?._lastAccess || null,
+        cookieExpires: parsed?.cookie?.expires || null,
+      });
+    }
+    res.json({ sessions });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/security/sessions/revoke', requireAuth, async (req, res) => {
+  try {
+    const key = String(req.body?.key || '').trim();
+    if (!key) return res.status(400).json({ ok: false, error: 'Session key richiesta' });
+    await redisClient.del(key);
+    await audit('session_revoked', { user: req.session?.user, key });
+    await sendNotificationEvent('session_revoked', {
+      channel: 'security',
+      severity: 'medium',
+      note: `revoked=${key}`,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/security/sessions/revoke-all', requireAuth, async (req, res) => {
+  try {
+    const keys = [];
+    for await (const key of redisClient.scanIterator({ MATCH: `${REDIS_PREFIX}*`, COUNT: 200 })) keys.push(key);
+    if (keys.length) await redisClient.del(keys);
+    await audit('session_revoke_all', { user: req.session?.user, count: keys.length });
+    await sendNotificationEvent('session_revoke_all', {
+      channel: 'security',
+      severity: 'high',
+      note: `revoked_count=${keys.length}`,
+    });
+    res.json({ ok: true, revoked: keys.length });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/maintenance/logs', requireAuth, async (req, res) => {
+  try {
+    const source = req.query.source === 'error' ? 'error' : 'out';
+    const processName = String(req.query.process || 'control-room');
+    const lines = Math.min(500, Math.max(20, parseInt(req.query.lines || '120', 10)));
+    const sanitized = processName.replace(/[^a-zA-Z0-9_.-]/g, '');
+    const filePath = `/home/ubuntu/.pm2/logs/${sanitized}-${source}.log`;
+    const raw = await fs.readFile(filePath, 'utf8').catch(() => '');
+    const list = raw.split('\n').filter(Boolean).slice(-lines);
+    const q = String(req.query.q || '').toLowerCase();
+    const filtered = q ? list.filter((line) => line.toLowerCase().includes(q)) : list;
+    res.json({ ok: true, source, process: sanitized, lines: filtered });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/maintenance/diagnostics', requireAuth, async (req, res) => {
+  try {
+    const [pm2ListNow, redisHealth, summary] = await Promise.all([
+      pm2List(),
+      (async () => {
+        try {
+          const ping = await redisClient.ping();
+          return { ok: ping === 'PONG', ping };
+        } catch (err) {
+          return { ok: false, error: err.message };
+        }
+      })(),
+      (async () => {
+        const r = await fetch(`http://127.0.0.1:${PORT}/api/health/summary`, {
+          headers: { cookie: req.headers.cookie || '' },
+          signal: AbortSignal.timeout(2500),
+        });
+        return r.json();
+      })(),
+    ]);
+    res.json({
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      checks: [
+        { name: 'pm2_online', ok: pm2ListNow.every((p) => p.status === 'online') },
+        { name: 'redis', ok: redisHealth.ok, detail: redisHealth },
+        { name: 'health_summary', ok: summary.severity === 'ok', detail: summary },
+      ],
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/notifications/health', requireAuth, async (req, res) => {
+  try {
+    const dead = await fs.readFile(NOTIFY_DEAD_LETTER_PATH, 'utf8').catch(() => '');
+    const deadItems = dead.split('\n').filter(Boolean);
+    const auditRaw = await fs.readFile(AUDIT_LOG_PATH, 'utf8').catch(() => '');
+    const auditItems = auditRaw
+      .split('\n')
+      .filter(Boolean)
+      .slice(-400)
+      .map((line) => {
+        try { return JSON.parse(line); } catch { return null; }
+      })
+      .filter(Boolean);
+    const runbookEvents = auditItems.filter((a) => a.event === 'runbook_recover_app' || a.event === 'runbook_recover_batch').length;
+    res.json({
+      ok: true,
+      deadLetterCount: deadItems.length,
+      latestDeadLetter: deadItems.length ? JSON.parse(deadItems[deadItems.length - 1]) : null,
+      recentRunbookEvents: runbookEvents,
+      dedupCacheSize: notificationDedup.size,
     });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -1197,6 +1553,33 @@ async function saveSettings(obj) {
   } catch (_) {}
 }
 
+async function readJsonFileSafe(filePath, fallbackValue) {
+  try {
+    const data = await fs.readFile(filePath, 'utf8');
+    return JSON.parse(data);
+  } catch (_) {
+    return fallbackValue;
+  }
+}
+
+async function appendLine(filePath, obj) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.appendFile(filePath, JSON.stringify(obj) + '\n', 'utf8');
+}
+
+async function readIncidents() {
+  return readJsonFileSafe(INCIDENTS_PATH, []);
+}
+
+async function writeIncidents(items) {
+  await fs.mkdir(path.dirname(INCIDENTS_PATH), { recursive: true });
+  await fs.writeFile(INCIDENTS_PATH, JSON.stringify(items, null, 2), 'utf8');
+}
+
+function createIncidentId() {
+  return `inc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function normalizeDailyCheckConfig(settings) {
   const raw = settings?.dailyCheck || {};
   const enabled = raw.enabled !== false;
@@ -1244,7 +1627,9 @@ app.post('/api/settings', requireAuth, async (req, res) => {
     if (!Array.isArray(body.sshProfiles)) body.sshProfiles = current.sshProfiles || [];
     if (!Array.isArray(body.cronJobs)) body.cronJobs = current.cronJobs || [];
     if (!Array.isArray(body.ipWhitelist)) body.ipWhitelist = current.ipWhitelist || [];
+    if (!Array.isArray(body.autoRemediations)) body.autoRemediations = current.autoRemediations || [];
     await saveSettings(body);
+    registerAutoRemediationsFromSettings(body);
     await audit('settings_saved', { user: req.session?.user });
     res.json({ ok: true });
   } catch (err) {
@@ -1376,6 +1761,7 @@ const cronJobHandles = new Map(); // id -> schedule.Job
 let dailyCheckHandle = null;
 let dailyCheckRunning = false;
 const cronRunHistory = [];
+const automationRemediationHandles = new Map();
 
 function parseCheckResponseOk(status) {
   return Number.isFinite(status) && status >= 200 && status < 400;
@@ -1692,6 +2078,59 @@ app.post('/api/daily-check/run', requireAuth, async (req, res) => {
     if (!result.ok) return res.status(409).json(result);
     logEvent('daily_check_run_manual', { user: req.session?.user, overall: result.report?.overall });
     res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+function registerAutoRemediationsFromSettings(settings) {
+  automationRemediationHandles.forEach((h) => h.cancel());
+  automationRemediationHandles.clear();
+  const items = Array.isArray(settings.autoRemediations) ? settings.autoRemediations : [];
+  items.filter((x) => x.enabled !== false && x.schedule && x.process).forEach((item) => {
+    try {
+      const job = schedule.scheduleJob(item.schedule, async () => {
+        try {
+          const report = await executeRunbook({
+            processName: item.process,
+            mode: item.mode || 'soft_recover',
+            dryRun: false,
+            operator: 'automation',
+          });
+          await audit('automation_remediation_run', { user: 'system', remediationId: item.id, ok: report.ok, process: item.process });
+        } catch (err) {
+          await audit('automation_remediation_error', { user: 'system', remediationId: item.id, process: item.process, error: err.message });
+        }
+      });
+      if (job) automationRemediationHandles.set(item.id, job);
+    } catch (err) {
+      logEvent('automation_remediation_schedule_error', { id: item.id, error: err.message });
+    }
+  });
+}
+
+app.get('/api/automation/remediations', requireAuth, async (req, res) => {
+  const settings = await loadSettings();
+  res.json({ items: settings.autoRemediations || [] });
+});
+
+app.post('/api/automation/remediations', requireAuth, async (req, res) => {
+  try {
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    const sanitized = items.map((item) => ({
+      id: String(item.id || `arm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`),
+      name: String(item.name || 'remediation'),
+      process: String(item.process || ''),
+      schedule: String(item.schedule || ''),
+      mode: ['soft_recover', 'full_recover', 'safe_rollback'].includes(item.mode) ? item.mode : 'soft_recover',
+      enabled: item.enabled !== false,
+    })).filter((item) => item.process && item.schedule);
+    const settings = await loadSettings();
+    settings.autoRemediations = sanitized;
+    await saveSettings(settings);
+    registerAutoRemediationsFromSettings(settings);
+    await audit('automation_remediations_saved', { user: req.session?.user, count: sanitized.length });
+    res.json({ ok: true, items: sanitized });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -2048,6 +2487,75 @@ io.on('connection', (socket) => {
 const notifyDebounce = new Map();
 const NOTIFY_DEBOUNCE_MS = 30000;
 const NOTIFY_DEBOUNCE_LOGERR_MS = 60000; // stderr più rumoroso: debounce 60s
+const notificationDedup = new Map();
+const NOTIFY_DEDUP_MS = 15000;
+
+function dedupNotificationKey(key) {
+  const now = Date.now();
+  const last = notificationDedup.get(key) || 0;
+  if (now - last < NOTIFY_DEDUP_MS) return false;
+  notificationDedup.set(key, now);
+  return true;
+}
+
+async function postWebhook(url, body) {
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) throw new Error(`Webhook HTTP ${resp.status}`);
+}
+
+function resolveDiscordWebhook(settings, channel) {
+  if (channel === 'incidents' && settings.discordWebhookIncidents) return settings.discordWebhookIncidents;
+  if (channel === 'security' && settings.discordWebhookSecurity) return settings.discordWebhookSecurity;
+  if (channel === 'ops' && settings.discordWebhookOps) return settings.discordWebhookOps;
+  return settings.webhookUrl || settings.discordWebhookOps || '';
+}
+
+function buildDiscordMessage(eventType, payload) {
+  const severity = payload?.severity || 'info';
+  const process = payload?.process ? `App: ${payload.process}\n` : '';
+  const note = payload?.note ? `Nota: ${payload.note}\n` : '';
+  const action = payload?.actionHint ? `Azione: ${payload.actionHint}\n` : '';
+  return `**${eventType}**\nSeverity: ${severity}\n${process}${note}${action}Time: ${new Date().toISOString()}`.slice(0, 1950);
+}
+
+async function sendNotificationEvent(eventType, payload = {}) {
+  const settings = await loadSettings();
+  if (eventType.startsWith('incident_') && settings.notifyOnIncident === false) return;
+  if (eventType.startsWith('runbook_') && settings.notifyOnRunbook !== true) return;
+  if (eventType.startsWith('session_') && settings.notifyOnSecurity !== true) return;
+  const channel = payload.channel || 'ops';
+  const dedupKey = `${eventType}:${payload.process || ''}:${payload.note || ''}`.slice(0, 160);
+  if (!dedupNotificationKey(dedupKey)) return;
+  const message = buildDiscordMessage(eventType, payload);
+  const webhook = resolveDiscordWebhook(settings, channel);
+  if (!webhook) return;
+  let sent = false;
+  let lastError = null;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await postWebhook(webhook, { content: message });
+      sent = true;
+      logEvent('notification_sent', { channel: 'discord', eventType, attempt });
+      break;
+    } catch (err) {
+      lastError = err;
+      await new Promise((r) => setTimeout(r, attempt * 500));
+    }
+  }
+  if (!sent) {
+    logEvent('notification_error', { channel: 'discord', eventType, error: lastError?.message || 'unknown' });
+    await appendLine(NOTIFY_DEAD_LETTER_PATH, {
+      ts: new Date().toISOString(),
+      eventType,
+      payload,
+      error: lastError?.message || 'unknown',
+    });
+  }
+}
 
 async function sendNotification(message) {
   const settings = await loadSettings();
@@ -2123,6 +2631,9 @@ pm2.connect(async (err) => {
   registerCronJobs();
   registerDailyCheckFromSettings().catch((e) => {
     logEvent('daily_check_schedule_error', { error: e.message });
+  });
+  loadSettings().then((s) => registerAutoRemediationsFromSettings(s)).catch((e) => {
+    logEvent('automation_remediation_schedule_error', { error: e.message });
   });
   pm2.launchBus((errBus, bus) => {
     if (errBus) return;
