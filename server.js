@@ -250,6 +250,8 @@ app.use(helmet({
     useDefaults: true,
     directives: {
       "default-src": ["'self'"],
+      /* Helmet default è script-src-attr 'none' → onclick="" sui bottoni non gira. */
+      "script-src-attr": ["'unsafe-inline'"],
       "script-src": ["'self'", "'unsafe-inline'", 'https://cdn.tailwindcss.com', 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
       "style-src": ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdn.jsdelivr.net'],
       "font-src": ["'self'", 'data:', 'https://fonts.gstatic.com'],
