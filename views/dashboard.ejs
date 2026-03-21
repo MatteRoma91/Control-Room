@@ -220,82 +220,19 @@
   </h2>
   <div id="processCardsMobile" class="md:hidden space-y-3">
     <% (processes || []).forEach((p) => { %>
-    <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
-      <a href="/process/<%= p.name %>" class="text-cr-accent hover:underline font-mono font-medium block mb-2"><%= p.name %></a>
-      <div class="flex flex-wrap gap-2 text-sm text-cr-muted mb-3">
-        <span class="px-2 py-0.5 rounded text-xs font-medium <%= p.status === 'online' ? 'bg-[var(--cr-success-bg)] text-cr-accent' : p.status === 'stopped' ? 'bg-[var(--cr-warning-bg)] text-cr-warning' : 'bg-[var(--cr-danger-bg)] text-cr-danger' %>"><%= p.status %></span>
-        <span>CPU <%= p.cpu %>%</span>
-        <span><%= p.memory %> MB</span>
-        <span>Uptime <%= p.uptime %></span>
-        <span>Restart <%= p.restart_time %></span>
-        <% if (p.restart_time >= 3) { %>
-          <span class="px-2 py-0.5 rounded text-xs font-medium bg-[var(--cr-danger-bg)] text-cr-danger">Crash loop?</span>
-        <% } %>
-      </div>
-      <div class="flex flex-wrap gap-1">
-        <button onclick="processAction('<%= p.name %>', 'start', this)" class="px-2 py-1.5 rounded text-xs bg-cr-accent hover:bg-cr-accent min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Start</button>
-        <button onclick="processAction('<%= p.name %>', 'stop', this)" class="px-2 py-1.5 rounded text-xs bg-cr-warning hover:opacity-90 text-white dark:text-slate-900 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed font-medium">Stop</button>
-        <button onclick="processAction('<%= p.name %>', 'restart', this)" class="px-2 py-1.5 rounded text-xs bg-cr-info hover:opacity-90 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>
-        <% if (!p.isModule) { %><button onclick="processFlush('<%= p.name %>', this)" class="px-2 py-1.5 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Flush</button><% } %>
-        <button onclick="resetRestartCount('<%= p.name %>', this)" class="px-2 py-1.5 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>
-      </div>
-    </div>
+      <%- include('partials/pm2-process-dashboard-card', { p, pm2CardInstance: 'm' }) %>
     <% }); %>
     <% if (!processes || processes.length === 0) { %>
     <p class="text-cr-muted text-center py-8">Nessun processo PM2</p>
     <% } %>
   </div>
-  <div class="hidden md:block rounded-lg border border-cr-border bg-cr-surface">
-    <table class="w-full">
-      <thead class="cr-thead">
-        <tr>
-          <th class="text-left px-4 py-3 text-cr-text font-medium">Nome</th>
-          <th class="text-left px-4 py-3 text-cr-text font-medium">Status</th>
-          <th class="text-left px-4 py-3 text-cr-text font-medium">CPU %</th>
-          <th class="text-left px-4 py-3 text-cr-text font-medium">Memory</th>
-          <th class="text-left px-4 py-3 text-cr-text font-medium">Uptime</th>
-          <th class="text-left px-4 py-3 text-cr-text font-medium">Restarts</th>
-          <th class="text-left px-4 py-3 text-cr-text font-medium">Azioni</th>
-        </tr>
-      </thead>
-      <tbody id="processTableBody">
-        <% (processes || []).forEach((p) => { %>
-          <tr class="border-t border-cr-border hover:bg-cr-navHover">
-            <td class="px-4 py-3 font-mono">
-              <a href="/process/<%= p.name %>" class="text-cr-accent hover:underline"><%= p.name %></a>
-            </td>
-            <td class="px-4 py-3">
-              <span class="px-2 py-0.5 rounded text-xs font-medium <%= p.status === 'online' ? 'bg-[var(--cr-success-bg)] text-cr-accent' : p.status === 'stopped' ? 'bg-[var(--cr-warning-bg)] text-cr-warning' : 'bg-[var(--cr-danger-bg)] text-cr-danger' %>">
-                <%= p.status %>
-              </span>
-            </td>
-            <td class="px-4 py-3"><%= p.cpu %>%</td>
-            <td class="px-4 py-3"><%= p.memory %> MB</td>
-            <td class="px-4 py-3"><%= p.uptime %></td>
-            <td class="px-4 py-3">
-              <%= p.restart_time %>
-              <% if (p.restart_time >= 3) { %>
-                <span class="ml-2 px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--cr-danger-bg)] text-cr-danger whitespace-nowrap">Crash loop?</span>
-              <% } %>
-            </td>
-            <td class="px-4 py-3">
-              <div class="flex flex-wrap gap-1">
-                <button onclick="processAction('<%= p.name %>', 'start', this)" class="px-2 py-1 rounded text-xs bg-cr-accent hover:bg-cr-accent disabled:opacity-50 disabled:cursor-not-allowed">Start</button>
-                <button onclick="processAction('<%= p.name %>', 'stop', this)" class="px-2 py-1 rounded text-xs bg-cr-warning hover:opacity-90 text-white dark:text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed font-medium">Stop</button>
-                <button onclick="processAction('<%= p.name %>', 'restart', this)" class="px-2 py-1 rounded text-xs bg-cr-info hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>
-                <% if (!p.isModule) { %><button onclick="processFlush('<%= p.name %>', this)" class="px-2 py-1 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover disabled:opacity-50 disabled:cursor-not-allowed">Flush</button><% } %>
-                <button onclick="resetRestartCount('<%= p.name %>', this)" class="px-2 py-1 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>
-              </div>
-            </td>
-          </tr>
-        <% }); %>
-        <% if (!processes || processes.length === 0) { %>
-          <tr>
-            <td colspan="7" class="px-4 py-8 text-center text-cr-muted">Nessun processo PM2</td>
-          </tr>
-        <% } %>
-      </tbody>
-    </table>
+  <div id="processCardsDesktop" class="hidden md:grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+    <% (processes || []).forEach((p) => { %>
+      <%- include('partials/pm2-process-dashboard-card', { p, pm2CardInstance: 'd' }) %>
+    <% }); %>
+    <% if (!processes || processes.length === 0) { %>
+    <p class="col-span-full text-cr-muted text-center py-10 border border-dashed border-cr-border rounded-xl">Nessun processo PM2</p>
+    <% } %>
   </div>
 </section>
 
@@ -919,44 +856,54 @@
     return 'bg-[var(--cr-danger-bg)] text-cr-danger';
   }
 
-  function renderProcessRow(p) {
-    const crashBadge = p.restart_time >= 3 ? '<span class="ml-2 px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--cr-danger-bg)] text-cr-danger whitespace-nowrap">Crash loop?</span>' : '';
-    const flushBtn = p.isModule ? '' : '<button onclick="processFlush(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>';
-    return '<tr class="border-t border-cr-border hover:bg-cr-navHover">' +
-      '<td class="px-4 py-3 font-mono"><a href="/process/' + encodeURIComponent(p.name) + '" class="text-cr-accent hover:underline">' + escapeHtml(p.name) + '</a></td>' +
-      '<td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs font-medium ' + statusClass(p.status) + '">' + escapeHtml(p.status) + '</span></td>' +
-      '<td class="px-4 py-3">' + escapeHtml(String(p.cpu)) + '%</td>' +
-      '<td class="px-4 py-3">' + escapeHtml(String(p.memory)) + ' MB</td>' +
-      '<td class="px-4 py-3">' + escapeHtml(p.uptime || '-') + '</td>' +
-      '<td class="px-4 py-3">' + escapeHtml(String(p.restart_time)) + crashBadge + '</td>' +
-      '<td class="px-4 py-3"><div class="flex flex-wrap gap-1">' +
-      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'start\', this)" class="px-2 py-1 rounded text-xs bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-medium disabled:opacity-50 disabled:cursor-not-allowed">Start</button>' +
-      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'stop\', this)" class="px-2 py-1 rounded text-xs bg-cr-warning hover:opacity-90 text-white dark:text-slate-900 font-medium disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>' +
-      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'restart\', this)" class="px-2 py-1 rounded text-xs bg-cr-info hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>' +
-      flushBtn +
-      '<button onclick="resetRestartCount(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>' +
-      '</div></td></tr>';
+  /** Allineare a views/partials/pm2-process-dashboard-card.ejs (instanceSuffix: 'm' | 'd' per id univoci) */
+  function pm2CardSafeId(p) {
+    return String(p.name || '').replace(/[^a-zA-Z0-9]/g, '_');
   }
 
-  function renderProcessCard(p) {
-    const crashBadge = p.restart_time >= 3 ? '<span class="px-2 py-0.5 rounded text-xs font-medium bg-[var(--cr-danger-bg)] text-cr-danger">Crash loop?</span>' : '';
-    const flushBtn = p.isModule ? '' : '<button onclick="processFlush(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1.5 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Flush</button>';
-    return '<div class="rounded-lg border border-cr-border bg-cr-surface p-4">' +
-      '<a href="/process/' + encodeURIComponent(p.name) + '" class="text-cr-accent hover:underline font-mono font-medium block mb-2">' + escapeHtml(p.name) + '</a>' +
-      '<div class="flex flex-wrap gap-2 text-sm text-cr-muted mb-3">' +
-      '<span class="px-2 py-0.5 rounded text-xs font-medium ' + statusClass(p.status) + '">' + escapeHtml(p.status) + '</span>' +
-      '<span>CPU ' + escapeHtml(String(p.cpu)) + '%</span>' +
-      '<span>' + escapeHtml(String(p.memory)) + ' MB</span>' +
-      '<span>Uptime ' + escapeHtml(p.uptime || '-') + '</span>' +
-      '<span>Restart ' + escapeHtml(String(p.restart_time)) + '</span>' + crashBadge +
-      '</div>' +
-      '<div class="flex flex-wrap gap-1">' +
-      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'start\', this)" class="px-2 py-1.5 rounded text-xs bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-medium min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Start</button>' +
-      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'stop\', this)" class="px-2 py-1.5 rounded text-xs bg-cr-warning hover:opacity-90 text-white dark:text-slate-900 font-medium min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>' +
-      '<button onclick="processAction(\'' + escapeHtml(p.name) + '\', \'restart\', this)" class="px-2 py-1.5 rounded text-xs bg-cr-info hover:opacity-90 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed">Restart</button>' +
+  function renderProcessDashboardCard(p, instanceSuffix) {
+    const sid = pm2CardSafeId(p);
+    const idSuf = instanceSuffix ? '-' + String(instanceSuffix) : '';
+    const titleId = 'pm2-card-title-' + sid + idSuf;
+    const crashRing = (p.restart_time >= 3) ? ' ring-1 ring-cr-danger/50 border-cr-danger/40' : '';
+    const crashCallout = (p.restart_time >= 3)
+      ? '<div class="mb-3 rounded-md border border-cr-danger/40 bg-[var(--cr-danger-bg)] px-3 py-2 text-xs font-medium text-cr-danger" role="status">Molti restart di seguito: possibile crash loop. Verifica log e salute del servizio.</div>'
+      : '';
+    const moduleBadge = p.isModule
+      ? '<span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-cr-surface2 text-cr-muted border border-cr-border">Modulo</span>'
+      : '';
+    const flushBtn = p.isModule ? '' : (
+      '<button type="button" onclick="processFlush(\'' + escapeHtml(p.name) + '\', this)" class="px-3 py-2 rounded-lg text-xs font-medium bg-cr-surface2 hover:bg-cr-navHover text-cr-text min-h-[40px] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-surface border border-cr-border" title="Svuota log su disco">Flush</button>'
+    );
+    const n = escapeHtml(p.name);
+    return (
+      '<article class="rounded-xl border border-cr-border bg-cr-surface p-4 shadow-sm hover:shadow-md transition-shadow focus-within:ring-2 focus-within:ring-cr-accent/30' + crashRing + '" role="region" aria-labelledby="' + titleId + '">' +
+      '<header class="flex flex-wrap items-start justify-between gap-2 mb-3 pb-3 border-b border-cr-border">' +
+      '<div class="min-w-0 flex-1">' +
+      '<h3 id="' + titleId + '" class="font-mono font-semibold text-base text-cr-text truncate">' +
+      '<a href="/process/' + encodeURIComponent(p.name) + '" class="text-cr-accent hover:underline">' + n + '</a></h3>' +
+      '<p class="text-xs text-cr-muted mt-0.5">Processo PM2</p></div>' +
+      '<div class="flex flex-wrap items-center gap-1.5 justify-end shrink-0">' + moduleBadge +
+      '<span class="px-2 py-0.5 rounded text-xs font-medium ' + statusClass(p.status) + '">' + escapeHtml(p.status) + '</span></div></header>' +
+      crashCallout +
+      '<dl class="grid grid-cols-2 gap-x-3 gap-y-2.5 mb-4 text-sm">' +
+      '<div><dt class="text-[11px] font-medium uppercase tracking-wide text-cr-muted">CPU</dt>' +
+      '<dd class="font-semibold text-cr-text tabular-nums">' + escapeHtml(String(p.cpu)) + '%</dd></div>' +
+      '<div><dt class="text-[11px] font-medium uppercase tracking-wide text-cr-muted">Memoria</dt>' +
+      '<dd class="font-semibold text-cr-text tabular-nums">' + escapeHtml(String(p.memory)) + ' MB</dd></div>' +
+      '<div><dt class="text-[11px] font-medium uppercase tracking-wide text-cr-muted">Uptime</dt>' +
+      '<dd class="font-semibold text-cr-text">' + escapeHtml(p.uptime || '—') + '</dd></div>' +
+      '<div><dt class="text-[11px] font-medium uppercase tracking-wide text-cr-muted">Restart</dt>' +
+      '<dd class="font-semibold text-cr-text tabular-nums">' + escapeHtml(String(p.restart_time)) + '</dd></div></dl>' +
+      '<div class="flex flex-col gap-2 pt-1 border-t border-cr-border/80">' +
+      '<div class="flex flex-wrap gap-2" role="group" aria-label="Azioni principali">' +
+      '<button type="button" onclick="processAction(\'' + escapeHtml(p.name) + '\', \'start\', this)" class="px-3 py-2 rounded-lg text-xs font-medium bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 min-h-[40px] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-surface" title="Avvia processo">Start</button>' +
+      '<button type="button" onclick="processAction(\'' + escapeHtml(p.name) + '\', \'restart\', this)" class="px-3 py-2 rounded-lg text-xs font-medium bg-cr-info hover:opacity-90 text-white min-h-[40px] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cr-info focus:ring-offset-2 focus:ring-offset-cr-surface" title="Riavvia processo">Restart</button></div>' +
+      '<div class="flex flex-wrap gap-2" role="group" aria-label="Altre azioni">' +
+      '<button type="button" onclick="processAction(\'' + escapeHtml(p.name) + '\', \'stop\', this)" class="px-3 py-2 rounded-lg text-xs font-medium bg-cr-warning hover:opacity-90 text-white dark:text-slate-900 min-h-[40px] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cr-warning focus:ring-offset-2 focus:ring-offset-cr-surface" title="Ferma processo">Stop</button>' +
       flushBtn +
-      '<button onclick="resetRestartCount(\'' + escapeHtml(p.name) + '\', this)" class="px-2 py-1.5 rounded text-xs bg-cr-surface2 hover:bg-cr-navHover min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed" title="Azzera contatore restart">Azzera restart</button>' +
-      '</div></div>';
+      '<button type="button" onclick="resetRestartCount(\'' + escapeHtml(p.name) + '\', this)" class="px-3 py-2 rounded-lg text-xs font-medium bg-cr-surface2 hover:bg-cr-navHover text-cr-text min-h-[40px] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-surface border border-cr-border" title="Azzera contatore restart PM2">Azzera restart</button></div></div></article>'
+    );
   }
 
   function escapeHtml(s) {
@@ -1031,16 +978,18 @@
   }
 
   async function updateProcessTable(processes) {
-    const tbody = document.getElementById('processTableBody');
-    const cards = document.getElementById('processCardsMobile');
-    if (!tbody || !cards) return;
+    const desktop = document.getElementById('processCardsDesktop');
+    const mobile = document.getElementById('processCardsMobile');
+    if (!desktop || !mobile) return;
+    const emptyMobile = '<p class="text-cr-muted text-center py-8">Nessun processo PM2</p>';
+    const emptyDesktop = '<p class="col-span-full text-cr-muted text-center py-10 border border-dashed border-cr-border rounded-xl">Nessun processo PM2</p>';
     if (!processes || processes.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-cr-muted">Nessun processo PM2</td></tr>';
-      cards.innerHTML = '<p class="text-cr-muted text-center py-8">Nessun processo PM2</p>';
+      mobile.innerHTML = emptyMobile;
+      desktop.innerHTML = emptyDesktop;
       return;
     }
-    tbody.innerHTML = processes.map(renderProcessRow).join('');
-    cards.innerHTML = processes.map(renderProcessCard).join('');
+    mobile.innerHTML = processes.map(function (p) { return renderProcessDashboardCard(p, 'm'); }).join('');
+    desktop.innerHTML = processes.map(function (p) { return renderProcessDashboardCard(p, 'd'); }).join('');
   }
 
   async function loadProcessesLive() {

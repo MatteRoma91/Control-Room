@@ -1,0 +1,66 @@
+<%#
+  Mini-dashboard card per un processo PM2.
+  Variabili: p (oggetto con name, status, cpu, memory, uptime, restart_time, isModule)
+  Opzionale: pm2CardInstance — suffisso univoco se la stessa card è ripetuta (es. "m" / "d" per mobile/desktop)
+  Tenere allineato a renderProcessDashboardCard() in views/dashboard.ejs
+%>
+<% var sid = String(p.name).replace(/[^a-zA-Z0-9]/g, '_'); %>
+<% var idSuf = (typeof pm2CardInstance !== 'undefined' && pm2CardInstance) ? '-' + String(pm2CardInstance) : ''; %>
+<% var titleId = 'pm2-card-title-' + sid + idSuf; %>
+<% var stOk = p.status === 'online'; var stStop = p.status === 'stopped'; %>
+<article
+  class="rounded-xl border border-cr-border bg-cr-surface p-4 shadow-sm hover:shadow-md transition-shadow focus-within:ring-2 focus-within:ring-cr-accent/30 <%= (p.restart_time >= 3) ? 'ring-1 ring-cr-danger/50 border-cr-danger/40' : '' %>"
+  role="region"
+  aria-labelledby="<%= titleId %>"
+>
+  <header class="flex flex-wrap items-start justify-between gap-2 mb-3 pb-3 border-b border-cr-border">
+    <div class="min-w-0 flex-1">
+      <h3 id="<%= titleId %>" class="font-mono font-semibold text-base text-cr-text truncate">
+        <a href="/process/<%= encodeURIComponent(p.name) %>" class="text-cr-accent hover:underline"><%= p.name %></a>
+      </h3>
+      <p class="text-xs text-cr-muted mt-0.5">Processo PM2</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-1.5 justify-end shrink-0">
+      <% if (p.isModule) { %>
+        <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-cr-surface2 text-cr-muted border border-cr-border">Modulo</span>
+      <% } %>
+      <span class="px-2 py-0.5 rounded text-xs font-medium <%= stOk ? 'bg-[var(--cr-success-bg)] text-cr-accent' : stStop ? 'bg-[var(--cr-warning-bg)] text-cr-warning' : 'bg-[var(--cr-danger-bg)] text-cr-danger' %>"><%= p.status %></span>
+    </div>
+  </header>
+  <% if (p.restart_time >= 3) { %>
+    <div class="mb-3 rounded-md border border-cr-danger/40 bg-[var(--cr-danger-bg)] px-3 py-2 text-xs font-medium text-cr-danger" role="status">
+      Molti restart di seguito: possibile crash loop. Verifica log e salute del servizio.
+    </div>
+  <% } %>
+  <dl class="grid grid-cols-2 gap-x-3 gap-y-2.5 mb-4 text-sm">
+    <div>
+      <dt class="text-[11px] font-medium uppercase tracking-wide text-cr-muted">CPU</dt>
+      <dd class="font-semibold text-cr-text tabular-nums"><%= p.cpu %>%</dd>
+    </div>
+    <div>
+      <dt class="text-[11px] font-medium uppercase tracking-wide text-cr-muted">Memoria</dt>
+      <dd class="font-semibold text-cr-text tabular-nums"><%= p.memory %> MB</dd>
+    </div>
+    <div>
+      <dt class="text-[11px] font-medium uppercase tracking-wide text-cr-muted">Uptime</dt>
+      <dd class="font-semibold text-cr-text"><%= p.uptime || '—' %></dd>
+    </div>
+    <div>
+      <dt class="text-[11px] font-medium uppercase tracking-wide text-cr-muted">Restart</dt>
+      <dd class="font-semibold text-cr-text tabular-nums"><%= p.restart_time %></dd>
+    </div>
+  </dl>
+  <div class="flex flex-col gap-2 pt-1 border-t border-cr-border/80">
+    <div class="flex flex-wrap gap-2" role="group" aria-label="Azioni principali">
+      <button type="button" onclick="processAction('<%= p.name %>', 'start', this)" class="px-3 py-2 rounded-lg text-xs font-medium bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 min-h-[40px] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-surface" title="Avvia processo">Start</button>
+      <button type="button" onclick="processAction('<%= p.name %>', 'restart', this)" class="px-3 py-2 rounded-lg text-xs font-medium bg-cr-info hover:opacity-90 text-white min-h-[40px] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cr-info focus:ring-offset-2 focus:ring-offset-cr-surface" title="Riavvia processo">Restart</button>
+    </div>
+    <div class="flex flex-wrap gap-2" role="group" aria-label="Altre azioni">
+      <button type="button" onclick="processAction('<%= p.name %>', 'stop', this)" class="px-3 py-2 rounded-lg text-xs font-medium bg-cr-warning hover:opacity-90 text-white dark:text-slate-900 min-h-[40px] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cr-warning focus:ring-offset-2 focus:ring-offset-cr-surface" title="Ferma processo">Stop</button>
+      <% if (!p.isModule) { %>
+        <button type="button" onclick="processFlush('<%= p.name %>', this)" class="px-3 py-2 rounded-lg text-xs font-medium bg-cr-surface2 hover:bg-cr-navHover text-cr-text min-h-[40px] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-surface border border-cr-border" title="Svuota log su disco">Flush</button>
+      <% } %>
+      <button type="button" onclick="resetRestartCount('<%= p.name %>', this)" class="px-3 py-2 rounded-lg text-xs font-medium bg-cr-surface2 hover:bg-cr-navHover text-cr-text min-h-[40px] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-surface border border-cr-border" title="Azzera contatore restart PM2">Azzera restart</button>
+    </div>
+  </div>
+</article>
