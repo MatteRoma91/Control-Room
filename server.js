@@ -29,29 +29,17 @@ const speakeasy = require('speakeasy');
 const QRCode = require('qrcode');
 const schedule = require('node-schedule');
 
-const ECOSYSTEMS = [
-  { path: '/home/ubuntu/Sito-Padel/ecosystem.config.js', name: 'padel-tour' },
-  { path: '/home/ubuntu/Roma-Buche/ecosystem.config.js', name: 'roma-buche' },
-  { path: '/home/ubuntu/Gestione-Veicoli/ecosystem.config.js', name: 'gestione-veicoli' },
-  { path: '/home/ubuntu/control-room/ecosystem.config.js', name: 'control-room' },
-];
-
-/** Siti noti: URL pubblico, porta in ascolto (backend Node o Nginx), PM2 se applicabile */
-const WEB_SITES = [
-  { name: 'Banana Padel Tour', url: 'https://bananapadeltour.duckdns.org', port: 3000, pm2: 'padel-tour', kind: 'app' },
-  { name: 'Roma-Buche', url: 'https://ibuche.duckdns.org', port: 3001, pm2: 'roma-buche', kind: 'app' },
-  { name: 'Gestione Veicoli', url: 'https://gestione-veicoli.duckdns.org', port: 3002, pm2: 'gestione-veicoli', kind: 'app' },
-  { name: 'Control Room', url: 'https://matteroma.duckdns.org', port: 3005, pm2: 'control-room', kind: 'app' },
-  { name: 'Nginx HTTP', url: '', port: 80, pm2: null, kind: 'proxy' },
-  { name: 'Nginx HTTPS', url: '', port: 443, pm2: null, kind: 'proxy' },
-];
-
-const DAILY_CHECK_SITES = WEB_SITES.filter((s) => s.kind === 'app' && s.pm2 && s.url);
-const DAILY_CHECK_STATE_PATH = path.join(__dirname, 'data', 'daily-check-state.json');
-const DAILY_CHECK_HISTORY_PATH = path.join(__dirname, 'logs', 'daily-check-history.log');
-const INCIDENTS_PATH = path.join(__dirname, 'data', 'incidents.json');
-const RUNBOOK_HISTORY_PATH = path.join(__dirname, 'logs', 'runbook-history.log');
-const NOTIFY_DEAD_LETTER_PATH = path.join(__dirname, 'logs', 'notify-dead-letter.log');
+const {
+  ECOSYSTEMS,
+  WEB_SITES,
+  DAILY_CHECK_SITES,
+  DAILY_CHECK_STATE_PATH,
+  DAILY_CHECK_HISTORY_PATH,
+  INCIDENTS_PATH,
+  RUNBOOK_HISTORY_PATH,
+  NOTIFY_DEAD_LETTER_PATH,
+} = require('./lib/constants');
+const { normalizeIp, isIpAllowedByEntries } = require('./lib/ip-utils');
 
 /** Parser output `ss -tlnp`: socket TCP in ascolto */
 function parseSsTcpListen() {
@@ -113,48 +101,6 @@ const HIGH_RISK_PHRASES = Object.freeze({
   disable2FA: 'DISABLE-2FA',
 });
 
-function normalizeIp(ip) {
-  return String(ip || '').replace(/^::ffff:/, '').trim();
-}
-
-function ipToInt(ip) {
-  const parts = normalizeIp(ip).split('.');
-  if (parts.length !== 4) return null;
-  let out = 0;
-  for (const p of parts) {
-    const n = Number(p);
-    if (!Number.isInteger(n) || n < 0 || n > 255) return null;
-    out = (out << 8) + n;
-  }
-  return out >>> 0;
-}
-
-function isIpInCidr(ip, cidr) {
-  const [base, bitsRaw] = String(cidr).split('/');
-  const bits = Number(bitsRaw);
-  const ipNum = ipToInt(ip);
-  const baseNum = ipToInt(base);
-  if (ipNum === null || baseNum === null || !Number.isInteger(bits) || bits < 0 || bits > 32) return false;
-  if (bits === 0) return true;
-  const mask = bits === 32 ? 0xffffffff : (0xffffffff << (32 - bits)) >>> 0;
-  return (ipNum & mask) === (baseNum & mask);
-}
-
-function isIpAllowedByEntries(ip, entries) {
-  const normalizedIp = normalizeIp(ip);
-  if (!normalizedIp) return false;
-  for (const raw of entries || []) {
-    const entry = String(raw || '').trim();
-    if (!entry) continue;
-    if (entry.includes('/')) {
-      if (isIpInCidr(normalizedIp, entry)) return true;
-      continue;
-    }
-    if (normalizeIp(entry) === normalizedIp) return true;
-  }
-  return false;
-}
-
 const MAX_PM2_NOTIFY_PER_APP_KEYS = 64;
 const MAX_PM2_PROCESS_NAME_LEN = 200;
 
@@ -212,8 +158,19 @@ function sanitizeSettings(raw) {
           .map((e) => ({ ip: String(e?.ip || '').trim(), expiresAt: String(e?.expiresAt || '') }))
           .filter((e) => e.ip && e.expiresAt)
       : [],
-    webhookType: ['discord', 'slack', 'telegram'].includes(source.webhookType) ? source.webhookType : 'discord',
+    webhookType: ['discord', 'slack', 'telegram', 'teams', 'email', 'pagerduty'].includes(source.webhookType)
+      ? source.webhookType
+      : 'discord',
     webhookUrl: String(source.webhookUrl || ''),
+    teamsWebhookUrl: String(source.teamsWebhookUrl || process.env.TEAMS_WEBHOOK_URL || ''),
+    smtpHost: String(source.smtpHost || process.env.CR_SMTP_HOST || ''),
+    smtpPort: parseInt(String(source.smtpPort || process.env.CR_SMTP_PORT || '587'), 10) || 587,
+    smtpUser: String(source.smtpUser || process.env.CR_SMTP_USER || ''),
+    smtpPass: String(source.smtpPass || process.env.CR_SMTP_PASS || ''),
+    smtpFrom: String(source.smtpFrom || process.env.CR_SMTP_FROM || ''),
+    smtpSecure: source.smtpSecure === true || process.env.CR_SMTP_SECURE === '1',
+    alertEmail: String(source.alertEmail || process.env.CR_ALERT_EMAIL || ''),
+    pagerdutyRoutingKey: String(source.pagerdutyRoutingKey || process.env.PAGERDUTY_ROUTING_KEY || ''),
     discordWebhookOps: String(source.discordWebhookOps || process.env.DISCORD_WEBHOOK_OPS || ''),
     discordWebhookIncidents: String(source.discordWebhookIncidents || process.env.DISCORD_WEBHOOK_INCIDENTS || ''),
     discordWebhookSecurity: String(source.discordWebhookSecurity || process.env.DISCORD_WEBHOOK_SECURITY || ''),
@@ -2677,6 +2634,75 @@ async function sendNotification(message) {
   const settings = await loadSettings();
   const type = settings.webhookType || 'discord';
   const text = message.slice(0, 1950);
+
+  if (type === 'teams' && (settings.teamsWebhookUrl || process.env.TEAMS_WEBHOOK_URL)) {
+    const url = settings.teamsWebhookUrl || process.env.TEAMS_WEBHOOK_URL;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          '@type': 'MessageCard',
+          '@context': 'http://schema.org/extensions',
+          summary: 'Control Room',
+          themeColor: '0076D7',
+          title: 'Control Room',
+          text: text.replace(/\*\*/g, ''),
+        }),
+      });
+      logEvent('notification_sent', { channel: 'teams', preview: text.slice(0, 80) });
+    } catch (err) {
+      logEvent('notification_error', { channel: 'teams', error: err.message });
+      console.error('Teams webhook error:', err);
+    }
+    return;
+  }
+
+  if (type === 'email' && settings.smtpHost && settings.alertEmail) {
+    try {
+      const nodemailer = require('nodemailer');
+      const transporter = nodemailer.createTransport({
+        host: settings.smtpHost,
+        port: settings.smtpPort,
+        secure: settings.smtpSecure === true,
+        auth: settings.smtpUser ? { user: settings.smtpUser, pass: settings.smtpPass } : undefined,
+      });
+      await transporter.sendMail({
+        from: settings.smtpFrom || settings.smtpUser || settings.alertEmail,
+        to: settings.alertEmail,
+        subject: '[Control Room] Avviso',
+        text,
+      });
+      logEvent('notification_sent', { channel: 'email', preview: text.slice(0, 80) });
+    } catch (err) {
+      logEvent('notification_error', { channel: 'email', error: err.message });
+      console.error('SMTP error:', err);
+    }
+    return;
+  }
+
+  if (type === 'pagerduty' && settings.pagerdutyRoutingKey) {
+    try {
+      await fetch('https://events.pagerduty.com/v2/enqueue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          routing_key: settings.pagerdutyRoutingKey,
+          event_action: 'trigger',
+          payload: {
+            summary: text.slice(0, 1024),
+            severity: 'info',
+            source: 'control-room',
+          },
+        }),
+      });
+      logEvent('notification_sent', { channel: 'pagerduty', preview: text.slice(0, 80) });
+    } catch (err) {
+      logEvent('notification_error', { channel: 'pagerduty', error: err.message });
+      console.error('PagerDuty error:', err);
+    }
+    return;
+  }
 
   if ((type === 'discord' || type === 'slack') && settings.webhookUrl) {
     try {
