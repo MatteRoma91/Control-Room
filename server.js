@@ -647,6 +647,7 @@ function getProcessDetail(name, params) {
     if (p.includes('Sito-Padel')) return 'Sito Padel';
     if (p.includes('Roma-Buche')) return 'Roma-Buche';
     if (p.includes('Gestione-Veicoli')) return 'Gestione Veicoli';
+    if (p.includes('Scommesse')) return 'Scommesse';
     if (p.includes('pm2-logrotate')) return 'PM2 Log Rotate';
     if (p.includes('extensionHost') || p.includes('--type=extensionHost')) return 'Cursor Extension Host';
     if (p.includes('fileWatcher') || p.includes('--type=fileWatcher')) return 'Cursor File Watcher';
