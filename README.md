@@ -59,7 +59,9 @@ pm2 save
 Oppure solo Control Room (se le altre app sono già in esecuzione):
 
 ```bash
-pm2 start control-room
+pm2 restart control-room
+# oppure (se non è ancora registrato in PM2):
+pm2 start /home/ubuntu/ecosystem.config.js --only control-room
 pm2 save
 ```
 
