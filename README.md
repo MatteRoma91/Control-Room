@@ -106,8 +106,8 @@ Poi modifica `/etc/nginx/sites-available/matteroma.duckdns.conf`:
    - **Aggiorna tutto**: pulsante per refresh di Overview, Processi PM2, Health check e Processi di sistema
    - **Overview server**: uptime, load, RAM, disco, stato Nginx
    - **Azioni globali**: riavvia tutte le webapp, ripristina tutti i processi
-   - **Porte in ascolto**: tabella siti con porta backend (3000, 3001, 3002, 3003 Scommesse, 3005) e Nginx (80, 443), verificata con `ss` sul server; include link a `https://scommesse.duckdns.org` per Scommesse
-   - **Health check**: verifica via HTTP le webapp con URL pubblico (Banana Padel, Roma-Buche, Gestione Veicoli, Scommesse, Control Room)
+   - **Porte in ascolto**: tabella siti con porta backend (3000, 3001, 3002, 3005) e Nginx (80, 443), verificata con `ss` sul server
+   - **Health check**: verifica via HTTP le webapp con URL pubblico (Banana Padel, Roma-Buche, Gestione Veicoli, Control Room)
    - **Link rapidi** alle webapp
    - **Processi PM2**: griglia di **card mini-dashboard** (desktop e mobile) con metriche (CPU, RAM, uptime, restart), stato crash loop, badge modulo, azioni Start/Stop/Restart/Flush/Azzera restart; aggiornamento live ogni 3s; link al dettaglio processo e log
    - **Processi di sistema**: top 25 per CPU (nginx, node, systemd, ecc.), tabella ordinabile cliccando sulle colonne (PID, Nome, CPU %, RAM, Utente)

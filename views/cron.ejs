@@ -21,7 +21,7 @@
     <pre id="dailyCheckLastReport" class="whitespace-pre-wrap text-xs bg-cr-code border border-cr-border rounded p-3 text-cr-text min-h-[80px]"></pre>
   </div>
 
-  <script>window.cronProcesses = <%- JSON.stringify((processes && processes.length) ? processes.map(p => p.name) : ['padel-tour','roma-buche','gestione-veicoli','scommesse','control-room']) %>;</script>
+  <script>window.cronProcesses = <%- JSON.stringify((processes && processes.length) ? processes.map(p => p.name) : ['padel-tour','roma-buche','gestione-veicoli','control-room']) %>;</script>
   <div class="space-y-4 mb-8" id="cronJobsList">
     <% (cronJobs || []).forEach((job) => { %>
     <div class="cron-job-card flex flex-wrap items-center gap-4 p-4 rounded-lg border border-cr-border bg-cr-surface" data-id="<%= job.id %>">
@@ -37,7 +37,7 @@
           </select>
           <span class="cron-target-wrap" style="<%= (job.action === 'pm2-restart' || job.action === 'pm2-start') ? '' : 'display:none' %>">
             <select class="cron-target px-2 py-1 rounded bg-cr-surface2 border border-cr-inputBorder text-cr-text text-sm">
-              <% (processes || [{name:'padel-tour'},{name:'roma-buche'},{name:'gestione-veicoli'},{name:'scommesse'},{name:'control-room'}]).forEach((p) => { %>
+              <% (processes || [{name:'padel-tour'},{name:'roma-buche'},{name:'gestione-veicoli'},{name:'control-room'}]).forEach((p) => { %>
               <option value="<%= p.name %>" <%= (job.target || '') === p.name ? 'selected' : '' %>><%= p.name %></option>
               <% }); %>
             </select>
@@ -94,7 +94,7 @@
           <% (processes || []).forEach((p) => { %>
           <option value="<%= p.name %>"><%= p.name %></option>
           <% }); %>
-          <% if (!processes || processes.length === 0) { %><option value="padel-tour">padel-tour</option><option value="roma-buche">roma-buche</option><option value="gestione-veicoli">gestione-veicoli</option><option value="scommesse">scommesse</option><option value="control-room">control-room</option><% } %>
+          <% if (!processes || processes.length === 0) { %><option value="padel-tour">padel-tour</option><option value="roma-buche">roma-buche</option><option value="gestione-veicoli">gestione-veicoli</option><option value="control-room">control-room</option><% } %>
         </select>
       </div>
       <div id="cronCommandWrap" class="hidden">
@@ -185,7 +185,7 @@
   }
 
   function addCronCard(job) {
-    const processes = window.cronProcesses || ['padel-tour', 'roma-buche', 'gestione-veicoli', 'scommesse', 'control-room'];
+    const processes = window.cronProcesses || ['padel-tour', 'roma-buche', 'gestione-veicoli', 'control-room'];
     const targetOpts = processes.map(p => {
       const name = typeof p === 'string' ? p : p.name;
       const sel = (job.target || 'padel-tour') === name ? ' selected' : '';
