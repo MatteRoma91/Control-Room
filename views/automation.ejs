@@ -52,9 +52,9 @@
     const res = await fetch('/api/runbook/apps');
     const data = await res.json();
     root.innerHTML = (data.apps || []).map((a) => `
-      <label class="px-2 py-1 rounded border border-cr-inputBorder bg-cr-surface2 text-sm">
+      <label class="px-2 py-1 rounded border border-cr-inputBorder bg-cr-surface2 text-sm" title="${(a.label || a.name).replace(/"/g, '&quot;')}">
         <input type="checkbox" value="${a.name}" class="mr-1" onchange="toggleBatchApp(this)" />
-        ${a.name}
+        ${a.kind === 'php' ? a.name + ' <span class="text-cr-muted">(PHP)</span>' : a.name}
       </label>
     `).join('');
   }

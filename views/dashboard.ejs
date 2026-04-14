@@ -517,17 +517,20 @@
       return '<span class="text-cr-muted">n/d</span>';
     }
     function kindLabel(kind) {
-      return kind === 'proxy' ? '<span class="text-cr-muted text-xs ml-1">(proxy)</span>' : '';
+      if (kind === 'proxy') return '<span class="text-cr-muted text-xs ml-1">(proxy)</span>';
+      if (kind === 'php') return '<span class="text-cr-muted text-xs ml-1">(PHP)</span>';
+      return '';
     }
     if (tbody) {
       tbody.innerHTML = rows.map(function (s) {
         const urlCell = s.url ? '<a href="' + escapeHtml(s.url) + '" class="text-cr-accent hover:underline break-all text-sm" target="_blank" rel="noopener">' + escapeHtml(s.url) + '</a>' : '<span class="text-cr-muted">—</span>';
         const pm2Cell = s.pm2 ? '<span class="font-mono text-sm">' + escapeHtml(s.pm2) + '</span>' : '<span class="text-cr-muted">—</span>';
+        const portCell = (s.port != null && s.port !== '') ? '<span class="font-mono text-cr-accent">' + escapeHtml(String(s.port)) + '</span>' : (s.portNote ? '<span class="text-cr-muted text-sm">' + escapeHtml(s.portNote) + '</span>' : '<span class="text-cr-muted">—</span>');
         const procHint = (s.processHints && s.processHints.length) ? '<div class="text-xs text-cr-muted mt-1 truncate max-w-[200px]" title="' + escapeHtml(s.processHints.join(', ')) + '">' + escapeHtml(s.processHints.join(', ')) + '</div>' : '';
         return '<tr class="border-t border-cr-border hover:bg-cr-navHover">' +
           '<td class="px-4 py-3 text-cr-text">' + escapeHtml(s.name) + kindLabel(s.kind) + '</td>' +
           '<td class="px-4 py-3">' + urlCell + '</td>' +
-          '<td class="px-4 py-3 font-mono text-cr-accent">' + escapeHtml(String(s.port)) + '</td>' +
+          '<td class="px-4 py-3">' + portCell + '</td>' +
           '<td class="px-4 py-3">' + pm2Cell + '</td>' +
           '<td class="px-4 py-3">' + listenBadge(s.listening) + procHint + '</td>' +
           '<td class="px-4 py-3 text-sm text-cr-muted">' + escapeHtml(formatBindAddresses(s.bindAddresses)) + '</td></tr>';
@@ -536,9 +539,10 @@
     if (mobile) {
       mobile.innerHTML = rows.map(function (s) {
         const urlLine = s.url ? '<a href="' + escapeHtml(s.url) + '" class="text-cr-accent hover:underline break-all text-sm" target="_blank" rel="noopener">' + escapeHtml(s.url) + '</a>' : '<span class="text-cr-muted text-sm">—</span>';
+        const mobilePort = (s.port != null && s.port !== '') ? '<span class="font-mono text-cr-accent">' + escapeHtml(String(s.port)) + '</span>' : (s.portNote ? '<span class="text-cr-muted">' + escapeHtml(s.portNote) + '</span>' : '<span class="text-cr-muted">—</span>');
         return '<div class="rounded-lg border border-cr-border bg-cr-surface p-4">' +
-          '<div class="font-medium text-cr-text mb-2">' + escapeHtml(s.name) + (s.kind === 'proxy' ? ' <span class="text-cr-muted text-xs">(proxy)</span>' : '') + '</div>' +
-          '<div class="space-y-1 text-sm text-cr-muted"><div>Porta <span class="font-mono text-cr-accent">' + escapeHtml(String(s.port)) + '</span></div>' +
+          '<div class="font-medium text-cr-text mb-2">' + escapeHtml(s.name) + (s.kind === 'proxy' ? ' <span class="text-cr-muted text-xs">(proxy)</span>' : '') + (s.kind === 'php' ? ' <span class="text-cr-muted text-xs">(PHP)</span>' : '') + '</div>' +
+          '<div class="space-y-1 text-sm text-cr-muted"><div>Porta ' + mobilePort + '</div>' +
           '<div>' + urlLine + '</div>' +
           (s.pm2 ? '<div>PM2 <span class="font-mono">' + escapeHtml(s.pm2) + '</span></div>' : '') +
           '<div class="pt-2">' + (s.listening === true ? '<span class="text-cr-accent">In ascolto</span>' : s.listening === false ? '<span class="text-cr-danger">Non in ascolto</span>' : '<span class="text-cr-muted">Stato n/d</span>') + '</div>' +
@@ -840,7 +844,9 @@
       (json.apps || []).forEach((app) => {
         const b = document.createElement('button');
         b.className = 'px-3 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-600 text-sm text-white font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-cr-surface';
-        b.textContent = `Recover ${app.name}`;
+        const suffix = app.kind === 'php' ? ' (PHP-FPM)' : '';
+        b.textContent = `Recover ${app.name}${suffix}`;
+        b.title = app.label ? String(app.label) : app.name;
         b.onclick = () => runRecoverRunbook(app.name, b);
         root.appendChild(b);
       });

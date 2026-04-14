@@ -38,6 +38,7 @@ const {
   INCIDENTS_PATH,
   RUNBOOK_HISTORY_PATH,
   NOTIFY_DEAD_LETTER_PATH,
+  PHP_FPM_SERVICE,
 } = require('./lib/constants');
 const { normalizeIp, isIpAllowedByEntries } = require('./lib/ip-utils');
 
@@ -811,12 +812,21 @@ app.post('/api/process/restore-all', requireAuth, async (req, res) => {
 });
 
 function getManagedApps() {
-  return WEB_SITES.filter((s) => s.kind === 'app' && s.pm2).map((s) => ({
+  const nodeApps = WEB_SITES.filter((s) => s.kind === 'app' && s.pm2).map((s) => ({
     name: s.pm2,
     label: s.name,
     port: s.port,
     url: s.url,
+    kind: 'node',
   }));
+  const phpApps = WEB_SITES.filter((s) => s.kind === 'php' && s.url).map((s) => ({
+    name: 'generator',
+    label: s.name,
+    port: null,
+    url: s.url,
+    kind: 'php',
+  }));
+  return [...nodeApps, ...phpApps];
 }
 
 async function executeRunbook({ processName, mode = 'full_recover', dryRun = false, operator = 'system' }) {
@@ -824,6 +834,62 @@ async function executeRunbook({ processName, mode = 'full_recover', dryRun = fal
   if (!appMeta) throw new Error('Processo non supportato');
   const startedAt = Date.now();
   const steps = [];
+
+  if (appMeta.kind === 'php') {
+    const checkUrl = appMeta.url;
+    const before = await fetchStatusCode(checkUrl, 5000);
+    steps.push({ step: 'public_health_before', status: before });
+    if (!dryRun) {
+      try {
+        execSync(`sudo /bin/systemctl reload ${PHP_FPM_SERVICE} 2>/dev/null`, { encoding: 'utf8' });
+        steps.push({ step: 'php_fpm_reload', ok: true });
+      } catch (err) {
+        steps.push({ step: 'php_fpm_reload', ok: false, error: err.message });
+      }
+      if (mode === 'full_recover' || mode === 'safe_rollback') {
+        try {
+          execSync('sudo /bin/systemctl reload nginx 2>/dev/null', { encoding: 'utf8' });
+          steps.push({ step: 'nginx_reload', ok: true });
+        } catch (err) {
+          steps.push({ step: 'nginx_reload', ok: false, error: err.message });
+        }
+      }
+    } else {
+      steps.push({ step: 'php_fpm_reload', ok: true, dryRun: true });
+      steps.push({ step: 'nginx_reload', ok: true, dryRun: true });
+    }
+    await new Promise((r) => setTimeout(r, 1500));
+    const after = await fetchStatusCode(checkUrl, 5000);
+    steps.push({ step: 'public_health_after', status: after });
+    let ok = parseCheckResponseOk(after);
+    if (!ok && mode === 'safe_rollback' && !dryRun) {
+      try {
+        execSync(`sudo /bin/systemctl reload ${PHP_FPM_SERVICE} 2>/dev/null`, { encoding: 'utf8' });
+        steps.push({ step: 'rollback_php_fpm_reload', ok: true });
+      } catch (err) {
+        steps.push({ step: 'rollback_php_fpm_reload', ok: false, error: err.message });
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+      const rollbackCheck = await fetchStatusCode(checkUrl, 5000);
+      steps.push({ step: 'rollback_health', status: rollbackCheck });
+      ok = parseCheckResponseOk(rollbackCheck);
+    }
+    const report = {
+      id: `rb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      process: processName,
+      mode,
+      dryRun,
+      ok,
+      durationMs: Date.now() - startedAt,
+      operator,
+      startedAt: new Date(startedAt).toISOString(),
+      finishedAt: new Date().toISOString(),
+      steps,
+    };
+    await appendLine(RUNBOOK_HISTORY_PATH, report);
+    return report;
+  }
+
   const localUrl = `http://127.0.0.1:${appMeta.port}/`;
   const before = await fetchStatusCode(localUrl, 5000);
   steps.push({ step: 'local_health_before', status: before });
@@ -1329,14 +1395,16 @@ app.get('/api/site-ports', requireAuth, (req, res) => {
     byPort.get(l.port).push(l);
   }
   const sites = WEB_SITES.map((s) => {
-    const found = byPort.get(s.port) || [];
-    const listening = ss.ok ? found.length > 0 : null;
+    const portNum = s.port;
+    const found = portNum != null ? byPort.get(portNum) || [] : [];
+    const listening = portNum == null ? null : ss.ok ? found.length > 0 : null;
     const bindAddresses = [...new Set(found.map((x) => x.address))];
     const processHints = [...new Set(found.map((x) => x.process).filter(Boolean))];
     return {
       name: s.name,
       url: s.url || null,
-      port: s.port,
+      port: portNum,
+      portNote: s.kind === 'php' ? 'PHP-FPM (socket Nginx)' : null,
       pm2: s.pm2,
       kind: s.kind,
       listening,
@@ -1839,6 +1907,54 @@ async function runDailyAppCheck(trigger = 'manual') {
 
   try {
     for (const site of DAILY_CHECK_SITES) {
+      if (site.kind === 'php') {
+        const entry = {
+          name: site.name,
+          process: 'GENERATOR',
+          localUrl: site.url,
+          publicUrl: site.url,
+          pm2Before: 'n/a',
+          pm2After: 'n/a',
+          localStatusBefore: 0,
+          publicStatusBefore: 0,
+          localStatusAfter: 0,
+          publicStatusAfter: 0,
+          actions: [],
+          status: 'ok',
+        };
+        entry.publicStatusBefore = await fetchStatusCode(site.url, 10000);
+        entry.localStatusBefore = entry.publicStatusBefore;
+        const publicOkBefore = parseCheckResponseOk(entry.publicStatusBefore);
+        if (!publicOkBefore) {
+          try {
+            execSync(`sudo /bin/systemctl reload ${PHP_FPM_SERVICE} 2>/dev/null`, { encoding: 'utf8' });
+            entry.actions.push(`systemctl reload ${PHP_FPM_SERVICE}`);
+          } catch (err) {
+            entry.actions.push(`php-fpm reload failed: ${err.message}`);
+          }
+          try {
+            execSync('sudo /bin/systemctl reload nginx 2>/dev/null', { encoding: 'utf8' });
+            entry.actions.push('nginx reload');
+          } catch (err) {
+            entry.actions.push(`nginx reload failed: ${err.message}`);
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        entry.publicStatusAfter = await fetchStatusCode(site.url, 10000);
+        entry.localStatusAfter = entry.publicStatusAfter;
+        const publicOkAfter = parseCheckResponseOk(entry.publicStatusAfter);
+        const healthyAfter = publicOkAfter;
+        if (!healthyAfter) {
+          entry.status = 'failed';
+          report.failedCount += 1;
+        } else if (entry.actions.length > 0) {
+          entry.status = 'repaired';
+          report.repairedCount += 1;
+        }
+        report.entries.push(entry);
+        continue;
+      }
+
       const entry = {
         name: site.name,
         process: site.pm2,

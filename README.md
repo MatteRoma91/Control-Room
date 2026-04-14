@@ -8,6 +8,8 @@ Dashboard Node.js/Express per gestire i processi PM2 senza accesso SSH.
 - PM2 installato e in esecuzione
 - Nginx (per reverse proxy e SSL)
 
+**GENERATOR (D&D)**: l’app PHP in `/home/ubuntu/GENERATOR` non è un processo PM2; è comunque elencata in `lib/constants.js` (`WEB_SITES`, `kind: 'php'`) per health check, tabella porte, daily check interno, script `scripts/daily-app-check.sh` / `health-check.sh` e runbook **Recover generator** (reload `php8.3-fpm` + Nginx). Il nome del servizio FPM si sovrascrive con la variabile d’ambiente `CR_PHP_FPM_SERVICE` se usi un’altra versione PHP.
+
 ## Setup
 
 ### 1. Crea la cartella e installa le dipendenze
