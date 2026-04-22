@@ -1,0 +1,147 @@
+<a href="/" class="inline-block mb-4 text-cr-accent hover:underline focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas rounded">
+  &larr; Dashboard
+</a>
+
+<section class="mb-6" aria-labelledby="php-header">
+  <div class="flex flex-wrap items-center gap-4 mb-4">
+    <h1 id="php-header" class="text-2xl font-bold text-cr-text"><%= phpApp.label %></h1>
+    <span class="px-2 py-0.5 rounded text-xs font-medium bg-cr-surface2 border border-cr-border text-cr-muted">PHP / Nginx</span>
+  </div>
+  <p class="text-sm text-cr-muted mb-4">Processo gestito da PHP-FPM (<code class="text-xs bg-cr-surface2 px-1 rounded"><%= phpFpmService %></code>), non da PM2. Monitoraggio su endpoint dedicato; recover = reload FPM + Nginx (vedi runbook).</p>
+
+  <dl class="grid gap-3 text-sm max-w-2xl mb-6">
+    <div>
+      <dt class="text-cr-muted text-xs uppercase tracking-wide">Sito pubblico</dt>
+      <dd class="font-mono text-cr-text break-all mt-1">
+        <a href="<%= phpApp.url %>" target="_blank" rel="noopener" class="text-cr-accent hover:underline"><%= phpApp.url %></a>
+      </dd>
+    </div>
+    <div>
+      <dt class="text-cr-muted text-xs uppercase tracking-wide">Health check</dt>
+      <dd class="font-mono text-xs text-cr-text break-all mt-1"><%= phpApp.healthCheckUrl || phpApp.url %></dd>
+    </div>
+    <div>
+      <dt class="text-cr-muted text-xs uppercase tracking-wide">PHP-FPM (systemd)</dt>
+      <dd id="phpFpmStatus" class="mt-1 text-cr-text">Caricamento…</dd>
+    </div>
+    <div>
+      <dt class="text-cr-muted text-xs uppercase tracking-wide">Ultimo health (HTTP)</dt>
+      <dd id="phpHealthInline" class="mt-1 text-cr-text">—</dd>
+    </div>
+  </dl>
+
+  <div class="flex flex-wrap gap-2">
+    <button
+      type="button"
+      id="btnPhpRefreshHealth"
+      class="min-h-[44px] px-3 py-2 rounded-lg text-sm bg-cr-surface2 hover:bg-cr-navHover border border-cr-border font-medium"
+    >
+      Aggiorna stato
+    </button>
+    <button
+      type="button"
+      id="btnPhpRecover"
+      class="min-h-[44px] px-3 py-2 rounded-lg text-sm bg-purple-700 hover:bg-purple-600 text-white font-medium"
+    >
+      Recover (runbook)
+    </button>
+    <a
+      href="https://github.com/MatteRoma91/dndpgbuilder/blob/master/GENERATOR/docs/runbook-production.md"
+      target="_blank"
+      rel="noopener"
+      class="min-h-[44px] inline-flex items-center px-3 py-2 rounded-lg text-sm bg-cr-surface2 border border-cr-border hover:bg-cr-navHover"
+    >
+      Runbook GENERATOR (repo)
+    </a>
+  </div>
+</section>
+
+<script>
+  (function () {
+    const processName = '<%= phpApp.name %>';
+
+    function showToast(message, type, duration) {
+      window.dispatchEvent(new CustomEvent('toast', { detail: { message, type, duration } }));
+    }
+
+    function setBtnLoading(btn, loading) {
+      if (!btn) return;
+      if (loading) {
+        btn._originalText = btn.textContent;
+        btn.textContent = 'In corso…';
+        btn.disabled = true;
+      } else {
+        btn.textContent = btn._originalText || btn.textContent;
+        btn.disabled = false;
+      }
+    }
+
+    async function refreshFpm() {
+      const el = document.getElementById('phpFpmStatus');
+      if (!el) return;
+      try {
+        const res = await fetch('/api/php-app/' + encodeURIComponent(processName) + '/system');
+        const data = await res.json();
+        if (!data.ok) {
+          el.textContent = 'n/d';
+          return;
+        }
+        el.innerHTML = data.isActive
+          ? '<span class="text-cr-accent font-medium">active</span> (' + (data.fpmService || '') + ')'
+          : '<span class="text-cr-danger font-medium">' + (data.raw || 'non attivo') + '</span>';
+      } catch (_) {
+        el.textContent = 'n/d (permessi sudo o servizio)';
+      }
+    }
+
+    async function refreshHealth() {
+      const el = document.getElementById('phpHealthInline');
+      if (!el) return;
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        const row = (data.results || []).find(function (r) { return r.kind === 'php'; });
+        if (!row) {
+          el.textContent = 'Nessuna riga PHP in /api/health';
+          return;
+        }
+        var txt = row.ok ? (row.status + ' OK') : (row.error || 'KO');
+        txt += ' — ' + (row.elapsed != null ? row.elapsed + ' ms' : '');
+        el.textContent = txt;
+        el.className = row.ok ? 'mt-1 text-cr-accent font-medium' : 'mt-1 text-cr-danger font-medium';
+      } catch (e) {
+        el.textContent = 'Errore: ' + e.message;
+      }
+    }
+
+    async function runRecover(btn) {
+      setBtnLoading(btn, true);
+      try {
+        const res = await fetch('/api/runbook/recover-app/' + encodeURIComponent(processName), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'full_recover', dryRun: false }),
+        });
+        const json = await res.json();
+        if (json.ok) showToast('Recover completato', 'success');
+        else showToast('Recover fallito o parziale', 'error');
+        await refreshFpm();
+        await refreshHealth();
+      } catch (e) {
+        showToast('Errore: ' + e.message, 'error');
+      }
+      setBtnLoading(btn, false);
+    }
+
+    document.getElementById('btnPhpRefreshHealth').addEventListener('click', function () {
+      refreshFpm();
+      refreshHealth();
+    });
+    document.getElementById('btnPhpRecover').addEventListener('click', function () {
+      runRecover(this);
+    });
+
+    refreshFpm();
+    refreshHealth();
+  })();
+</script>

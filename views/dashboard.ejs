@@ -221,7 +221,7 @@
         <thead class="cr-thead">
           <tr>
             <th class="text-left px-4 py-3 text-cr-text font-medium">Webapp</th>
-            <th class="text-left px-4 py-3 text-cr-text font-medium">URL</th>
+            <th class="text-left px-4 py-3 text-cr-text font-medium">URL check</th>
             <th class="text-left px-4 py-3 text-cr-text font-medium">Status</th>
             <th class="text-left px-4 py-3 text-cr-text font-medium">Tempo (ms)</th>
           </tr>
@@ -238,6 +238,14 @@
   <div id="qualityGatesBox" class="rounded-lg border border-cr-border bg-cr-surface p-4 text-sm text-cr-text">Caricamento KPI operativi...</div>
 </section>
 </div>
+
+<!-- Servizi PHP (GENERATOR / Nginx + FPM) -->
+<section class="mb-8" aria-labelledby="php-services-heading">
+  <h2 id="php-services-heading" class="text-lg font-semibold text-cr-text mb-1">Servizi PHP</h2>
+  <p class="text-xs text-cr-muted mb-4">Health su endpoint dedicato (<code class="text-[11px]">/health.php</code> per GENERATOR). Aggiornamento con «Aggiorna tutto» o «Health check».</p>
+  <div id="phpServicesMobile" class="md:hidden space-y-3"></div>
+  <div id="phpServicesDesktop" class="hidden md:grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+</section>
 
 <!-- Processi PM2 (aggiornamento live ogni 3s) -->
 <section class="mb-8" aria-labelledby="processes-heading">
@@ -608,6 +616,41 @@
     }
   }
 
+  function renderPhpServiceCards(results) {
+    const php = (results || []).filter(function (r) { return r.kind === 'php'; });
+    const mob = document.getElementById('phpServicesMobile');
+    const desk = document.getElementById('phpServicesDesktop');
+    if (!mob || !desk) return;
+    function oneCard(r) {
+      const ok = r.ok;
+      const st = ok ? (r.status + ' OK') : (r.error || 'Errore');
+      const urlShown = r.checkUrl || r.url || '';
+      const pub = r.url || '';
+      return (
+        '<article class="rounded-xl border border-cr-border bg-cr-surface p-4 shadow-sm">' +
+        '<header class="flex flex-wrap justify-between gap-2 mb-2 pb-2 border-b border-cr-border">' +
+        '<div><h3 class="font-semibold text-cr-text">' + escapeHtml(r.name || '') + '</h3>' +
+        '<p class="text-xs text-cr-muted">PHP-FPM + Nginx</p></div>' +
+        '<span class="px-2 py-0.5 rounded text-xs font-medium ' + (ok ? 'bg-[var(--cr-success-bg)] text-cr-accent' : 'bg-[var(--cr-danger-bg)] text-cr-danger') + '">' + escapeHtml(st) + '</span></header>' +
+        '<dl class="text-sm space-y-1 mb-3">' +
+        '<dt class="text-cr-muted text-xs">Health URL</dt><dd class="font-mono text-xs break-all">' + escapeHtml(urlShown) + '</dd>' +
+        '<dt class="text-cr-muted text-xs">Sito</dt><dd class="font-mono text-xs break-all"><a class="text-cr-accent hover:underline" href="' + escapeHtml(pub) + '" target="_blank" rel="noopener">' + escapeHtml(pub) + '</a></dd></dl>' +
+        '<div class="flex flex-wrap gap-2">' +
+        '<a href="/process/generator" class="px-3 py-2 rounded-lg text-xs font-medium bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 min-h-[40px] inline-flex items-center">Dettaglio</a>' +
+        '<button type="button" onclick="runRecoverRunbook(\'generator\', this)" class="px-3 py-2 rounded-lg text-xs font-medium bg-purple-700 hover:bg-purple-600 text-white min-h-[40px]">Recover</button>' +
+        '</div><p class="text-xs text-cr-muted mt-2">' + (r.elapsed != null ? r.elapsed + ' ms' : '') + '</p></article>'
+      );
+    }
+    if (!php.length) {
+      mob.innerHTML = '<p class="text-cr-muted text-center py-6 text-sm">Nessun servizio PHP configurato</p>';
+      desk.innerHTML = '<p class="col-span-full text-cr-muted text-center py-6 text-sm border border-dashed border-cr-border rounded-xl">Nessun servizio PHP configurato</p>';
+      return;
+    }
+    const html = php.map(oneCard).join('');
+    mob.innerHTML = html;
+    desk.innerHTML = html;
+  }
+
   async function checkHealth() {
     try {
       const res = await fetch('/api/health');
@@ -620,15 +663,17 @@
       (data.results || []).forEach(function (r) {
         const statusCls = r.ok ? 'text-cr-accent' : 'text-cr-danger';
         const statusText = r.ok ? r.status + ' OK' : (r.error || 'Errore');
+        const urlShown = r.checkUrl || r.url || '';
         const tr = document.createElement('tr');
         tr.className = 'border-t border-cr-border';
-        tr.innerHTML = '<td class="px-4 py-3">' + (r.name || '') + '</td><td class="px-4 py-3 font-mono text-sm">' + (r.url || '') + '</td><td class="px-4 py-3 ' + statusCls + '">' + statusText + '</td><td class="px-4 py-3">' + (r.elapsed || '-') + '</td>';
+        tr.innerHTML = '<td class="px-4 py-3">' + (r.name || '') + '</td><td class="px-4 py-3 font-mono text-sm break-all">' + urlShown + '</td><td class="px-4 py-3 ' + statusCls + '">' + statusText + '</td><td class="px-4 py-3">' + (r.elapsed || '-') + '</td>';
         tbody.appendChild(tr);
         const card = document.createElement('div');
         card.className = 'rounded-lg border border-cr-border bg-cr-surface p-4';
-        card.innerHTML = '<div class="font-medium text-cr-text mb-1">' + (r.name || '') + '</div><div class="font-mono text-sm text-cr-muted mb-2 break-all">' + (r.url || '') + '</div><div class="flex flex-wrap gap-2"><span class="' + statusCls + ' text-sm">' + statusText + '</span><span class="text-cr-muted text-sm">' + (r.elapsed || '-') + ' ms</span></div>';
+        card.innerHTML = '<div class="font-medium text-cr-text mb-1">' + (r.name || '') + '</div><div class="font-mono text-sm text-cr-muted mb-2 break-all">' + urlShown + '</div><div class="flex flex-wrap gap-2"><span class="' + statusCls + ' text-sm">' + statusText + '</span><span class="text-cr-muted text-sm">' + (r.elapsed || '-') + ' ms</span></div>';
         cardsContainer.appendChild(card);
       });
+      renderPhpServiceCards(data.results || []);
       container.classList.remove('hidden');
     } catch (e) {
       showToast('Errore: ' + e.message, 'error');
@@ -778,15 +823,17 @@
           (data.results || []).forEach(function (r) {
             const statusCls = r.ok ? 'text-cr-accent' : 'text-cr-danger';
             const statusText = r.ok ? r.status + ' OK' : (r.error || 'Errore');
+            const urlShown = r.checkUrl || r.url || '';
             const tr = document.createElement('tr');
             tr.className = 'border-t border-cr-border';
-            tr.innerHTML = '<td class="px-4 py-3">' + (r.name || '') + '</td><td class="px-4 py-3 font-mono text-sm">' + (r.url || '') + '</td><td class="px-4 py-3 ' + statusCls + '">' + statusText + '</td><td class="px-4 py-3">' + (r.elapsed || '-') + '</td>';
+            tr.innerHTML = '<td class="px-4 py-3">' + (r.name || '') + '</td><td class="px-4 py-3 font-mono text-sm break-all">' + urlShown + '</td><td class="px-4 py-3 ' + statusCls + '">' + statusText + '</td><td class="px-4 py-3">' + (r.elapsed || '-') + '</td>';
             tbody.appendChild(tr);
             const card = document.createElement('div');
             card.className = 'rounded-lg border border-cr-border bg-cr-surface p-4';
-            card.innerHTML = '<div class="font-medium text-cr-text mb-1">' + (r.name || '') + '</div><div class="font-mono text-sm text-cr-muted mb-2 break-all">' + (r.url || '') + '</div><div class="flex flex-wrap gap-2"><span class="' + statusCls + ' text-sm">' + statusText + '</span><span class="text-cr-muted text-sm">' + (r.elapsed || '-') + ' ms</span></div>';
+            card.innerHTML = '<div class="font-medium text-cr-text mb-1">' + (r.name || '') + '</div><div class="font-mono text-sm text-cr-muted mb-2 break-all">' + urlShown + '</div><div class="flex flex-wrap gap-2"><span class="' + statusCls + ' text-sm">' + statusText + '</span><span class="text-cr-muted text-sm">' + (r.elapsed || '-') + ' ms</span></div>';
             cardsContainer.appendChild(card);
           });
+          renderPhpServiceCards(data.results || []);
           container.classList.remove('hidden');
         })(),
         (async () => {
@@ -1069,8 +1116,17 @@
   loadRunbookApps();
   fetchStats();
   loadProcessesLive();
+  async function loadPhpServiceCards() {
+    try {
+      const res = await fetch('/api/health');
+      const data = await res.json();
+      renderPhpServiceCards(data.results || []);
+    } catch (_) {}
+  }
+  loadPhpServiceCards();
   setInterval(fetchStats, 3000);
   setInterval(loadProcessesLive, 3000);
+  setInterval(loadPhpServiceCards, 15000);
   setInterval(loadIncidentSummary, 10000);
   setInterval(loadQualityGates, 20000);
 </script>

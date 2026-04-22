@@ -8,7 +8,7 @@ Dashboard Node.js/Express per gestire i processi PM2 senza accesso SSH.
 - PM2 installato e in esecuzione
 - Nginx (per reverse proxy e SSL)
 
-**GENERATOR (D&D)**: l’app PHP in `/home/ubuntu/GENERATOR` non è un processo PM2; è comunque elencata in `lib/constants.js` (`WEB_SITES`, `kind: 'php'`) per health check, tabella porte, daily check interno, script `scripts/daily-app-check.sh` / `health-check.sh` e runbook **Recover generator** (reload `php8.3-fpm` + Nginx). Il nome del servizio FPM si sovrascrive con la variabile d’ambiente `CR_PHP_FPM_SERVICE` se usi un’altra versione PHP.
+**GENERATOR (D&D)**: l’app PHP in `/home/ubuntu/GENERATOR` non è un processo PM2; è elencata in `lib/constants.js` (`WEB_SITES`, `kind: 'php'`, `healthPath: '/health.php'`) per health check, tabella porte, daily check interno, script `scripts/daily-app-check.sh` / `health-check.sh` e runbook **Recover generator** (reload FPM + Nginx). I check HTTP (dashboard, `GET /api/health`, summary, runbook before/after, daily check) puntano a **`https://dndpgbuilder.duckdns.org/health.php`**, non alla sola home. In UI: sezione **Servizi PHP** sulla dashboard e pagina **`/process/generator`** (URL pubblico, health, opzionale stato FPM, pulsante Recover). API opzionale stato unità: **`GET /api/php-app/generator/system`** (`systemctl is-active` sul servizio FPM). Il nome del servizio FPM si imposta con `CR_PHP_FPM_SERVICE` (default `php8.3-fpm`).
 
 ## Setup
 
@@ -109,7 +109,7 @@ Poi modifica `/etc/nginx/sites-available/matteroma.duckdns.conf`:
    - **Overview server**: uptime, load, RAM, disco, stato Nginx
    - **Azioni globali**: riavvia tutte le webapp, ripristina tutti i processi
    - **Porte in ascolto**: tabella siti con porta backend (3000, 3001, 3002, 3005) e Nginx (80, 443), verificata con `ss` sul server
-   - **Health check**: verifica via HTTP le webapp con URL pubblico (Banana Padel, Roma-Buche, Gestione Veicoli, Control Room)
+   - **Health check**: verifica via HTTP le webapp con URL pubblico; per **GENERATOR** il target è `…/health.php` (JSON stabile). **Servizi PHP**: card con stato/latency e link a **`/process/generator`**
    - **Link rapidi** alle webapp
    - **Processi PM2**: griglia di **card mini-dashboard** (desktop e mobile) con metriche (CPU, RAM, uptime, restart), stato crash loop, badge modulo, azioni Start/Stop/Restart/Flush/Azzera restart; aggiornamento live ogni 3s; link al dettaglio processo e log
    - **Processi di sistema**: top 25 per CPU (nginx, node, systemd, ecc.), tabella ordinabile cliccando sulle colonne (PID, Nome, CPU %, RAM, Utente)
@@ -135,6 +135,18 @@ Se il pulsante "Reload Nginx" non funziona, aggiungi la regola sudoers:
 ```bash
 echo 'ubuntu ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx' | sudo tee /etc/sudoers.d/control-room
 sudo chmod 440 /etc/sudoers.d/control-room
+```
+
+### GENERATOR: php-fpm (runbook Recover e API stato)
+
+Il runbook **Recover generator** e `GET /api/php-app/generator/system` eseguono `sudo systemctl` sul servizio FPM (`CR_PHP_FPM_SERVICE`, es. `php8.3-fpm`). Se servono, aggiungi righe dedicate in sudoers (adatta il nome servizio al tuo ambiente):
+
+```bash
+sudo tee /etc/sudoers.d/control-room-php-fpm << 'EOF'
+ubuntu ALL=(ALL) NOPASSWD: /bin/systemctl reload php8.3-fpm
+ubuntu ALL=(ALL) NOPASSWD: /bin/systemctl is-active php8.3-fpm
+EOF
+sudo chmod 440 /etc/sudoers.d/control-room-php-fpm
 ```
 
 ### Nginx Config Generator

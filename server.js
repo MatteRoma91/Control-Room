@@ -40,6 +40,7 @@ const {
   NOTIFY_DEAD_LETTER_PATH,
   PHP_FPM_SERVICE,
 } = require('./lib/constants');
+const { getSiteHealthTarget } = require('./lib/siteHealth');
 const { normalizeIp, isIpAllowedByEntries } = require('./lib/ip-utils');
 
 /** Parser output `ss -tlnp`: socket TCP in ascolto */
@@ -500,6 +501,15 @@ app.get('/index', requireAuth, (req, res) => res.redirect('/'));
 app.get('/process/:name', requireAuth, async (req, res) => {
   const { name } = req.params;
   try {
+    const phpApp = getManagedApps().find((a) => a.kind === 'php' && a.name === name);
+    if (phpApp) {
+      return res.render('layout', {
+        contentPartial: 'process-detail-php',
+        phpApp,
+        phpFpmService: PHP_FPM_SERVICE,
+        dbConfigured: DB_CONFIGURED,
+      });
+    }
     const list = await pm2List();
     const proc = list.find((p) => p.name === name);
     if (!proc) return res.status(404).render('layout', { contentPartial: 'dashboard', processes: list, error: 'Processo non trovato', dbConfigured: DB_CONFIGURED });
@@ -824,6 +834,7 @@ function getManagedApps() {
     label: s.name,
     port: null,
     url: s.url,
+    healthCheckUrl: getSiteHealthTarget(s),
     kind: 'php',
   }));
   return [...nodeApps, ...phpApps];
@@ -836,7 +847,7 @@ async function executeRunbook({ processName, mode = 'full_recover', dryRun = fal
   const steps = [];
 
   if (appMeta.kind === 'php') {
-    const checkUrl = appMeta.url;
+    const checkUrl = appMeta.healthCheckUrl || appMeta.url;
     const before = await fetchStatusCode(checkUrl, 5000);
     steps.push({ step: 'public_health_before', status: before });
     if (!dryRun) {
@@ -940,6 +951,26 @@ app.get('/api/runbook/apps', requireAuth, async (req, res) => {
   res.json({ apps: getManagedApps() });
 });
 
+/** Stato systemd PHP-FPM (GENERATOR / dndpgbuilder). Richiede sudo come per il runbook. */
+app.get('/api/php-app/:name/system', requireAuth, async (req, res) => {
+  const { name } = req.params;
+  const allowed = new Set(getManagedApps().filter((a) => a.kind === 'php').map((a) => a.name));
+  if (!allowed.has(name)) {
+    return res.status(404).json({ ok: false, error: 'Servizio PHP sconosciuto' });
+  }
+  let raw = '';
+  let isActive = false;
+  try {
+    raw = execSync(`sudo /bin/systemctl is-active ${PHP_FPM_SERVICE}`, { encoding: 'utf8' }).trim();
+    isActive = raw === 'active';
+  } catch (e) {
+    const out = (e.stdout && e.stdout.toString()) || (e.stderr && e.stderr.toString()) || '';
+    raw = String(out).trim() || 'inactive';
+    isActive = raw === 'active';
+  }
+  res.json({ ok: true, fpmService: PHP_FPM_SERVICE, isActive, raw });
+});
+
 app.get('/api/runbook/history', requireAuth, async (req, res) => {
   const raw = await fs.readFile(RUNBOOK_HISTORY_PATH, 'utf8').catch(() => '');
   const reports = raw
@@ -1016,13 +1047,31 @@ app.get('/api/health', requireAuth, async (req, res) => {
   const results = [];
   for (const site of WEB_SITES) {
     if (!site.url) continue;
+    const checkUrl = getSiteHealthTarget(site);
     const start = Date.now();
     try {
-      const resp = await fetch(site.url, { method: 'GET', signal: AbortSignal.timeout(10000) });
+      const resp = await fetch(checkUrl, { method: 'GET', signal: AbortSignal.timeout(10000) });
       const elapsed = Date.now() - start;
-      results.push({ url: site.url, name: site.name, status: resp.status, elapsed, ok: resp.ok });
+      results.push({
+        url: site.url,
+        checkUrl,
+        name: site.name,
+        kind: site.kind || 'app',
+        status: resp.status,
+        elapsed,
+        ok: resp.ok,
+      });
     } catch (err) {
-      results.push({ url: site.url, name: site.name, status: 0, elapsed: Date.now() - start, ok: false, error: err.message });
+      results.push({
+        url: site.url,
+        checkUrl,
+        name: site.name,
+        kind: site.kind || 'app',
+        status: 0,
+        elapsed: Date.now() - start,
+        ok: false,
+        error: err.message,
+      });
     }
   }
   res.json({ results });
@@ -1035,12 +1084,26 @@ app.get('/api/health/summary', requireAuth, async (req, res) => {
         const out = [];
         for (const site of WEB_SITES) {
           if (!site.url) continue;
+          const checkUrl = getSiteHealthTarget(site);
           const start = Date.now();
           try {
-            const resp = await fetch(site.url, { method: 'GET', signal: AbortSignal.timeout(6000) });
-            out.push({ name: site.name, ok: resp.ok, status: resp.status, elapsed: Date.now() - start });
+            const resp = await fetch(checkUrl, { method: 'GET', signal: AbortSignal.timeout(6000) });
+            out.push({
+              name: site.name,
+              ok: resp.ok,
+              status: resp.status,
+              elapsed: Date.now() - start,
+              checkUrl,
+            });
           } catch (err) {
-            out.push({ name: site.name, ok: false, status: 0, elapsed: Date.now() - start, error: err.message });
+            out.push({
+              name: site.name,
+              ok: false,
+              status: 0,
+              elapsed: Date.now() - start,
+              error: err.message,
+              checkUrl,
+            });
           }
         }
         return out;
@@ -1922,7 +1985,8 @@ async function runDailyAppCheck(trigger = 'manual') {
           actions: [],
           status: 'ok',
         };
-        entry.publicStatusBefore = await fetchStatusCode(site.url, 10000);
+        const healthUrl = getSiteHealthTarget(site);
+        entry.publicStatusBefore = await fetchStatusCode(healthUrl, 10000);
         entry.localStatusBefore = entry.publicStatusBefore;
         const publicOkBefore = parseCheckResponseOk(entry.publicStatusBefore);
         if (!publicOkBefore) {
@@ -1940,7 +2004,7 @@ async function runDailyAppCheck(trigger = 'manual') {
           }
         }
         await new Promise((resolve) => setTimeout(resolve, 2000));
-        entry.publicStatusAfter = await fetchStatusCode(site.url, 10000);
+        entry.publicStatusAfter = await fetchStatusCode(healthUrl, 10000);
         entry.localStatusAfter = entry.publicStatusAfter;
         const publicOkAfter = parseCheckResponseOk(entry.publicStatusAfter);
         const healthyAfter = publicOkAfter;
