@@ -54,7 +54,7 @@
     root.innerHTML = (data.apps || []).map((a) => `
       <label class="px-2 py-1 rounded border border-cr-inputBorder bg-cr-surface2 text-sm" title="${(a.label || a.name).replace(/"/g, '&quot;')}">
         <input type="checkbox" value="${a.name}" class="mr-1" onchange="toggleBatchApp(this)" />
-        ${a.kind === 'php' ? a.name + ' <span class="text-cr-muted">(PHP)</span>' : a.name}
+        ${a.name}
       </label>
     `).join('');
   }

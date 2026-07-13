@@ -33,6 +33,7 @@ const {
   ECOSYSTEMS,
   WEB_SITES,
   DAILY_CHECK_SITES,
+  MANAGED_PM2_APPS,
   DAILY_CHECK_STATE_PATH,
   DAILY_CHECK_HISTORY_PATH,
   INCIDENTS_PATH,
@@ -771,7 +772,7 @@ app.get('/api/system/stats', requireAuth, async (req, res) => {
 
 // API: restart all webapps
 app.post('/api/process/restart-all', requireAuth, async (req, res) => {
-  const apps = ['padel-tour', 'roma-buche', 'gestione-veicoli'];
+  const apps = MANAGED_PM2_APPS.filter((name) => name !== 'control-room');
   if (!hasStrongConfirmation(req, 'restartAll')) {
     return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.restartAll}` });
   }
@@ -793,11 +794,15 @@ app.post('/api/process/restore-all', requireAuth, async (req, res) => {
   }
   try {
     const list = await pm2ListRaw();
+    const startedEcosystems = new Set();
     for (const { path: cfgPath, name } of ECOSYSTEMS) {
       const proc = list.find((p) => (p.pm2_env || p).name === name);
       const status = proc?.pm2_env?.status;
       if (!proc) {
-        await pm2StartEcosystem(cfgPath);
+        if (!startedEcosystems.has(cfgPath)) {
+          await pm2StartEcosystem(cfgPath);
+          startedEcosystems.add(cfgPath);
+        }
       } else if (status && status !== 'online') {
         await pm2Action('restart', name);
       }
