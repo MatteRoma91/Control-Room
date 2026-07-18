@@ -42,6 +42,41 @@ const {
 } = require('./lib/constants');
 const { getSiteHealthTarget } = require('./lib/siteHealth');
 const { normalizeIp, isIpAllowedByEntries } = require('./lib/ip-utils');
+const { registerHealthRoutes } = require('./routes/health');
+const { registerAuthRoutes } = require('./routes/auth');
+const { registerPageRoutes } = require('./routes/pages');
+const { registerProcessRoutes } = require('./routes/processes');
+const { registerSystemRoutes } = require('./routes/system');
+const { registerRunbookRoutes } = require('./routes/runbook');
+const { registerIncidentRoutes } = require('./routes/incidents');
+const { registerNginxRoutes } = require('./routes/nginx');
+const { registerSettingsRoutes } = require('./routes/settings');
+const {
+  loadSettings,
+  saveSettings,
+  normalizeDailyCheckConfig,
+} = require('./services/settings');
+const {
+  appendLine,
+  readIncidents,
+} = require('./services/incidents');
+const {
+  parseCheckResponseOk,
+  fetchStatusCode,
+  executeRunbook,
+} = require('./services/runbook');
+const { isPathAllowed } = require('./lib/path-utils');
+const {
+  formatUptime,
+  resolveManagedProjectCwd,
+  pm2List,
+  pm2Action,
+  pm2ListRaw,
+  pm2StartEcosystem,
+  pm2GetCwd,
+  pm2GetLogPaths,
+  pm2GetLogs,
+} = require('./services/pm2');
 
 /** Parser output `ss -tlnp`: socket TCP in ascolto */
 function parseSsTcpListen() {
@@ -102,107 +137,6 @@ const HIGH_RISK_PHRASES = Object.freeze({
   panicDisable: 'PANIC-DISABLE',
   disable2FA: 'DISABLE-2FA',
 });
-
-const MAX_PM2_NOTIFY_PER_APP_KEYS = 64;
-const MAX_PM2_PROCESS_NAME_LEN = 200;
-
-function sanitizePm2ProcessName(s) {
-  const t = String(s || '')
-    .trim()
-    .slice(0, MAX_PM2_PROCESS_NAME_LEN);
-  return t || null;
-}
-
-function sanitizeNotifyPm2OnlyApps(arr) {
-  if (!Array.isArray(arr)) return [];
-  const seen = new Set();
-  const out = [];
-  for (const x of arr) {
-    const n = sanitizePm2ProcessName(x);
-    if (n && !seen.has(n)) {
-      seen.add(n);
-      out.push(n);
-    }
-    if (out.length >= MAX_PM2_NOTIFY_PER_APP_KEYS) break;
-  }
-  return out;
-}
-
-function sanitizeNotifyPm2PerApp(obj) {
-  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
-  const out = {};
-  for (const k of Object.keys(obj)) {
-    if (Object.keys(out).length >= MAX_PM2_NOTIFY_PER_APP_KEYS) break;
-    const name = sanitizePm2ProcessName(k);
-    if (!name) continue;
-    const v = obj[k];
-    if (!v || typeof v !== 'object') continue;
-    const row = {};
-    if (v.crash === false) row.crash = false;
-    if (v.restartLoop === false) row.restartLoop = false;
-    if (v.exception === false) row.exception = false;
-    if (v.stderr === false) row.stderr = false;
-    if (Object.keys(row).length) out[name] = row;
-  }
-  return out;
-}
-
-function sanitizeSettings(raw) {
-  const source = raw && typeof raw === 'object' ? raw : {};
-  const dailyRaw = source.dailyCheck || {};
-  const panicExpiresAt = source.panicExpiresAt ? String(source.panicExpiresAt) : '';
-  const safe = {
-    schemaVersion: 1,
-    ipWhitelistEnabled: source.ipWhitelistEnabled === true,
-    ipWhitelist: Array.isArray(source.ipWhitelist) ? source.ipWhitelist.map((s) => String(s).trim()).filter(Boolean) : [],
-    ipWhitelistTemporary: Array.isArray(source.ipWhitelistTemporary)
-      ? source.ipWhitelistTemporary
-          .map((e) => ({ ip: String(e?.ip || '').trim(), expiresAt: String(e?.expiresAt || '') }))
-          .filter((e) => e.ip && e.expiresAt)
-      : [],
-    webhookType: ['discord', 'slack', 'telegram', 'teams', 'email', 'pagerduty'].includes(source.webhookType)
-      ? source.webhookType
-      : 'discord',
-    webhookUrl: String(source.webhookUrl || ''),
-    teamsWebhookUrl: String(source.teamsWebhookUrl || process.env.TEAMS_WEBHOOK_URL || ''),
-    smtpHost: String(source.smtpHost || process.env.CR_SMTP_HOST || ''),
-    smtpPort: parseInt(String(source.smtpPort || process.env.CR_SMTP_PORT || '587'), 10) || 587,
-    smtpUser: String(source.smtpUser || process.env.CR_SMTP_USER || ''),
-    smtpPass: String(source.smtpPass || process.env.CR_SMTP_PASS || ''),
-    smtpFrom: String(source.smtpFrom || process.env.CR_SMTP_FROM || ''),
-    smtpSecure: source.smtpSecure === true || process.env.CR_SMTP_SECURE === '1',
-    alertEmail: String(source.alertEmail || process.env.CR_ALERT_EMAIL || ''),
-    pagerdutyRoutingKey: String(source.pagerdutyRoutingKey || process.env.PAGERDUTY_ROUTING_KEY || ''),
-    discordWebhookOps: String(source.discordWebhookOps || process.env.DISCORD_WEBHOOK_OPS || ''),
-    discordWebhookIncidents: String(source.discordWebhookIncidents || process.env.DISCORD_WEBHOOK_INCIDENTS || ''),
-    discordWebhookSecurity: String(source.discordWebhookSecurity || process.env.DISCORD_WEBHOOK_SECURITY || ''),
-    telegramBotToken: String(source.telegramBotToken || ''),
-    telegramChatId: String(source.telegramChatId || ''),
-    notifyOnCrash: source.notifyOnCrash !== false,
-    notifyOnRestart: source.notifyOnRestart !== false,
-    notifyOnException: source.notifyOnException === true || (source.notifyOnException !== false && source.notifyOnCrash !== false),
-    notifyOnLogErr: source.notifyOnLogErr === true,
-    notifyOnRunbook: source.notifyOnRunbook === true,
-    notifyOnIncident: source.notifyOnIncident !== false,
-    notifyOnSecurity: source.notifyOnSecurity === true,
-    notifyPm2Scope: source.notifyPm2Scope === 'onlyListed' ? 'onlyListed' : 'all',
-    notifyPm2OnlyApps: sanitizeNotifyPm2OnlyApps(source.notifyPm2OnlyApps),
-    notifyPm2PerApp: sanitizeNotifyPm2PerApp(source.notifyPm2PerApp),
-    sshProfiles: Array.isArray(source.sshProfiles) ? source.sshProfiles : [],
-    totpSecret: String(source.totpSecret || ''),
-    totpEnabled: source.totpEnabled === true,
-    cronJobs: Array.isArray(source.cronJobs) ? source.cronJobs : [],
-    panicMode: source.panicMode === true,
-    panicModeIp: String(source.panicModeIp || ''),
-    panicExpiresAt,
-    dailyCheck: {
-      enabled: dailyRaw.enabled !== false,
-      time: typeof dailyRaw.time === 'string' && /^\d{2}:\d{2}$/.test(dailyRaw.time) ? dailyRaw.time : '00:00',
-    },
-    autoRemediations: Array.isArray(source.autoRemediations) ? source.autoRemediations : [],
-  };
-  return safe;
-}
 
 async function appendAuditEvent(event, payload = {}) {
   const line = JSON.stringify({ ts: new Date().toISOString(), event, ...payload });
@@ -410,690 +344,63 @@ async function ipWhitelistMiddleware(req, res, next) {
 app.use(ipWhitelistMiddleware);
 
 // ============ ROUTES ============
-
-// Login page (GET)
-app.get('/login', (req, res) => {
-  if (req.session?.user) return res.redirect('/');
-  res.render('login', {
-    error: req.query.error === '1',
-    rateLimited: req.query.rateLimited === '1',
-  });
+registerAuthRoutes(app, {
+  AUTH_USER,
+  AUTH_PASSWORD,
+  loginLimiter,
+  login2FALimiter,
+  loadSettings,
+  audit,
+  speakeasy,
 });
 
-// Login (POST) - con rate limiting
-app.post('/login', loginLimiter, async (req, res) => {
-  const { username, password } = req.body || {};
-  if (username === AUTH_USER && password === AUTH_PASSWORD) {
-    const settings = await loadSettings();
-    if (settings.totpEnabled && settings.totpSecret) {
-      req.session.pending2FA = username;
-      req.session.pending2FATime = Date.now();
-      return res.redirect('/login/2fa');
-    }
-    req.session.user = username;
-    await audit('login', { user: username });
-    return res.redirect('/');
-  }
-  await audit('login_fail', { reason: 'invalid_credentials' });
-  res.redirect('/login?error=1');
-});
-
-// Login 2FA (GET) - form codice a 6 cifre
-app.get('/login/2fa', (req, res) => {
-  if (req.session?.user) return res.redirect('/');
-  if (!req.session?.pending2FA) return res.redirect('/login');
-  res.render('login-2fa', {
-    error: req.query.error === '1',
-    rateLimited: req.query.rateLimited === '1',
-  });
-});
-
-// Login 2FA (POST) - verifica codice
-app.post('/login/2fa', login2FALimiter, async (req, res) => {
-  const username = req.session?.pending2FA;
-  if (!username) return res.redirect('/login');
-  const { code } = req.body || {};
-  const settings = await loadSettings();
-  if (!settings.totpSecret || !code || code.length !== 6) {
-    return res.redirect('/login/2fa?error=1');
-  }
-  const valid = speakeasy.totp.verify({
-    secret: settings.totpSecret,
-    encoding: 'base32',
-    token: code.trim(),
-    window: 1,
-  });
-  if (valid) {
-    req.session.user = username;
-    delete req.session.pending2FA;
-    delete req.session.pending2FATime;
-    await audit('login', { user: username, mfa: true });
-    return res.redirect('/');
-  }
-  await audit('login_fail', { reason: 'invalid_2fa' });
-  res.redirect('/login/2fa?error=1');
-});
-
-// Logout
-app.post('/logout', (req, res) => {
-  const user = req.session?.user;
-  req.session.destroy(() => {
-    if (user) audit('logout', { user });
-    res.redirect('/login');
-  });
-});
-
-// Dashboard principale
-app.get('/', requireAuth, async (req, res) => {
-  try {
-    const list = await pm2List();
-    res.render('layout', { contentPartial: 'dashboard', processes: list, dbConfigured: DB_CONFIGURED });
-  } catch (err) {
-    console.error('PM2 list error:', err);
-    res.render('layout', { contentPartial: 'dashboard', processes: [], error: err.message, dbConfigured: DB_CONFIGURED });
-  }
-});
-
-// Redirect index per retrocompatibilità
-app.get('/index', requireAuth, (req, res) => res.redirect('/'));
-
-// Vista dettaglio processo
-app.get('/process/:name', requireAuth, async (req, res) => {
-  const { name } = req.params;
-  try {
-    const list = await pm2List();
-    const proc = list.find((p) => p.name === name);
-    if (!proc) return res.status(404).render('layout', { contentPartial: 'dashboard', processes: list, error: 'Processo non trovato', dbConfigured: DB_CONFIGURED });
-    const headExtra = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />';
-    res.render('layout', { contentPartial: 'process-detail', process: proc, headExtra });
-  } catch (err) {
-    console.error('Process detail error:', err);
-    res.redirect('/');
-  }
-});
-
-app.get('/audit', requireAuth, async (req, res) => {
-  res.render('layout', { contentPartial: 'audit', title: 'Audit log' });
-});
-
-app.get('/incidents', requireAuth, async (req, res) => {
-  res.render('layout', { contentPartial: 'incidents', title: 'Incident Center' });
-});
-
-app.get('/automation', requireAuth, async (req, res) => {
-  res.render('layout', { contentPartial: 'automation', title: 'Automation' });
-});
-
-app.get('/analytics', requireAuth, async (req, res) => {
-  res.render('layout', { contentPartial: 'analytics', title: 'Analytics' });
-});
-
-app.get('/maintenance', requireAuth, async (req, res) => {
-  res.render('layout', { contentPartial: 'maintenance', title: 'Maintenance' });
+registerPageRoutes(app, {
+  requireAuth,
+  pm2List,
+  DB_CONFIGURED,
 });
 
 // ============ API ROUTES ============
-// Route specifiche prima della generica :action/:name (altrimenti "reset" viene interpretato come action)
-
-// API: flush logs
-app.post('/api/process/flush/:name', requireAuth, (req, res) => {
-  const { name } = req.params;
-  pm2.flush(name, (err) => {
-    if (err) {
-      logEvent('process_flush_error', { process: name, user: req.session?.user, error: err.message });
-      console.error('PM2 flush error:', err);
-      return res.status(500).json({ ok: false, error: err.message });
-    }
-    logEvent('process_flush', { process: name, user: req.session?.user });
-    res.json({ ok: true });
-  });
+registerProcessRoutes(app, {
+  requireAuth,
+  logEvent,
+  audit,
+  hasStrongConfirmation,
+  getExpectedPhrase,
+  HIGH_RISK_PHRASES,
+  MANAGED_PM2_APPS,
+  ECOSYSTEMS,
+  pm2List,
+  pm2Action,
+  pm2ListRaw,
+  pm2StartEcosystem,
+  pm2GetLogs,
+  resolveManagedProjectCwd,
 });
 
-// API: reset restart counter (usa daemon PM2 come flush, non CLI — PATH affidabile)
-app.post('/api/process/reset/:name', requireAuth, (req, res) => {
-  const { name } = req.params;
-  if (!/^[a-zA-Z0-9_.-]+$/.test(name)) {
-    return res.status(400).json({ ok: false, error: 'Nome processo non valido' });
-  }
-  pm2.reset(name, (err) => {
-    if (err) {
-      logEvent('process_reset_error', { process: name, user: req.session?.user, error: err.message });
-      console.error('PM2 reset error:', err);
-      return res.status(500).json({ ok: false, error: err.message || String(err) });
-    }
-    logEvent('process_reset', { process: name, user: req.session?.user });
-    res.json({ ok: true });
-  });
+registerSystemRoutes(app, {
+  requireAuth,
+  formatUptime,
 });
 
-// API: git pull & restart
-app.post('/api/process/git-pull/:name', requireAuth, async (req, res) => {
-  const { name } = req.params;
-  try {
-    const cwd = await pm2GetCwd(name);
-    if (!cwd) return res.status(400).json({ ok: false, error: 'Processo non trovato o cwd non disponibile' });
-    const output = execSync('git pull 2>&1', { encoding: 'utf8', cwd });
-    await pm2Action('restart', name);
-    logEvent('git_pull', { process: name, user: req.session?.user });
-    res.json({ ok: true, output });
-  } catch (err) {
-    logEvent('git_pull_error', { process: name, user: req.session?.user, error: err.message });
-    console.error('Git pull error:', err);
-    let output = '';
-    if (err.stdout) output += Buffer.isBuffer(err.stdout) ? err.stdout.toString() : err.stdout;
-    if (err.stderr) output += (Buffer.isBuffer(err.stderr) ? err.stderr.toString() : err.stderr) || '';
-    if (!output) output = err.message || String(err);
-    res.status(500).json({ ok: false, error: err.message, output });
-  }
+registerRunbookRoutes(app, {
+  requireAuth,
+  audit,
+  sendNotificationEvent,
 });
 
-// API: process action (restart, stop, start) - deve essere DOPO le route specifiche flush/reset/git-pull
-app.post('/api/process/:action/:name', requireAuth, async (req, res) => {
-  const { action, name } = req.params;
-  if (!['restart', 'stop', 'start'].includes(action)) {
-    return res.status(400).json({ ok: false, error: 'Invalid action' });
-  }
-  if ((action === 'stop' || action === 'restart') && !hasStrongConfirmation(req, `process-${action}`, name)) {
-    return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${getExpectedPhrase(req, `process-${action}`, name)}` });
-  }
-  try {
-    await pm2Action(action, name);
-    await audit('process_action', { action, process: name, user: req.session?.user });
-    res.json({ ok: true });
-  } catch (err) {
-    await audit('process_action_error', { action, process: name, user: req.session?.user, error: err.message });
-    console.error(`PM2 ${action} error:`, err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
+// API: health check (extracted → routes/health.js)
+registerHealthRoutes(app, {
+  requireAuth,
+  WEB_SITES,
+  getSiteHealthTarget,
+  pm2List,
 });
 
-// API: get last 50 lines of logs
-app.get('/api/logs/:name', requireAuth, async (req, res) => {
-  try {
-    const logs = await pm2GetLogs(req.params.name);
-    res.json(logs);
-  } catch (err) {
-    console.error('PM2 logs error:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// API: lista processi PM2 (per polling live)
-app.get('/api/processes', requireAuth, async (req, res) => {
-  try {
-    const list = await pm2List();
-    res.json({ processes: list });
-  } catch (err) {
-    console.error('PM2 processes error:', err);
-    res.status(500).json({ ok: false, error: err.message, processes: [] });
-  }
-});
-
-/** Estrae un'etichetta descrittiva da nome processo + parametri (per evitare "node" generico) */
-function getProcessDetail(name, params) {
-  const p = (params || '').trim();
-  const n = (name || '').toLowerCase();
-  if (!p && n !== 'node') return null;
-
-  // next-server → Next.js (Roma-Buche)
-  if (n === 'next-server') return 'Next.js (Roma-Buche)';
-
-  // PM2, nginx, tsserver hanno già nomi chiari
-  if (n === 'pm2') return 'Process Manager';
-  if (n === 'nginx') return p.includes('worker') ? 'Worker' : 'Master';
-  if (n.includes('tsserver')) return 'TypeScript Language Server';
-
-  // node: estrai dettagli dai params
-  if (n === 'node') {
-    if (p.includes('control-room')) return 'Control Room';
-    if (p.includes('Sito-Padel')) return 'Sito Padel';
-    if (p.includes('Roma-Buche')) return 'Roma-Buche';
-    if (p.includes('Gestione-Veicoli')) return 'Gestione Veicoli';
-    if (p.includes('pm2-logrotate')) return 'PM2 Log Rotate';
-    if (p.includes('extensionHost') || p.includes('--type=extensionHost')) return 'Cursor Extension Host';
-    if (p.includes('fileWatcher') || p.includes('--type=fileWatcher')) return 'Cursor File Watcher';
-    if (p.includes('server-main')) return 'Cursor Server';
-    if (p.includes('ptyHost') || p.includes('--type=ptyHost')) return 'Cursor Terminal';
-    if (p.includes('jsonServerMain')) return 'Cursor JSON Server';
-    if (p.includes('markdown-language-features')) return 'Cursor Markdown Server';
-    if (p.includes('typingsInstaller')) return 'TypeScript Typings';
-    if (p.includes('multiplex-server')) return 'Cursor Multiplex';
-    // path script: /home/ubuntu/xxx/server.js → xxx
-    const scriptMatch = p.match(/\/home\/[^/]+\/([^/]+)\/(?:server\.js|\.cursor-server)/);
-    if (scriptMatch) return scriptMatch[1];
-  }
-  return null;
-}
-
-// API: processi di sistema (top 25 per CPU, per monitoraggio generale)
-app.get('/api/system/processes', requireAuth, async (req, res) => {
-  try {
-    const data = await si.processes();
-    const list = (data.list || [])
-      .filter((p) => p.pid && (p.cpu > 0 || (p.memRss || 0) > 0))
-      .sort((a, b) => (b.memRss || 0) - (a.memRss || 0))
-      .slice(0, 25)
-      .map((p) => {
-        const detail = getProcessDetail(p.name, p.params);
-        return {
-          pid: p.pid,
-          name: p.name || '(unknown)',
-          detail: detail || p.params?.slice(0, 80) || null,
-          cpu: (p.cpu || 0).toFixed(1),
-          memRss: Math.round((p.memRss || 0) / 1024),
-          user: p.user || '-',
-        };
-      });
-    res.json({ processes: list });
-  } catch (err) {
-    console.error('System processes error:', err);
-    res.status(500).json({ ok: false, error: err.message, processes: [] });
-  }
-});
-
-// API: system info (completo, per overview)
-app.get('/api/system', requireAuth, async (req, res) => {
-  try {
-    const [load, mem, disk] = await Promise.all([
-      si.currentLoad(),
-      si.mem(),
-      si.fsSize('/').catch(() => ({ used: 0, size: 0 })),
-    ]);
-    const diskInfo = Array.isArray(disk) ? disk[0] : disk;
-    const uptimeSec = os.uptime();
-    // Usa MemAvailable: memoria realmente usata (esclude cache disco recuperabile)
-    const memUsedBytes = mem.available != null ? mem.total - mem.available : mem.total - mem.free;
-    res.json({
-      uptime: formatUptime(uptimeSec * 1000),
-      uptimeSec,
-      loadAvg1: load.currentLoad != null ? load.currentLoad.toFixed(2) : '-',
-      memoryUsedMB: Math.round(memUsedBytes / 1024 / 1024),
-      memoryTotalMB: Math.round(mem.total / 1024 / 1024),
-      memoryPercent: mem.total ? Math.round(100 * memUsedBytes / mem.total) : 0,
-      diskUsedGB: diskInfo?.used ? (diskInfo.used / 1024 / 1024 / 1024).toFixed(2) : '0',
-      diskTotalGB: diskInfo?.size ? (diskInfo.size / 1024 / 1024 / 1024).toFixed(2) : '0',
-      diskPercent: diskInfo?.use || 0,
-      cpuPercent: load.currentLoad ?? 0,
-      memUsedMB: Math.round(memUsedBytes / 1024 / 1024),
-    });
-  } catch (err) {
-    console.error('System info error:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// Buffer stats CPU/RAM dall'ultimo avvio (per grafici persistenti)
-const statsHistory = [];
-const STATS_HISTORY_MAX = 100;
-const STATS_INTERVAL_MS = 3000;
-
-async function collectStatsPoint() {
-  try {
-    const [load, mem] = await Promise.all([si.currentLoad(), si.mem()]);
-    const memUsedBytes = mem.available != null ? mem.total - mem.available : mem.total - mem.free;
-    const ramPercent = mem.total ? 100 * memUsedBytes / mem.total : 0;
-    const now = new Date();
-    statsHistory.push({
-      label: now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      cpu: load.currentLoad ?? 0,
-      ram: ramPercent,
-    });
-    if (statsHistory.length > STATS_HISTORY_MAX) statsHistory.shift();
-  } catch (_) {}
-}
-setInterval(collectStatsPoint, STATS_INTERVAL_MS);
-collectStatsPoint();
-
-// API: system stats per Chart.js (CPU %, RAM %) + history dall'avvio
-app.get('/api/system/stats', requireAuth, async (req, res) => {
-  try {
-    const [load, mem] = await Promise.all([si.currentLoad(), si.mem()]);
-    const memUsedBytes = mem.available != null ? mem.total - mem.available : mem.total - mem.free;
-    const usedMemMB = Math.round(memUsedBytes / 1024 / 1024);
-    const memoryPercent = mem.total ? 100 * memUsedBytes / mem.total : 0;
-    const history = {
-      labels: statsHistory.map((p) => p.label),
-      cpu: statsHistory.map((p) => p.cpu),
-      ram: statsHistory.map((p) => p.ram),
-    };
-    res.json({
-      cpuPercent: load.currentLoad ?? 0,
-      memoryPercent,
-      memoryUsedMB: usedMemMB,
-      memoryTotalMB: Math.round(mem.total / 1024 / 1024),
-      timestamp: new Date().toISOString(),
-      history,
-    });
-  } catch (err) {
-    console.error('System stats error:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// API: restart all webapps
-app.post('/api/process/restart-all', requireAuth, async (req, res) => {
-  const apps = MANAGED_PM2_APPS.filter((name) => name !== 'control-room');
-  if (!hasStrongConfirmation(req, 'restartAll')) {
-    return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.restartAll}` });
-  }
-  try {
-    await Promise.all(apps.map((name) => pm2Action('restart', name)));
-    await audit('restart_all', { processes: apps, user: req.session?.user });
-    res.json({ ok: true });
-  } catch (err) {
-    await audit('restart_all_error', { user: req.session?.user, error: err.message });
-    console.error('Restart-all error:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// API: restore all processes
-app.post('/api/process/restore-all', requireAuth, async (req, res) => {
-  if (!hasStrongConfirmation(req, 'restoreAll')) {
-    return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.restoreAll}` });
-  }
-  try {
-    const list = await pm2ListRaw();
-    const startedEcosystems = new Set();
-    for (const { path: cfgPath, name } of ECOSYSTEMS) {
-      const proc = list.find((p) => (p.pm2_env || p).name === name);
-      const status = proc?.pm2_env?.status;
-      if (!proc) {
-        if (!startedEcosystems.has(cfgPath)) {
-          await pm2StartEcosystem(cfgPath);
-          startedEcosystems.add(cfgPath);
-        }
-      } else if (status && status !== 'online') {
-        await pm2Action('restart', name);
-      }
-    }
-    await audit('restore_all', { user: req.session?.user });
-    res.json({ ok: true });
-  } catch (err) {
-    await audit('restore_all_error', { user: req.session?.user, error: err.message });
-    console.error('Restore-all error:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-function getManagedApps() {
-  return WEB_SITES.filter((s) => s.kind === 'app' && s.pm2).map((s) => ({
-    name: s.pm2,
-    label: s.name,
-    port: s.port,
-    url: s.url,
-    kind: 'node',
-  }));
-}
-
-async function executeRunbook({ processName, mode = 'full_recover', dryRun = false, operator = 'system' }) {
-  const appMeta = getManagedApps().find((a) => a.name === processName);
-  if (!appMeta) throw new Error('Processo non supportato');
-  const startedAt = Date.now();
-  const steps = [];
-
-  const localUrl = `http://127.0.0.1:${appMeta.port}/`;
-  const before = await fetchStatusCode(localUrl, 5000);
-  steps.push({ step: 'local_health_before', status: before });
-  if (!dryRun) {
-    await pm2Action('restart', processName);
-    steps.push({ step: 'pm2_restart', ok: true });
-  } else {
-    steps.push({ step: 'pm2_restart', ok: true, dryRun: true });
-  }
-  if (mode === 'full_recover' || mode === 'safe_rollback') {
-    try {
-      if (!dryRun) {
-        execSync('sudo /bin/systemctl reload nginx 2>/dev/null', { encoding: 'utf8' });
-      }
-      steps.push({ step: 'nginx_reload', ok: true, dryRun });
-    } catch (err) {
-      steps.push({ step: 'nginx_reload', ok: false, error: err.message });
-    }
-  }
-  await new Promise((r) => setTimeout(r, 1500));
-  const after = await fetchStatusCode(localUrl, 5000);
-  steps.push({ step: 'local_health_after', status: after });
-  let ok = parseCheckResponseOk(after);
-  if (!ok && mode === 'safe_rollback' && !dryRun) {
-    await pm2Action('restart', processName);
-    steps.push({ step: 'rollback_restart', ok: true });
-    const rollbackCheck = await fetchStatusCode(localUrl, 5000);
-    steps.push({ step: 'rollback_health', status: rollbackCheck });
-    ok = parseCheckResponseOk(rollbackCheck);
-  }
-  const report = {
-    id: `rb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    process: processName,
-    mode,
-    dryRun,
-    ok,
-    durationMs: Date.now() - startedAt,
-    operator,
-    startedAt: new Date(startedAt).toISOString(),
-    finishedAt: new Date().toISOString(),
-    steps,
-  };
-  await appendLine(RUNBOOK_HISTORY_PATH, report);
-  return report;
-}
-
-app.get('/api/runbook/apps', requireAuth, async (req, res) => {
-  res.json({ apps: getManagedApps() });
-});
-
-app.get('/api/runbook/history', requireAuth, async (req, res) => {
-  const raw = await fs.readFile(RUNBOOK_HISTORY_PATH, 'utf8').catch(() => '');
-  const reports = raw
-    .split('\n')
-    .filter(Boolean)
-    .slice(-200)
-    .map((line) => {
-      try { return JSON.parse(line); } catch { return null; }
-    })
-    .filter(Boolean)
-    .reverse();
-  res.json({ reports });
-});
-
-app.post('/api/runbook/recover-app/:name', requireAuth, async (req, res) => {
-  const { name } = req.params;
-  const mode = ['soft_recover', 'full_recover', 'safe_rollback'].includes(req.body?.mode) ? req.body.mode : 'full_recover';
-  const dryRun = req.body?.dryRun === true;
-  try {
-    const report = await executeRunbook({
-      processName: name,
-      mode,
-      dryRun,
-      operator: req.session?.user || 'unknown',
-    });
-    await audit('runbook_recover_app', { user: req.session?.user, process: name, ok: report.ok, mode, dryRun, steps: report.steps });
-    await sendNotificationEvent('runbook_recover_app', {
-      channel: 'ops',
-      severity: report.ok ? 'low' : 'high',
-      process: name,
-      note: `mode=${mode} dryRun=${dryRun} ok=${report.ok}`,
-      actionHint: report.ok ? 'Nessuna azione richiesta' : 'Verifica logs e incident center',
-    });
-    res.json({ ok: report.ok, report });
-  } catch (err) {
-    await audit('runbook_recover_app_error', { user: req.session?.user, process: name, error: err.message });
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-app.post('/api/runbook/recover-batch', requireAuth, async (req, res) => {
-  const apps = Array.isArray(req.body?.apps) ? req.body.apps : [];
-  const mode = ['soft_recover', 'full_recover', 'safe_rollback'].includes(req.body?.mode) ? req.body.mode : 'full_recover';
-  const stopOnFail = req.body?.stopOnFail !== false;
-  const dryRun = req.body?.dryRun === true;
-  const results = [];
-  for (const appName of apps) {
-    try {
-      const report = await executeRunbook({
-        processName: appName,
-        mode,
-        dryRun,
-        operator: req.session?.user || 'unknown',
-      });
-      results.push(report);
-      if (!report.ok && stopOnFail) break;
-    } catch (err) {
-      results.push({ process: appName, ok: false, error: err.message });
-      if (stopOnFail) break;
-    }
-  }
-  const ok = results.length > 0 && results.every((r) => r.ok);
-  await audit('runbook_recover_batch', { user: req.session?.user, ok, mode, dryRun, count: results.length });
-  await sendNotificationEvent('runbook_recover_batch', {
-    channel: 'ops',
-    severity: ok ? 'low' : 'high',
-    note: `apps=${results.length} mode=${mode} ok=${ok}`,
-  });
-  res.json({ ok, results });
-});
-
-// API: health check
-app.get('/api/health', requireAuth, async (req, res) => {
-  const results = [];
-  for (const site of WEB_SITES) {
-    if (!site.url) continue;
-    const checkUrl = getSiteHealthTarget(site);
-    const start = Date.now();
-    try {
-      const resp = await fetch(checkUrl, { method: 'GET', signal: AbortSignal.timeout(10000) });
-      const elapsed = Date.now() - start;
-      results.push({
-        url: site.url,
-        checkUrl,
-        name: site.name,
-        kind: site.kind || 'app',
-        status: resp.status,
-        elapsed,
-        ok: resp.ok,
-      });
-    } catch (err) {
-      results.push({
-        url: site.url,
-        checkUrl,
-        name: site.name,
-        kind: site.kind || 'app',
-        status: 0,
-        elapsed: Date.now() - start,
-        ok: false,
-        error: err.message,
-      });
-    }
-  }
-  res.json({ results });
-});
-
-app.get('/api/health/summary', requireAuth, async (req, res) => {
-  try {
-    const [healthRes, processList] = await Promise.all([
-      (async () => {
-        const out = [];
-        for (const site of WEB_SITES) {
-          if (!site.url) continue;
-          const checkUrl = getSiteHealthTarget(site);
-          const start = Date.now();
-          try {
-            const resp = await fetch(checkUrl, { method: 'GET', signal: AbortSignal.timeout(6000) });
-            out.push({
-              name: site.name,
-              ok: resp.ok,
-              status: resp.status,
-              elapsed: Date.now() - start,
-              checkUrl,
-            });
-          } catch (err) {
-            out.push({
-              name: site.name,
-              ok: false,
-              status: 0,
-              elapsed: Date.now() - start,
-              error: err.message,
-              checkUrl,
-            });
-          }
-        }
-        return out;
-      })(),
-      pm2List(),
-    ]);
-
-    const offline = processList.filter((p) => p.status !== 'online');
-    const failing = healthRes.filter((h) => !h.ok);
-    const severity = offline.length > 0 || failing.length > 0 ? 'critical' : 'ok';
-    const incidents = [];
-    for (const p of offline) incidents.push(`Processo ${p.name} in stato ${p.status}`);
-    for (const h of failing) incidents.push(`Health check fallito: ${h.name} (${h.status || 'no-response'})`);
-
-    res.json({
-      severity,
-      incidents,
-      processSummary: { total: processList.length, offline: offline.length },
-      healthSummary: { total: healthRes.length, failing: failing.length },
-      generatedAt: new Date().toISOString(),
-    });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-app.get('/api/incidents', requireAuth, async (req, res) => {
-  const items = await readIncidents();
-  res.json({ incidents: items.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')) });
-});
-
-app.post('/api/incidents', requireAuth, async (req, res) => {
-  const title = String(req.body?.title || '').trim();
-  const severity = ['low', 'medium', 'high', 'critical'].includes(req.body?.severity) ? req.body.severity : 'medium';
-  if (!title) return res.status(400).json({ ok: false, error: 'Titolo richiesto' });
-  const items = await readIncidents();
-  const now = new Date().toISOString();
-  const incident = {
-    id: createIncidentId(),
-    title,
-    severity,
-    status: 'open',
-    source: req.body?.source || 'manual',
-    owner: req.session?.user || 'admin',
-    timeline: [{ ts: now, action: 'created', by: req.session?.user || 'admin', note: String(req.body?.note || '') }],
-    createdAt: now,
-    updatedAt: now,
-  };
-  items.push(incident);
-  await writeIncidents(items);
-  await audit('incident_created', { user: req.session?.user, incidentId: incident.id, severity });
-  await sendNotificationEvent('incident_created', {
-    channel: 'incidents',
-    severity,
-    note: title,
-    actionHint: 'Apri Incident Center e valuta runbook',
-  });
-  res.json({ ok: true, incident });
-});
-
-app.post('/api/incidents/:id/status', requireAuth, async (req, res) => {
-  const status = ['open', 'ack', 'resolved'].includes(req.body?.status) ? req.body.status : null;
-  if (!status) return res.status(400).json({ ok: false, error: 'Status non valido' });
-  const items = await readIncidents();
-  const idx = items.findIndex((x) => x.id === req.params.id);
-  if (idx < 0) return res.status(404).json({ ok: false, error: 'Incidente non trovato' });
-  const now = new Date().toISOString();
-  items[idx].status = status;
-  items[idx].updatedAt = now;
-  items[idx].timeline = Array.isArray(items[idx].timeline) ? items[idx].timeline : [];
-  items[idx].timeline.push({ ts: now, action: status, by: req.session?.user || 'admin', note: String(req.body?.note || '') });
-  await writeIncidents(items);
-  await audit('incident_status_change', { user: req.session?.user, incidentId: req.params.id, status });
-  await sendNotificationEvent('incident_status_change', {
-    channel: 'incidents',
-    severity: items[idx].severity || 'medium',
-    note: `${items[idx].title} -> ${status}`,
-  });
-  res.json({ ok: true, incident: items[idx] });
+registerIncidentRoutes(app, {
+  requireAuth,
+  audit,
+  sendNotificationEvent,
 });
 
 app.get('/api/redis-health', requireAuth, async (req, res) => {
@@ -1389,173 +696,11 @@ app.get('/api/site-ports', requireAuth, (req, res) => {
   res.json({ sites, ssOk: ss.ok, ssError: ss.error || null });
 });
 
-// API: nginx status
-app.get('/api/nginx-status', requireAuth, (req, res) => {
-  try {
-    const out = execSync('systemctl is-active nginx 2>/dev/null', { encoding: 'utf8' }).trim();
-    res.json({ active: out === 'active' });
-  } catch {
-    res.json({ active: false });
-  }
-});
-
-// API: nginx reload
-app.post('/api/nginx-reload', requireAuth, (req, res) => {
-  if (!hasStrongConfirmation(req, 'nginxReload')) {
-    return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.nginxReload}` });
-  }
-  try {
-    execSync('sudo /bin/systemctl reload nginx 2>/dev/null', { encoding: 'utf8' });
-    audit('nginx_reload', { user: req.session?.user });
-    res.json({ ok: true });
-  } catch (err) {
-    audit('nginx_reload_error', { user: req.session?.user, error: err.message });
-    console.error('Nginx reload error:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// Nginx Config Generator page
-app.get('/nginx', requireAuth, (req, res) => {
-  res.render('layout', { contentPartial: 'nginx' });
-});
-
-// API: nginx config generator
-app.post('/api/nginx-generate', requireAuth, async (req, res) => {
-  let output = [];
-  try {
-    const { domain, port, ssl } = req.body || {};
-    if (!domain || typeof domain !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$/.test(domain.trim())) {
-      return res.status(400).json({ ok: false, error: 'Dominio non valido' });
-    }
-    const safeDomain = domain.trim().replace(/\./g, '_');
-    const portNum = parseInt(port || 3000, 10);
-    if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
-      return res.status(400).json({ ok: false, error: 'Porta non valida' });
-    }
-
-    const httpBlock = `# Generato da Control Room - ${domain}
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${domain};
-    location / {
-        proxy_pass http://127.0.0.1:${portNum};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-`;
-    const tmpPath = `/tmp/controlroom-nginx-${safeDomain}.conf`;
-    const destPath = `/etc/nginx/sites-available/${domain}.conf`;
-    const backupPath = `/tmp/controlroom-nginx-backup-${safeDomain}-${Date.now()}.conf`;
-
-    await fs.writeFile(tmpPath, httpBlock, 'utf8');
-    output.push('File generato: ' + tmpPath);
-
-    try {
-      execFileSync('sudo', ['cp', destPath, backupPath], { encoding: 'utf8' });
-      output.push('Backup config esistente: ' + backupPath);
-    } catch (_) {}
-    execFileSync('sudo', ['cp', tmpPath, destPath], { encoding: 'utf8' });
-    output.push('Copiato in: ' + destPath);
-
-    execFileSync('sudo', ['ln', '-sf', destPath, `/etc/nginx/sites-enabled/${domain}.conf`], { encoding: 'utf8' });
-    output.push('Symlink creato in sites-enabled');
-
-    if (ssl) {
-      try {
-        const certbotEmail = process.env.CR_CONTACT_EMAIL || `admin@${domain}`;
-        execFileSync(
-          'sudo',
-          ['certbot', 'certonly', '--nginx', '-d', domain, '--non-interactive', '--agree-tos', '--email', certbotEmail],
-          { encoding: 'utf8' }
-        );
-        output.push('Certificato SSL ottenuto con Certbot');
-        const httpsBlock = `
-# HTTPS - abilitato da Certbot
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name ${domain};
-    ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-
-    location / {
-        proxy_pass http://127.0.0.1:${portNum};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-`;
-        await fs.writeFile(tmpPath, httpBlock + httpsBlock, 'utf8');
-        execFileSync('sudo', ['cp', tmpPath, destPath], { encoding: 'utf8' });
-      } catch (certErr) {
-        output.push('Certbot fallito (certificati potrebbero esistere già): ' + (certErr.message || certErr));
-      }
-    }
-
-    execFileSync('sudo', ['nginx', '-t'], { encoding: 'utf8' });
-    output.push('nginx -t OK');
-
-    execFileSync('sudo', ['/bin/systemctl', 'reload', 'nginx'], { encoding: 'utf8' });
-    output.push('Nginx ricaricato');
-
-    await audit('nginx_generate', { user: req.session?.user, domain, port: portNum, ssl: !!ssl });
-    res.json({ ok: true, output: output.join('\n'), rollbackHint: backupPath });
-  } catch (err) {
-    console.error('Nginx generate error:', err);
-    res.status(500).json({ ok: false, error: err.message, output: output.join('\n') });
-  }
-});
-
-app.post('/api/nginx-preview', requireAuth, async (req, res) => {
-  try {
-    const { domain, port } = req.body || {};
-    if (!domain || typeof domain !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$/.test(domain.trim())) {
-      return res.status(400).json({ ok: false, error: 'Dominio non valido' });
-    }
-    const portNum = parseInt(port || 3000, 10);
-    if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
-      return res.status(400).json({ ok: false, error: 'Porta non valida' });
-    }
-    const config = `server {\n    listen 80;\n    listen [::]:80;\n    server_name ${domain.trim()};\n    location / {\n        proxy_pass http://127.0.0.1:${portNum};\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection "upgrade";\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n}\n`;
-    res.json({ ok: true, config });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-app.post('/api/nginx-rollback', requireAuth, async (req, res) => {
-  try {
-    const backupPath = String(req.body?.backupPath || '').trim();
-    const domain = String(req.body?.domain || '').trim();
-    if (!backupPath.startsWith('/tmp/controlroom-nginx-backup-')) {
-      return res.status(400).json({ ok: false, error: 'Backup non valido' });
-    }
-    if (!domain || !/^[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$/.test(domain)) {
-      return res.status(400).json({ ok: false, error: 'Dominio non valido' });
-    }
-    const destPath = `/etc/nginx/sites-available/${domain}.conf`;
-    execFileSync('sudo', ['cp', backupPath, destPath], { encoding: 'utf8' });
-    execFileSync('sudo', ['nginx', '-t'], { encoding: 'utf8' });
-    execFileSync('sudo', ['/bin/systemctl', 'reload', 'nginx'], { encoding: 'utf8' });
-    await audit('nginx_rollback', { user: req.session?.user, domain, backupPath });
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
+registerNginxRoutes(app, {
+  requireAuth,
+  audit,
+  hasStrongConfirmation,
+  HIGH_RISK_PHRASES,
 });
 
 // API: db backup (mysqldump | gzip, stream download)
@@ -1601,73 +746,7 @@ app.get('/api/db-configured', requireAuth, (req, res) => {
   res.json({ configured: DB_CONFIGURED });
 });
 
-// ============ SETTINGS (settings.json) ============
-
-const SETTINGS_PATH = path.join(__dirname, 'settings.json');
-
-async function loadSettings() {
-  try {
-    const data = await fs.readFile(SETTINGS_PATH, 'utf8');
-    const s = sanitizeSettings(JSON.parse(data));
-    if (s.sshHost && (!s.sshProfiles || s.sshProfiles.length === 0)) {
-      s.sshProfiles = [{
-        id: 'migrated',
-        name: 'Server',
-        host: s.sshHost,
-        port: parseInt(s.sshPort || '22', 10),
-        username: s.sshUser || '',
-        authType: s.sshAuth || 'key',
-        keyPath: s.sshKeyPath || '',
-      }];
-    }
-    return s;
-  } catch {
-    return sanitizeSettings({});
-  }
-}
-
-async function saveSettings(obj) {
-  const validated = sanitizeSettings(obj);
-  await fs.writeFile(SETTINGS_PATH, JSON.stringify(validated, null, 2), 'utf8');
-  try {
-    await fs.chmod(SETTINGS_PATH, 0o600);
-  } catch (_) {}
-}
-
-async function readJsonFileSafe(filePath, fallbackValue) {
-  try {
-    const data = await fs.readFile(filePath, 'utf8');
-    return JSON.parse(data);
-  } catch (_) {
-    return fallbackValue;
-  }
-}
-
-async function appendLine(filePath, obj) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.appendFile(filePath, JSON.stringify(obj) + '\n', 'utf8');
-}
-
-async function readIncidents() {
-  return readJsonFileSafe(INCIDENTS_PATH, []);
-}
-
-async function writeIncidents(items) {
-  await fs.mkdir(path.dirname(INCIDENTS_PATH), { recursive: true });
-  await fs.writeFile(INCIDENTS_PATH, JSON.stringify(items, null, 2), 'utf8');
-}
-
-function createIncidentId() {
-  return `inc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function normalizeDailyCheckConfig(settings) {
-  const raw = settings?.dailyCheck || {};
-  const enabled = raw.enabled !== false;
-  const time = typeof raw.time === 'string' && /^\d{2}:\d{2}$/.test(raw.time) ? raw.time : '00:00';
-  return { enabled, time };
-}
-
+// Daily check state (cron) — settings load/save live in services/settings.js
 async function readDailyCheckState() {
   try {
     const data = await fs.readFile(DAILY_CHECK_STATE_PATH, 'utf8');
@@ -1682,164 +761,20 @@ async function writeDailyCheckState(state) {
   await fs.writeFile(DAILY_CHECK_STATE_PATH, JSON.stringify(state, null, 2), 'utf8');
 }
 
-// Pagina Settings
-app.get('/settings', requireAuth, async (req, res) => {
-  const settings = await loadSettings();
-  let pm2Processes = [];
-  try {
-    pm2Processes = await pm2List();
-  } catch (e) {
-    logEvent('settings_pm2_list_error', { error: e.message });
-  }
-  res.render('layout', { contentPartial: 'settings', settings, pm2Processes });
-});
-
-// API: GET settings
-app.get('/api/settings', requireAuth, async (req, res) => {
-  const settings = await loadSettings();
-  res.json(settings);
-});
-
-// API: POST settings (salva)
-app.post('/api/settings', requireAuth, async (req, res) => {
-  try {
-    const body = sanitizeSettings({ ...(req.body || {}) });
-    const current = await loadSettings();
-    body.totpSecret = current.totpSecret;
-    body.totpEnabled = current.totpEnabled;
-    body.panicMode = current.panicMode;
-    body.panicModeIp = current.panicModeIp;
-    body.panicExpiresAt = current.panicExpiresAt;
-    body.dailyCheck = current.dailyCheck;
-    if (!Array.isArray(body.sshProfiles)) body.sshProfiles = current.sshProfiles || [];
-    if (!Array.isArray(body.cronJobs)) body.cronJobs = current.cronJobs || [];
-    if (!Array.isArray(body.ipWhitelist)) body.ipWhitelist = current.ipWhitelist || [];
-    if (!Array.isArray(body.autoRemediations)) body.autoRemediations = current.autoRemediations || [];
-    await saveSettings(body);
-    registerAutoRemediationsFromSettings(body);
-    await audit('settings_saved', { user: req.session?.user });
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('Settings save error:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// API: Attiva Panic Mode (solo IP corrente)
-app.post('/api/settings/panic-activate', requireAuth, async (req, res) => {
-  try {
-    if (!hasStrongConfirmation(req, 'panicActivate')) {
-      return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.panicActivate}` });
-    }
-    const clientIp = normalizeIp(req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || '');
-    const durationMin = Math.max(5, Math.min(240, parseInt(req.body?.durationMin || String(DEFAULT_PANIC_DURATION_MIN), 10)));
-    const expiresAt = new Date(Date.now() + durationMin * 60 * 1000).toISOString();
-    const current = await loadSettings();
-    current.panicMode = true;
-    current.panicModeIp = clientIp;
-    current.panicExpiresAt = expiresAt;
-    await saveSettings(current);
-    await audit('panic_activate', { user: req.session?.user, ip: clientIp, expiresAt });
-    res.json({ ok: true, panicModeIp: clientIp, expiresAt });
-  } catch (err) {
-    console.error('Panic activate error:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// API: Disattiva Panic Mode
-app.post('/api/settings/panic-disable', requireAuth, async (req, res) => {
-  try {
-    if (!hasStrongConfirmation(req, 'panicDisable')) {
-      return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.panicDisable}` });
-    }
-    const current = await loadSettings();
-    current.panicMode = false;
-    current.panicModeIp = '';
-    current.panicExpiresAt = '';
-    await saveSettings(current);
-    await audit('panic_disable', { user: req.session?.user });
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('Panic disable error:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// ============ 2FA (Google Authenticator) ============
-
-// Pagina setup 2FA
-app.get('/settings/2fa-setup', requireAuth, async (req, res) => {
-  const settings = await loadSettings();
-  res.render('layout', { contentPartial: 'settings-2fa-setup', settings });
-});
-
-// API: genera secret per setup 2FA
-app.post('/api/2fa/setup', requireAuth, async (req, res) => {
-  try {
-    const secret = speakeasy.generateSecret({
-      name: `Control Room (${AUTH_USER})`,
-      length: 20,
-      issuer: 'Control Room',
-    });
-    const qrDataUrl = await QRCode.toDataURL(secret.otpauth_url);
-    req.session.temp2FASecret = secret.base32;
-    res.json({ secret: secret.base32, otpauth_url: secret.otpauth_url, qrDataUrl });
-  } catch (err) {
-    console.error('2FA setup error:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// API: verifica codice e attiva 2FA
-app.post('/api/2fa/verify-setup', requireAuth, async (req, res) => {
-  try {
-    const tempSecret = req.session?.temp2FASecret;
-    const { code } = req.body || {};
-    if (!tempSecret || !code || code.length !== 6) {
-      return res.status(400).json({ ok: false, error: 'Codice non valido' });
-    }
-    const valid = speakeasy.totp.verify({
-      secret: tempSecret,
-      encoding: 'base32',
-      token: code.trim(),
-      window: 1,
-    });
-    if (!valid) {
-      return res.status(400).json({ ok: false, error: 'Codice non corretto' });
-    }
-    const current = await loadSettings();
-    current.totpSecret = tempSecret;
-    current.totpEnabled = true;
-    await saveSettings(current);
-    delete req.session.temp2FASecret;
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('2FA verify-setup error:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// API: disattiva 2FA
-app.post('/api/2fa/disable', requireAuth, async (req, res) => {
-  try {
-    const { password, confirmPhrase } = req.body || {};
-    if (String(confirmPhrase || '').trim() !== HIGH_RISK_PHRASES.disable2FA) {
-      return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.disable2FA}` });
-    }
-    if (password !== AUTH_PASSWORD) {
-      return res.status(401).json({ ok: false, error: 'Password non valida' });
-    }
-    const current = await loadSettings();
-    current.totpEnabled = false;
-    current.totpSecret = '';
-    await saveSettings(current);
-    await audit('2fa_disabled', { user: req.session?.user });
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('2FA disable error:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
+registerSettingsRoutes(app, {
+  requireAuth,
+  audit,
+  hasStrongConfirmation,
+  HIGH_RISK_PHRASES,
+  normalizeIp,
+  DEFAULT_PANIC_DURATION_MIN,
+  AUTH_USER,
+  AUTH_PASSWORD,
+  pm2List,
+  logEvent,
+  registerAutoRemediationsFromSettings,
+  speakeasy,
+  QRCode,
 });
 
 // ============ CRON JOBS ============
@@ -1849,19 +784,6 @@ let dailyCheckHandle = null;
 let dailyCheckRunning = false;
 const cronRunHistory = [];
 const automationRemediationHandles = new Map();
-
-function parseCheckResponseOk(status) {
-  return Number.isFinite(status) && status >= 200 && status < 400;
-}
-
-async function fetchStatusCode(url, timeoutMs = 10000) {
-  try {
-    const resp = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(timeoutMs) });
-    return resp.status;
-  } catch (_) {
-    return 0;
-  }
-}
 
 async function runDailyAppCheck(trigger = 'manual') {
   if (dailyCheckRunning) {
@@ -2231,18 +1153,12 @@ app.get('/terminal', requireAuth, (req, res) => {
 
 // ============ EDITOR .ENV ============
 
-const ALLOWED_CWD_PREFIX = '/home/ubuntu/';
-
-function isPathAllowed(filePath) {
-  const resolved = path.resolve(filePath);
-  return resolved.startsWith(ALLOWED_CWD_PREFIX);
-}
 
 // API: GET .env di un processo
 app.get('/api/env/:name', requireAuth, async (req, res) => {
   const { name } = req.params;
   try {
-    const cwd = await pm2GetCwd(name);
+    const cwd = await resolveManagedProjectCwd(name);
     if (!cwd || !isPathAllowed(cwd)) return res.status(403).json({ ok: false, error: 'Accesso non consentito' });
     const envPath = path.join(cwd, '.env');
     try {
@@ -2288,7 +1204,7 @@ app.post('/api/env/:name', requireAuth, async (req, res) => {
     return res.status(400).json({ ok: false, error: 'Contenuto non valido' });
   }
   try {
-    const cwd = await pm2GetCwd(name);
+    const cwd = await resolveManagedProjectCwd(name);
     if (!cwd || !isPathAllowed(cwd)) return res.status(403).json({ ok: false, error: 'Accesso non consentito' });
     const envPath = path.join(cwd, '.env');
     const bakPath = path.join(cwd, '.env.bak');
@@ -2297,8 +1213,8 @@ app.post('/api/env/:name', requireAuth, async (req, res) => {
     } catch (_) {}
     await fs.writeFile(envPath, content, 'utf8');
     if (restartProcess === true) await pm2Action('restart', name);
-    await audit('env_save', { process: name, user: req.session?.user, restartProcess: restartProcess === true });
-    res.json({ ok: true, restarted: restartProcess === true });
+    await audit('env_save', { process: name, user: req.session?.user, restartProcess: restartProcess === true, cwd });
+    res.json({ ok: true, restarted: restartProcess === true, cwd });
   } catch (err) {
     await audit('env_save_error', { process: name, user: req.session?.user, error: err.message });
     console.error('Env save error:', err);
@@ -2307,121 +1223,6 @@ app.post('/api/env/:name', requireAuth, async (req, res) => {
 });
 
 // ============ PM2 HELPERS ============
-
-function pm2List() {
-  return new Promise((resolve, reject) => {
-    pm2.list((err, list) => {
-      if (err) return reject(err);
-      const processes = list.map((p) => {
-        const env = p.pm2_env || {};
-        const monit = p.monit || {};
-        const cwd = env.pm_cwd || env.exec_cwd || '';
-        const isModule = !!(env.pmx_module || cwd.includes('.pm2/modules'));
-        return {
-          name: env.name || p.name,
-          status: env.status,
-          cpu: monit.cpu ?? 0,
-          memory: Math.round((monit.memory || 0) / 1024 / 1024),
-          uptime: env.pm_uptime ? formatUptime(Date.now() - env.pm_uptime) : '-',
-          restart_time: env.restart_time ?? 0,
-          isModule,
-        };
-      });
-      resolve(processes);
-    });
-  });
-}
-
-function pm2Action(action, name) {
-  return new Promise((resolve, reject) => {
-    const fn = pm2[action];
-    if (!fn) return reject(new Error(`Unknown action: ${action}`));
-    // PM2 API methods require 'this' bound to pm2 instance; fn(name,cb) loses context
-    fn.call(pm2, name, (err) => (err ? reject(err) : resolve()));
-  });
-}
-
-function pm2ListRaw() {
-  return new Promise((resolve, reject) => {
-    pm2.list((err, list) => (err ? reject(err) : resolve(list || [])));
-  });
-}
-
-function pm2StartEcosystem(ecosystemPath) {
-  return new Promise((resolve, reject) => {
-    pm2.start(ecosystemPath, (err) => (err ? reject(err) : resolve()));
-  });
-}
-
-function pm2GetCwd(name) {
-  return new Promise((resolve, reject) => {
-    pm2.describe(name, (err, list) => {
-      if (err) return reject(err);
-      const proc = Array.isArray(list) ? list[0] : list;
-      resolve(proc?.pm2_env?.pm_cwd || null);
-    });
-  });
-}
-
-function pm2GetLogPaths(name) {
-  return new Promise((resolve, reject) => {
-    pm2.describe(name, (err, list) => {
-      if (err) return reject(err);
-      const proc = Array.isArray(list) ? list[0] : list;
-      if (!proc?.pm2_env) return reject(new Error('Process not found'));
-      const env = proc.pm2_env;
-      resolve({
-        out: env.pm_out_log_path,
-        err: env.pm_err_log_path,
-      });
-    });
-  });
-}
-
-async function pm2GetLogs(name) {
-  return new Promise((resolve, reject) => {
-    pm2.describe(name, async (err, list) => {
-      if (err) return reject(err);
-      const proc = Array.isArray(list) ? list[0] : list;
-      if (!proc?.pm2_env) return reject(new Error('Process not found'));
-      const env = proc.pm2_env;
-      const outPath = env.pm_out_log_path;
-      const errPath = env.pm_err_log_path;
-      const lines = 50;
-
-      const readLastLines = async (filePath) => {
-        try {
-          const content = await fs.readFile(filePath, 'utf8');
-          return content.split('\n').slice(-lines).join('\n');
-        } catch {
-          return '(file not found or empty)';
-        }
-      };
-
-      try {
-        const [stdout, stderr] = await Promise.all([
-          readLastLines(outPath),
-          readLastLines(errPath),
-        ]);
-        resolve({ stdout, stderr });
-      } catch (e) {
-        reject(e);
-      }
-    });
-  });
-}
-
-function formatUptime(ms) {
-  if (ms < 0) return '-';
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  const h = Math.floor(m / 60);
-  const d = Math.floor(h / 24);
-  if (d) return `${d}d ${h % 24}h`;
-  if (h) return `${h}h ${m % 60}m`;
-  if (m) return `${m}m ${s % 60}s`;
-  return `${s}s`;
-}
 
 // ============ HTTP SERVER + SOCKET.IO ============
 
