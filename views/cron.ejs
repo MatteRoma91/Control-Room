@@ -1,9 +1,9 @@
 <section class="mb-8" aria-labelledby="cron-heading">
-  <h1 id="cron-heading" class="text-2xl font-bold text-cr-text mb-6">Cron Jobs (Pianificazione)</h1>
+  <h1 id="cron-heading" class="font-sans text-headline-lg text-cr-text mb-6">Cron Jobs (Pianificazione)</h1>
   <p class="text-cr-muted mb-6">Pianifica riavvii PM2, backup database o comandi personalizzati. Formato cron: minuto ora giorno mese giorno_settimana (es. <code class="text-cr-accent">0 4 * * *</code> = ogni giorno alle 04:00, <code class="text-cr-accent">0 4 * * 5</code> = ogni venerdì alle 04:00).</p>
 
   <div class="rounded-lg border border-cr-border bg-cr-surface p-6 mb-8">
-    <h2 class="text-lg font-semibold text-cr-text mb-2">Daily App Check (auto-ripristino)</h2>
+    <h2 class="font-sans text-label-md font-medium text-cr-text mb-2">Daily App Check (auto-ripristino)</h2>
     <p class="text-cr-muted text-sm mb-4">Controllo automatico giornaliero di tutte le webapp (locale + internet) con tentativo di ripristino automatico in caso di problemi.</p>
     <div class="flex flex-wrap gap-3 items-center mb-4">
       <label class="flex items-center gap-2 text-sm text-cr-text">
@@ -57,7 +57,7 @@
   </div>
 
   <div class="rounded-lg border border-cr-border bg-cr-surface p-6 mb-6">
-    <h2 class="text-lg font-semibold text-cr-text mb-4">Aggiungi job</h2>
+    <h2 class="font-sans text-label-md font-medium text-cr-text mb-4">Aggiungi job</h2>
     <div class="space-y-4">
       <div>
         <label class="block text-sm text-cr-muted mb-1">Nome</label>
@@ -113,7 +113,7 @@
   </button>
 
   <div class="rounded-lg border border-cr-border bg-cr-surface p-6 mt-6">
-    <h2 class="text-lg font-semibold text-cr-text mb-2">Storico esecuzioni cron</h2>
+    <h2 class="font-sans text-label-md font-medium text-cr-text mb-2">Storico esecuzioni cron</h2>
     <div id="cronHistory" class="text-xs text-cr-text font-mono whitespace-pre-wrap">Caricamento...</div>
   </div>
 </section>

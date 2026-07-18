@@ -1,11 +1,11 @@
 <% var p = typeof reqPath !== 'undefined' ? reqPath : ''; %>
 <% function navItem(href, isActive) {
-  var base = 'flex items-center min-h-[44px] px-4 py-2.5 text-sm border-l-2 transition-colors rounded-r-md mr-2 ';
+  var base = 'cr-nav-link flex items-center min-h-[44px] px-4 py-2.5 font-sans text-label-md border-l-2 transition-colors rounded-r-md mr-2 ';
   if (isActive) return base + 'border-cr-accent bg-cr-surface2 text-cr-accent font-semibold';
   return base + 'border-transparent text-cr-muted hover:bg-cr-navHover hover:text-cr-text';
 } %>
 <div class="py-3 flex flex-col flex-1 min-h-0 overflow-y-auto">
-  <p class="px-4 pb-1 text-[10px] font-semibold uppercase tracking-wider text-cr-muted">Operazioni</p>
+  <p class="px-4 pb-1 font-sans text-label-md font-medium uppercase tracking-wider text-cr-muted">Operazioni</p>
   <a href="/" class="<%= navItem('/', p === '/' || p.indexOf('/process/') === 0) %>">
     Dashboard
   </a>
@@ -37,7 +37,7 @@
     Audit log
   </a>
 
-  <p class="px-4 pt-5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-cr-muted">Siti</p>
+  <p class="px-4 pt-5 pb-1 font-sans text-label-md font-medium uppercase tracking-wider text-cr-muted">Siti</p>
   <a href="https://bananapadeltour.duckdns.org/" target="_blank" rel="noopener" onclick="window.crCloseMobileDrawer && window.crCloseMobileDrawer()" class="flex items-center min-h-[44px] px-4 py-2 text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2 gap-2">
     <span class="opacity-60" aria-hidden="true">↗</span>
     Banana Padel Tour

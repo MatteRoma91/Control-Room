@@ -11,7 +11,7 @@
 >
   <div class="absolute inset-0 bg-[var(--cr-overlay)] backdrop-blur-[2px]" @click="cancel()"></div>
   <div class="absolute inset-4 md:inset-x-[25%] md:top-[18%] md:bottom-auto bg-cr-surface rounded-xl border border-cr-border p-5 shadow-xl">
-    <h2 id="confirm-modal-title" class="text-lg font-semibold text-cr-text mb-2" x-text="title"></h2>
+    <h2 id="confirm-modal-title" class="font-sans text-label-md font-medium text-cr-text mb-2" x-text="title"></h2>
     <p class="text-sm text-cr-muted mb-4" x-text="message"></p>
     <p class="text-xs text-cr-warning font-medium mb-2">Inserisci la frase di conferma:</p>
     <div class="font-mono text-xs text-cr-accent mb-2 break-all" x-text="expectedPhrase"></div>

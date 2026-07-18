@@ -10,7 +10,7 @@
   <div id="incidentBanner" class="hidden rounded-lg border p-4">
     <div class="flex items-center justify-between gap-2">
       <div>
-        <h2 id="incident-heading" class="text-lg font-semibold text-cr-text">Incident center</h2>
+        <h2 id="incident-heading" class="font-sans text-label-md font-medium text-cr-text">Incident center</h2>
         <p id="incidentText" class="text-sm text-cr-text mt-1"></p>
       </div>
       <a href="/audit" class="px-3 py-1.5 rounded bg-cr-surface2 hover:bg-cr-navHover text-sm">Apri audit</a>
@@ -20,7 +20,7 @@
 
 <!-- Azioni rapide (mobile-first; utili anche su desktop compatto) -->
 <section class="mb-8 md:mb-6 rounded-xl border border-cr-accent/25 bg-cr-surface p-4 md:p-4" aria-labelledby="quick-actions-heading">
-  <h2 id="quick-actions-heading" class="text-base font-semibold text-cr-text mb-1">Azioni rapide</h2>
+  <h2 id="quick-actions-heading" class="font-sans text-label-md font-medium text-cr-text mb-1">Azioni rapide</h2>
   <p class="text-xs text-cr-muted mb-3">Collegamenti e controlli frequenti (target touch ≥44px).</p>
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
     <button type="button" id="btnQuickRefreshAll" onclick="refreshAllTables(this)" class="min-h-[44px] px-3 py-2 rounded-lg bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 text-sm font-medium focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas">Aggiorna tutto</button>
@@ -37,7 +37,7 @@
 <section class="mb-0" aria-labelledby="charts-heading">
   <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
     <div>
-      <h2 id="charts-heading" class="text-lg font-semibold text-cr-text">Stato e risorse</h2>
+      <h2 id="charts-heading" class="font-sans text-label-md font-medium text-cr-text">Stato e risorse</h2>
       <p class="text-xs text-cr-muted mt-1">CPU e RAM in tempo reale (scala 0–100%). Usa «Aggiorna tutto» in alto per sincronizzare tutte le sezioni.</p>
     </div>
     <button
@@ -66,7 +66,7 @@
 
 <!-- Overview Server -->
 <section class="mb-0" aria-labelledby="overview-heading">
-  <h3 id="overview-heading" class="text-base font-semibold text-cr-text mb-1">Overview server</h3>
+  <h3 id="overview-heading" class="font-sans text-label-md font-medium text-cr-text mb-1">Overview server</h3>
   <p class="text-xs text-cr-muted mb-3">Uptime, load, RAM, disco e stato Nginx.</p>
   <div id="systemOverview" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
     <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
@@ -104,7 +104,7 @@
 <div class="rounded-xl border border-cr-border/70 bg-cr-surface/40 p-4 md:p-6 mb-10 space-y-6" aria-labelledby="global-actions-heading">
 <!-- Azioni globali -->
 <section class="mb-0" aria-labelledby="global-actions-heading">
-  <h2 id="global-actions-heading" class="text-lg font-semibold text-cr-text mb-1">Operazioni</h2>
+  <h2 id="global-actions-heading" class="font-sans text-label-md font-medium text-cr-text mb-1">Operazioni</h2>
   <p class="text-xs text-cr-muted mb-4">Azioni su più processi: possono richiedere conferma. Dopo OK le webapp possono restare non raggiungibili per alcuni secondi.</p>
   <div class="flex flex-wrap gap-4">
     <button
@@ -150,7 +150,7 @@
 <section class="mb-0" aria-labelledby="ports-heading">
   <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
     <div>
-      <h2 id="ports-heading" class="text-lg font-semibold text-cr-text">Rete: porte in ascolto</h2>
+      <h2 id="ports-heading" class="font-sans text-label-md font-medium text-cr-text">Rete: porte in ascolto</h2>
       <p class="text-sm text-cr-muted mt-1">Backend Node e Nginx 80/443; rilevamento con <span class="font-mono text-cr-text">ss</span> sul server.</p>
     </div>
     <button
@@ -187,7 +187,7 @@
 <!-- Database Backup -->
 <% if (dbConfigured) { %>
 <section class="mb-0" aria-labelledby="db-heading">
-  <h2 id="db-heading" class="text-lg font-semibold text-cr-text mb-1">Database</h2>
+  <h2 id="db-heading" class="font-sans text-label-md font-medium text-cr-text mb-1">Database</h2>
   <p class="text-xs text-cr-muted mb-3">Backup on-demand del database configurato in .env.</p>
   <a
     href="/api/db-backup"
@@ -199,14 +199,14 @@
 </section>
 <% } else { %>
 <section class="mb-0" aria-labelledby="db-heading">
-  <h2 id="db-heading" class="text-lg font-semibold text-cr-text mb-1">Database</h2>
+  <h2 id="db-heading" class="font-sans text-label-md font-medium text-cr-text mb-1">Database</h2>
   <p class="text-cr-muted text-sm">Database MySQL non configurato. Imposta DB_HOST, DB_USER, DB_NAME in .env.</p>
 </section>
 <% } %>
 
 <!-- Health check -->
 <section class="mb-0" aria-labelledby="health-heading">
-  <h2 id="health-heading" class="text-lg font-semibold text-cr-text mb-1">Health check webapp</h2>
+  <h2 id="health-heading" class="font-sans text-label-md font-medium text-cr-text mb-1">Health check webapp</h2>
   <p class="text-xs text-cr-muted mb-3">Richiesta HTTP alle URL pubbliche delle app monitorate.</p>
   <button
     onclick="checkHealth()"
@@ -233,7 +233,7 @@
 </section>
 
 <section class="mb-0" aria-labelledby="quality-heading">
-  <h2 id="quality-heading" class="text-lg font-semibold text-cr-text mb-1">Diagnostica: quality gates</h2>
+  <h2 id="quality-heading" class="font-sans text-label-md font-medium text-cr-text mb-1">Diagnostica: quality gates</h2>
   <p class="text-xs text-cr-muted mb-3">KPI operativi aggregati (caricamento automatico).</p>
   <div id="qualityGatesBox" class="rounded-lg border border-cr-border bg-cr-surface p-4 text-sm text-cr-text">Caricamento KPI operativi...</div>
 </section>
@@ -241,7 +241,7 @@
 
 <!-- Processi PM2 (aggiornamento live ogni 3s) -->
 <section class="mb-8" aria-labelledby="processes-heading">
-  <h2 id="processes-heading" class="text-lg font-semibold text-cr-text mb-1 flex items-center gap-2 flex-wrap">
+  <h2 id="processes-heading" class="font-sans text-label-md font-medium text-cr-text mb-1 flex items-center gap-2 flex-wrap">
     Processi PM2
     <span id="pm2LiveIndicator" class="inline-flex items-center gap-1 text-xs font-normal text-cr-muted">
       <span class="w-2 h-2 rounded-full bg-cr-accentHover animate-pulse" aria-hidden="true"></span>
@@ -271,7 +271,7 @@
 <section class="mb-8" aria-labelledby="sysprocesses-heading">
   <div class="flex flex-wrap items-center gap-4 mb-4">
     <div>
-      <h2 id="sysprocesses-heading" class="text-lg font-semibold text-cr-text">Processi di sistema</h2>
+      <h2 id="sysprocesses-heading" class="font-sans text-label-md font-medium text-cr-text">Processi di sistema</h2>
       <p class="text-sm text-cr-muted mt-1">Top 25 processi per RAM (nginx, node, systemd, ecc.)</p>
     </div>
     <button
@@ -921,7 +921,7 @@
       '<article class="rounded-xl border border-cr-border bg-cr-surface p-4 shadow-sm hover:shadow-md transition-shadow focus-within:ring-2 focus-within:ring-cr-accent/30' + crashRing + '" role="region" aria-labelledby="' + titleId + '">' +
       '<header class="flex flex-wrap items-start justify-between gap-2 mb-3 pb-3 border-b border-cr-border">' +
       '<div class="min-w-0 flex-1">' +
-      '<h3 id="' + titleId + '" class="font-mono font-semibold text-base text-cr-text truncate">' +
+      '<h3 id="' + titleId + '" class="font-mono text-label-md font-medium text-cr-text truncate">' +
       '<a href="/process/' + encodeURIComponent(p.name) + '" class="text-cr-accent hover:underline">' + n + '</a></h3>' +
       '<p class="text-xs text-cr-muted mt-0.5">Processo PM2</p></div>' +
       '<div class="flex flex-wrap items-center gap-1.5 justify-end shrink-0">' + moduleBadge +

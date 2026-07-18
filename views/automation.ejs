@@ -1,11 +1,11 @@
 <section class="space-y-6" aria-labelledby="automation-heading">
   <div>
-    <h1 id="automation-heading" class="text-2xl font-bold text-cr-text">Automation Suite</h1>
+    <h1 id="automation-heading" class="font-sans text-headline-lg text-cr-text">Automation Suite</h1>
     <p class="text-sm text-cr-muted mt-1 max-w-3xl">Runbook multi-app, storico esecuzioni e remediation pianificate (cron). Le azioni possono richiedere conferma a seconda dell’API.</p>
   </div>
 
   <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
-    <h2 class="text-lg font-semibold text-cr-text mb-1">Runbook batch</h2>
+    <h2 class="font-sans text-label-md font-medium text-cr-text mb-1">Runbook batch</h2>
     <p class="text-xs text-cr-muted mb-3">Seleziona le app, modalità e opzionalmente dry-run prima di eseguire in produzione.</p>
     <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
       <select id="batchMode" class="rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2">
@@ -21,13 +21,13 @@
   </div>
 
   <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
-    <h2 class="text-lg font-semibold text-cr-text mb-1">Storico runbook</h2>
+    <h2 class="font-sans text-label-md font-medium text-cr-text mb-1">Storico runbook</h2>
     <p class="text-xs text-cr-muted mb-3">Ultime esecuzioni registrate. Lista vuota finché non lanci batch o runbook dalla dashboard.</p>
     <div id="runbookHistory" class="text-sm text-cr-text min-h-[2rem]"></div>
   </div>
 
   <div class="rounded-lg border border-cr-border bg-cr-surface p-4">
-    <h2 class="text-lg font-semibold text-cr-text mb-1">Scheduled remediation</h2>
+    <h2 class="font-sans text-label-md font-medium text-cr-text mb-1">Scheduled remediation</h2>
     <p class="text-xs text-cr-muted mb-3">Regole cron per rieseguire un runbook su un processo. Salva in <span class="font-mono text-cr-text">settings.json</span>.</p>
     <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
       <input id="autoName" class="rounded bg-cr-surface2 border border-cr-inputBorder px-3 py-2" placeholder="nome regola" />

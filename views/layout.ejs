@@ -45,7 +45,7 @@
   <script defer src="/js/cr-theme.js"></script>
   <%- typeof headExtra !== 'undefined' ? headExtra : '' %>
 </head>
-<body class="min-h-screen bg-cr-canvas text-cr-text font-sans antialiased">
+<body class="min-h-screen bg-cr-canvas text-cr-text font-mono text-body-md antialiased">
   <input type="checkbox" id="cr-drawer-toggle" class="peer sr-only" autocomplete="off" tabindex="-1" aria-hidden="true"/>
   <nav id="cr-top-nav" class="fixed top-0 left-0 right-0 z-50 bg-cr-nav border-b border-cr-border px-3 md:px-4 py-2.5 flex justify-between items-center gap-2 shadow-sm isolate">
     <div class="flex items-center gap-2 md:gap-3 min-w-0">
@@ -62,11 +62,11 @@
         </svg>
       </label>
       <div class="min-w-0 hidden sm:block">
-        <h1 class="text-lg md:text-xl font-bold tracking-tight truncate text-cr-text">Control Room</h1>
-        <p class="hidden md:block text-xs text-cr-muted truncate">Ops console · recovery · incidenti · sicurezza</p>
+        <h1 class="font-sans text-label-md font-medium tracking-tight truncate text-cr-text">Control Room</h1>
+        <p class="hidden md:block font-mono text-body-md text-cr-muted truncate">Ops console · recovery · incidenti · sicurezza</p>
       </div>
       <div class="min-w-0 sm:hidden">
-        <h1 class="text-base font-bold truncate">CR</h1>
+        <h1 class="font-sans text-label-md font-medium truncate">CR</h1>
       </div>
     </div>
     <div class="flex items-center gap-1.5 md:gap-2 shrink-0">

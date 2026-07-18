@@ -11,7 +11,7 @@
   <%- include('partials/head-common') %>
   <script defer src="/js/cr-theme.js"></script>
 </head>
-<body class="min-h-screen bg-cr-canvas text-cr-text font-sans antialiased flex flex-col items-center justify-center p-4 relative">
+<body class="min-h-screen bg-cr-canvas text-cr-text font-mono text-body-md antialiased flex flex-col items-center justify-center p-4 relative">
   <div class="absolute top-4 right-4">
     <button
       type="button"
@@ -27,8 +27,8 @@
   </div>
   <main class="w-full max-w-md" role="main">
     <div class="text-center mb-8">
-      <h1 class="text-3xl font-bold text-cr-text tracking-tight">Control Room</h1>
-      <p class="text-cr-muted mt-2 text-sm">PM2 dashboard</p>
+      <h1 class="font-sans text-headline-lg text-cr-text">Control Room</h1>
+      <p class="text-cr-muted mt-2 font-mono text-body-md">PM2 dashboard</p>
     </div>
     <div class="bg-cr-surface rounded-2xl shadow-xl p-8 border border-cr-border">
       <% if (typeof rateLimited !== 'undefined' && rateLimited) { %>
@@ -43,7 +43,7 @@
       <form method="POST" action="/login" class="space-y-6" aria-labelledby="login-heading">
         <h2 id="login-heading" class="sr-only">Accedi a Control Room</h2>
         <div>
-          <label for="username" class="block text-sm font-medium text-cr-text mb-2">Utente</label>
+          <label for="username" class="block font-sans text-label-md text-cr-text mb-2">Utente</label>
           <input
             type="text"
             id="username"
@@ -57,7 +57,7 @@
           />
         </div>
         <div>
-          <label for="password" class="block text-sm font-medium text-cr-text mb-2">Password</label>
+          <label for="password" class="block font-sans text-label-md text-cr-text mb-2">Password</label>
           <div class="relative" data-password-toggle="3">
             <input
               type="password"
@@ -74,7 +74,7 @@
         </div>
         <button
           type="submit"
-          class="w-full py-2.5 px-4 rounded-lg bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-semibold transition focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-surface"
+          class="w-full py-2.5 px-4 rounded-lg bg-cr-accent hover:opacity-90 text-white dark:text-slate-900 font-sans text-label-md font-medium transition focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-surface"
           aria-label="Invia credenziali per accedere"
         >
           Accedi

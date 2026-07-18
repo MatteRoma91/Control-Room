@@ -1,0 +1,79 @@
+/**
+ * Control Room typography — loaded AFTER Tailwind CDN so tokens win over Preflight.
+ * Families: Inter (headlines/labels) + JetBrains Mono (body / interface copy)
+ */
+
+html body {
+  font-family: var(--cr-font-body) !important;
+  font-size: var(--cr-typo-body-md-size) !important;
+  font-weight: 400 !important;
+  line-height: var(--cr-typo-body-md-leading) !important;
+  letter-spacing: normal !important;
+}
+
+html body .typo-headline-lg,
+html body .text-headline-lg,
+html body h1:not(.sr-only) {
+  font-family: var(--cr-font-display) !important;
+  font-size: var(--cr-typo-headline-lg-size) !important;
+  font-weight: 400 !important;
+  line-height: var(--cr-typo-headline-lg-leading) !important;
+  letter-spacing: var(--cr-typo-headline-lg-tracking) !important;
+  text-transform: none !important;
+}
+
+html body .typo-body-md,
+html body .text-body-md,
+html body p,
+html body td,
+html body th,
+html body li,
+html body input,
+html body textarea,
+html body select,
+html body pre,
+html body code {
+  font-family: var(--cr-font-body) !important;
+}
+
+html body .typo-body-md,
+html body .text-body-md,
+html body p {
+  font-size: var(--cr-typo-body-md-size) !important;
+  font-weight: 400 !important;
+  line-height: var(--cr-typo-body-md-leading) !important;
+  letter-spacing: normal !important;
+}
+
+html body .typo-label-md,
+html body .text-label-md,
+html body h2:not(.sr-only),
+html body h3,
+html body h4,
+html body label,
+html body button,
+html body [role="button"],
+html body .cr-nav-link,
+html body nav a,
+html body .font-sans.text-label-md {
+  font-family: var(--cr-font-display) !important;
+  font-size: var(--cr-typo-label-md-size) !important;
+  font-weight: 500 !important;
+  line-height: var(--cr-typo-label-md-leading) !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+}
+
+/* Keep mono for intentional data/code (process names, paths, logs) */
+html body .font-mono,
+html body .font-mono * {
+  font-family: var(--cr-font-body) !important;
+}
+
+/* Compact chrome in top nav: stay Inter label, not page headline */
+#cr-top-nav h1 {
+  font-size: var(--cr-typo-label-md-size) !important;
+  font-weight: 500 !important;
+  line-height: var(--cr-typo-label-md-leading) !important;
+  letter-spacing: normal !important;
+}

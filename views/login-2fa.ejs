@@ -11,7 +11,7 @@
   <%- include('partials/head-common') %>
   <script defer src="/js/cr-theme.js"></script>
 </head>
-<body class="min-h-screen bg-cr-canvas text-cr-text font-sans antialiased flex flex-col items-center justify-center p-4 relative">
+<body class="min-h-screen bg-cr-canvas text-cr-text font-mono text-body-md antialiased flex flex-col items-center justify-center p-4 relative">
   <div class="absolute top-4 right-4">
     <button
       type="button"
@@ -27,8 +27,8 @@
   </div>
   <main class="w-full max-w-md" role="main">
     <div class="text-center mb-8">
-      <h1 class="text-3xl font-bold text-cr-text tracking-tight">Control Room</h1>
-      <p class="text-cr-muted mt-2 text-sm">Autenticazione a due fattori</p>
+      <h1 class="font-sans text-headline-lg text-cr-text">Control Room</h1>
+      <p class="text-cr-muted mt-2 font-mono text-body-md">Autenticazione a due fattori</p>
     </div>
     <div class="bg-cr-surface rounded-2xl shadow-xl p-8 border border-cr-border">
       <% if (typeof rateLimited !== 'undefined' && rateLimited) { %>

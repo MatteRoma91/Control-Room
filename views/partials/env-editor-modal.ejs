@@ -14,7 +14,7 @@
   <div class="absolute inset-0 bg-[var(--cr-overlay)] backdrop-blur-[2px]" @click="$dispatch('env-editor-hide')"></div>
   <div class="absolute inset-4 md:inset-10 bg-cr-surface rounded-xl border border-cr-border flex flex-col shadow-xl overflow-hidden">
     <div class="flex justify-between items-center p-4 border-b border-cr-border bg-cr-nav">
-      <h2 id="env-editor-title" class="text-lg font-semibold text-cr-text">Editor .env — <span x-text="processName || '...'"></span></h2>
+      <h2 id="env-editor-title" class="font-sans text-label-md font-medium text-cr-text">Editor .env — <span x-text="processName || '...'"></span></h2>
       <button
         type="button"
         @click="$dispatch('env-editor-hide')"

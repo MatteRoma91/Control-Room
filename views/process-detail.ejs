@@ -4,7 +4,7 @@
 
 <section class="mb-6" aria-labelledby="process-header">
   <div class="flex flex-wrap items-center gap-4 mb-4">
-    <h1 id="process-header" class="text-2xl font-bold font-mono"><%= process.name %></h1>
+    <h1 id="process-header" class="font-mono text-headline-lg"><%= process.name %></h1>
     <span class="px-2 py-0.5 rounded text-xs font-medium <%= process.status === 'online' ? 'bg-[var(--cr-success-bg)] text-cr-accent' : process.status === 'stopped' ? 'bg-[var(--cr-warning-bg)] text-cr-warning' : 'bg-[var(--cr-danger-bg)] text-cr-danger' %>">
       <%= process.status %>
     </span>
@@ -38,7 +38,7 @@
 </section>
 
 <section aria-labelledby="logs-heading">
-  <h2 id="logs-heading" class="text-lg font-semibold text-cr-text mb-1">Log in tempo reale</h2>
+  <h2 id="logs-heading" class="font-sans text-label-md font-medium text-cr-text mb-1">Log in tempo reale</h2>
   <p class="text-xs text-cr-muted mb-3">Stream da PM2. Pausa accumula in memoria fino a Riprendi. «Solo stderr» nasconde l’output standard. Copia usa la selezione nel terminale.</p>
   <div class="flex flex-wrap gap-2 mb-3" role="toolbar" aria-label="Controlli log">
     <button type="button" id="btnLogPause" class="min-h-[40px] px-3 py-2 rounded-lg text-xs font-medium bg-cr-surface2 border border-cr-border hover:bg-cr-navHover">Pausa</button>
