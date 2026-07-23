@@ -65,7 +65,7 @@ function registerSettingsRoutes(app, ctx) {
       if (!hasStrongConfirmation(req, 'panicActivate')) {
         return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.panicActivate}` });
       }
-      const clientIp = normalizeIp(req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || '');
+      const clientIp = normalizeIp(req.headers['x-real-ip'] || req.ip || '');
       const durationMin = Math.max(5, Math.min(240, parseInt(req.body?.durationMin || String(DEFAULT_PANIC_DURATION_MIN), 10)));
       const expiresAt = new Date(Date.now() + durationMin * 60 * 1000).toISOString();
       const current = await loadSettings();

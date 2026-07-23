@@ -300,7 +300,11 @@ function requireAuth(req, res, next) {
 async function ipWhitelistMiddleware(req, res, next) {
   try {
     const settings = await loadSettings();
-    const clientIp = normalizeIp(req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.connection?.remoteAddress || '');
+    // Prefer X-Real-IP (set by nginx from $remote_addr) and Express req.ip (trust proxy).
+    // Never trust the leftmost X-Forwarded-For hop — clients can spoof it.
+    const clientIp = normalizeIp(
+      req.headers['x-real-ip'] || req.ip || req.connection?.remoteAddress || ''
+    );
     const nowIso = new Date().toISOString();
 
     const tempEntries = (settings.ipWhitelistTemporary || []).filter((e) => e.expiresAt > nowIso);
@@ -337,7 +341,8 @@ async function ipWhitelistMiddleware(req, res, next) {
     res.status(403).send('Accesso negato. IP non autorizzato.');
   } catch (err) {
     console.error('IP whitelist error:', err);
-    next();
+    // Fail closed when whitelist/panic is enabled — do not allow traffic on errors.
+    res.status(503).send('Controllo accesso temporaneamente non disponibile.');
   }
 }
 
@@ -929,8 +934,8 @@ async function executeCronJob(job) {
       await pm2Action('start', job.target);
       console.log(`[Cron] Avviato ${job.target}`);
     } else if (job.action === 'command' && job.command) {
-      execSync(job.command, { encoding: 'utf8', stdio: 'pipe' });
-      console.log(`[Cron] Eseguito comando: ${job.command}`);
+      // Arbitrary shell commands via cron are disabled (RCE risk).
+      throw new Error('Cron action "command" non consentita. Usa pm2-restart/pm2-start/db-backup.');
     } else if (job.action === 'db-backup' && DB_CONFIGURED) {
       const fname = `backup-${new Date().toISOString().slice(0, 10)}.sql.gz`;
       const outPath = path.join(__dirname, 'backups', fname);
@@ -1032,8 +1037,23 @@ app.post('/api/cron-jobs/preview', requireAuth, async (req, res) => {
 app.post('/api/cron-jobs', requireAuth, async (req, res) => {
   try {
     const jobs = req.body?.jobs || req.body || [];
+    if (!Array.isArray(jobs)) {
+      return res.status(400).json({ ok: false, error: 'jobs deve essere un array' });
+    }
+    const allowedActions = new Set(['pm2-restart', 'pm2-start', 'db-backup']);
+    for (const job of jobs) {
+      if (!job || typeof job !== 'object') {
+        return res.status(400).json({ ok: false, error: 'Job non valido' });
+      }
+      if (!allowedActions.has(job.action)) {
+        return res.status(400).json({
+          ok: false,
+          error: `Azione cron non consentita: ${job.action || '(vuota)'}. Consentite: pm2-restart, pm2-start, db-backup.`,
+        });
+      }
+    }
     const current = await loadSettings();
-    current.cronJobs = Array.isArray(jobs) ? jobs : [];
+    current.cronJobs = jobs;
     await saveSettings(current);
     registerCronJobs();
     res.json({ ok: true });
@@ -1679,9 +1699,10 @@ pm2.connect(async (err) => {
       await sendNotification(`⚠️ PM2 stderr [${name}]: ${msg}`);
     });
   });
-  httpServer.listen(PORT, () => {
-    logEvent('startup', { port: PORT });
-    console.log(`Control Room running on http://localhost:${PORT}`);
+  const bindHost = process.env.CR_BIND_HOST || '127.0.0.1';
+  httpServer.listen(PORT, bindHost, () => {
+    logEvent('startup', { port: PORT, bindHost });
+    console.log(`Control Room running on http://${bindHost}:${PORT}`);
   });
 });
 
