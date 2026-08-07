@@ -2,6 +2,8 @@
 
 Dashboard Node.js/Express per gestire i processi PM2 senza accesso SSH.
 
+**Repo:** [MatteRoma91/Control-Room](https://github.com/MatteRoma91/Control-Room) · **Produzione:** https://matteroma.duckdns.org · PM2 `control-room` :3005
+
 ## Requisiti
 
 - Node.js 18+ (22 LTS consigliato per coerenza con le altre webapp)
