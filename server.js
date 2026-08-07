@@ -40,7 +40,12 @@ const {
   RUNBOOK_HISTORY_PATH,
   NOTIFY_DEAD_LETTER_PATH,
 } = require('./lib/constants');
-const { getSiteHealthTarget } = require('./lib/siteHealth');
+const {
+  getSiteHealthTarget,
+  getSiteLocalHealthUrl,
+  getSitePublicHealthUrl,
+  isSiteHealthStatusOk,
+} = require('./lib/siteHealth');
 const { normalizeIp, isIpAllowedByEntries } = require('./lib/ip-utils');
 const { registerHealthRoutes } = require('./routes/health');
 const { registerAuthRoutes } = require('./routes/auth');
@@ -61,7 +66,6 @@ const {
   readIncidents,
 } = require('./services/incidents');
 const {
-  parseCheckResponseOk,
   fetchStatusCode,
   executeRunbook,
 } = require('./services/runbook');
@@ -394,6 +398,7 @@ registerHealthRoutes(app, {
   requireAuth,
   WEB_SITES,
   getSiteHealthTarget,
+  isSiteHealthStatusOk,
   pm2List,
 });
 
@@ -803,11 +808,12 @@ async function runDailyAppCheck(trigger = 'manual') {
 
   try {
     for (const site of DAILY_CHECK_SITES) {
+      const skipPublic = site.skipPublicCheck === true;
       const entry = {
         name: site.name,
         process: site.pm2,
-        localUrl: `http://127.0.0.1:${site.port}/`,
-        publicUrl: site.url,
+        localUrl: getSiteLocalHealthUrl(site),
+        publicUrl: skipPublic ? null : getSitePublicHealthUrl(site),
         pm2Before: 'unknown',
         pm2After: 'unknown',
         localStatusBefore: 0,
@@ -822,10 +828,10 @@ async function runDailyAppCheck(trigger = 'manual') {
       const proc = list.find((p) => (p.pm2_env || p).name === site.pm2);
       entry.pm2Before = proc?.pm2_env?.status || 'not_found';
       entry.localStatusBefore = await fetchStatusCode(entry.localUrl, 8000);
-      entry.publicStatusBefore = await fetchStatusCode(entry.publicUrl, 10000);
+      entry.publicStatusBefore = skipPublic ? 0 : await fetchStatusCode(entry.publicUrl, 10000);
 
-      const localOkBefore = parseCheckResponseOk(entry.localStatusBefore);
-      const publicOkBefore = parseCheckResponseOk(entry.publicStatusBefore);
+      const localOkBefore = isSiteHealthStatusOk(entry.localStatusBefore, site);
+      const publicOkBefore = skipPublic ? true : isSiteHealthStatusOk(entry.publicStatusBefore, site);
 
       if (entry.pm2Before === 'stopped' || entry.pm2Before === 'not_found' || entry.pm2Before === 'errored') {
         try {
@@ -857,10 +863,10 @@ async function runDailyAppCheck(trigger = 'manual') {
       const procAfter = listAfter.find((p) => (p.pm2_env || p).name === site.pm2);
       entry.pm2After = procAfter?.pm2_env?.status || 'not_found';
       entry.localStatusAfter = await fetchStatusCode(entry.localUrl, 8000);
-      entry.publicStatusAfter = await fetchStatusCode(entry.publicUrl, 10000);
+      entry.publicStatusAfter = skipPublic ? 0 : await fetchStatusCode(entry.publicUrl, 10000);
 
-      const localOkAfter = parseCheckResponseOk(entry.localStatusAfter);
-      const publicOkAfter = parseCheckResponseOk(entry.publicStatusAfter);
+      const localOkAfter = isSiteHealthStatusOk(entry.localStatusAfter, site);
+      const publicOkAfter = skipPublic ? true : isSiteHealthStatusOk(entry.publicStatusAfter, site);
       const healthyAfter = entry.pm2After === 'online' && localOkAfter && publicOkAfter;
 
       if (!healthyAfter) {

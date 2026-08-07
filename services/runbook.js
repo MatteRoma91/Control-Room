@@ -3,11 +3,12 @@
  */
 const { execSync } = require('child_process');
 const { WEB_SITES, RUNBOOK_HISTORY_PATH } = require('../lib/constants');
+const { getSiteLocalHealthUrl, isSiteHealthStatusOk } = require('../lib/siteHealth');
 const { appendLine } = require('./incidents');
 const { pm2Action } = require('./pm2');
 
-function parseCheckResponseOk(status) {
-  return Number.isFinite(status) && status >= 200 && status < 400;
+function parseCheckResponseOk(status, site = null) {
+  return isSiteHealthStatusOk(status, site);
 }
 
 async function fetchStatusCode(url, timeoutMs = 10000) {
@@ -26,6 +27,7 @@ function getManagedApps() {
     port: s.port,
     url: s.url,
     kind: 'node',
+    site: s,
   }));
 }
 
@@ -34,10 +36,11 @@ async function executeRunbook({ processName, mode = 'full_recover', dryRun = fal
   if (!appMeta) throw new Error('Processo non supportato');
   const startedAt = Date.now();
   const steps = [];
+  const site = appMeta.site;
 
-  const localUrl = `http://127.0.0.1:${appMeta.port}/`;
+  const localUrl = getSiteLocalHealthUrl(site);
   const before = await fetchStatusCode(localUrl, 5000);
-  steps.push({ step: 'local_health_before', status: before });
+  steps.push({ step: 'local_health_before', status: before, url: localUrl });
   if (!dryRun) {
     await pm2Action('restart', processName);
     steps.push({ step: 'pm2_restart', ok: true });
@@ -56,14 +59,14 @@ async function executeRunbook({ processName, mode = 'full_recover', dryRun = fal
   }
   await new Promise((r) => setTimeout(r, 1500));
   const after = await fetchStatusCode(localUrl, 5000);
-  steps.push({ step: 'local_health_after', status: after });
-  let ok = parseCheckResponseOk(after);
+  steps.push({ step: 'local_health_after', status: after, url: localUrl });
+  let ok = parseCheckResponseOk(after, site);
   if (!ok && mode === 'safe_rollback' && !dryRun) {
     await pm2Action('restart', processName);
     steps.push({ step: 'rollback_restart', ok: true });
     const rollbackCheck = await fetchStatusCode(localUrl, 5000);
     steps.push({ step: 'rollback_health', status: rollbackCheck });
-    ok = parseCheckResponseOk(rollbackCheck);
+    ok = parseCheckResponseOk(rollbackCheck, site);
   }
   const report = {
     id: `rb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,

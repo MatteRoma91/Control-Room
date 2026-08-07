@@ -1,10 +1,14 @@
 /**
  * Health check API routes (extracted from server.js — behavior unchanged).
  * @param {import('express').Express} app
- * @param {{ requireAuth: Function, WEB_SITES: any[], getSiteHealthTarget: Function, pm2List: Function }} ctx
+ * @param {{ requireAuth: Function, WEB_SITES: any[], getSiteHealthTarget: Function, pm2List: Function, isSiteHealthStatusOk?: Function }} ctx
  */
 function registerHealthRoutes(app, ctx) {
   const { requireAuth, WEB_SITES, getSiteHealthTarget, pm2List } = ctx;
+  const isOk =
+    typeof ctx.isSiteHealthStatusOk === 'function'
+      ? ctx.isSiteHealthStatusOk
+      : (status) => Number.isFinite(status) && status >= 200 && status < 400;
 
   app.get('/api/health', requireAuth, async (req, res) => {
     const results = [];
@@ -25,7 +29,7 @@ function registerHealthRoutes(app, ctx) {
           kind: site.kind || 'app',
           status: resp.status,
           elapsed,
-          ok: resp.ok,
+          ok: isOk(resp.status, site),
         });
       } catch (err) {
         results.push({
@@ -59,7 +63,7 @@ function registerHealthRoutes(app, ctx) {
               });
               out.push({
                 name: site.name,
-                ok: resp.ok,
+                ok: isOk(resp.status, site),
                 status: resp.status,
                 elapsed: Date.now() - start,
                 checkUrl,
