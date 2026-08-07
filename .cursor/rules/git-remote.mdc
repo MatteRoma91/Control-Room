@@ -1,0 +1,13 @@
+---
+description: Repository git corretta per Control Room
+alwaysApply: true
+---
+
+# Git remote — control-room
+
+Il progetto in `/home/ubuntu/control-room` deve essere pushato **solo** sulla repo:
+
+**https://github.com/MatteRoma91/Control-Room**
+
+- `origin` punta a `MatteRoma91/Control-Room`
+- Per pushare: `cd /home/ubuntu/control-room && git push origin HEAD`
