@@ -1,7 +1,7 @@
 <% var p = typeof reqPath !== 'undefined' ? reqPath : ''; %>
 <% function navItem(href, isActive) {
   var base = 'cr-nav-link flex items-center min-h-[44px] px-4 py-2.5 font-sans text-label-md border-l-2 transition-colors rounded-r-md mr-2 ';
-  if (isActive) return base + 'border-cr-accent bg-cr-surface2 text-cr-accent font-semibold';
+  if (isActive) return base + 'cr-nav-active border-cr-accent text-cr-accent font-semibold';
   return base + 'border-transparent text-cr-muted hover:bg-cr-navHover hover:text-cr-text';
 } %>
 <div class="py-3 flex flex-col flex-1 min-h-0 overflow-y-auto">
@@ -36,6 +36,24 @@
   <a href="/audit" class="<%= navItem('/audit', p === '/audit') %>">
     Audit log
   </a>
+
+  <div class="mt-6 mx-4 pt-4 border-t border-cr-border">
+    <p class="text-[10px] font-mono uppercase tracking-wider text-cr-muted mb-3">System status</p>
+    <div class="space-y-3">
+      <div>
+        <div class="flex justify-between text-xs text-cr-muted mb-1"><span>Core</span><span id="crSidebarCore">—</span></div>
+        <div class="cr-bar"><div id="crSidebarCoreBar" class="cr-bar__fill cr-bar__fill--cyan" style="width:0%"></div></div>
+      </div>
+      <div>
+        <div class="flex justify-between text-xs text-cr-muted mb-1"><span>RAM</span><span id="crSidebarRam">—</span></div>
+        <div class="cr-bar"><div id="crSidebarRamBar" class="cr-bar__fill cr-bar__fill--purple" style="width:0%"></div></div>
+      </div>
+      <div>
+        <div class="flex justify-between text-xs text-cr-muted mb-1"><span>Health</span><span id="crSidebarHealth">—</span></div>
+        <div class="cr-bar"><div id="crSidebarHealthBar" class="cr-bar__fill cr-bar__fill--blue" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
 
   <p class="px-4 pt-5 pb-1 font-sans text-label-md font-medium uppercase tracking-wider text-cr-muted">Siti</p>
   <a href="https://bananapadeltour.duckdns.org/" target="_blank" rel="noopener" onclick="window.crCloseMobileDrawer && window.crCloseMobileDrawer()" class="flex items-center min-h-[44px] px-4 py-2 text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2 gap-2">

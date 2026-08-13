@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0d9488">
+  <meta name="theme-color" content="#020617">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Control Room">
@@ -43,11 +43,14 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script defer src="/js/cr-theme.js"></script>
+  <script defer src="/js/cr-particles.js"></script>
   <%- typeof headExtra !== 'undefined' ? headExtra : '' %>
 </head>
 <body class="min-h-screen bg-cr-canvas text-cr-text font-mono text-body-md antialiased">
+  <canvas id="cr-particles" aria-hidden="true"></canvas>
+  <div class="cr-app-shell">
   <input type="checkbox" id="cr-drawer-toggle" class="peer sr-only" autocomplete="off" tabindex="-1" aria-hidden="true"/>
-  <nav id="cr-top-nav" class="fixed top-0 left-0 right-0 z-50 bg-cr-nav border-b border-cr-border px-3 md:px-4 py-2.5 flex justify-between items-center gap-2 shadow-sm isolate">
+  <nav id="cr-top-nav" class="fixed top-0 left-0 right-0 z-50 bg-cr-nav/95 border-b border-cr-border backdrop-blur-md px-3 md:px-4 py-2.5 flex justify-between items-center gap-2 shadow-sm isolate">
     <div class="flex items-center gap-2 md:gap-3 min-w-0">
       <label
         for="cr-drawer-toggle"
@@ -61,15 +64,20 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
       </label>
+      <svg class="hidden sm:block w-8 h-8 text-cr-accent shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 2L20.66 7v10L12 22 3.34 17V7L12 2z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 22V12M3.34 7L12 12l8.66-5"/>
+      </svg>
       <div class="min-w-0 hidden sm:block">
-        <h1 class="font-sans text-label-md font-medium tracking-tight truncate text-cr-text">Control Room</h1>
+        <h1 class="font-sans text-label-md font-bold tracking-tight truncate cr-gradient-text">Control Room</h1>
         <p class="hidden md:block font-mono text-body-md text-cr-muted truncate">Ops console · recovery · incidenti · sicurezza</p>
       </div>
       <div class="min-w-0 sm:hidden">
-        <h1 class="font-sans text-label-md font-medium truncate">CR</h1>
+        <h1 class="font-sans text-label-md font-bold truncate cr-gradient-text">CR</h1>
       </div>
     </div>
     <div class="flex items-center gap-1.5 md:gap-2 shrink-0">
+      <span id="cr-header-clock" class="hidden md:inline cr-clock text-sm mr-1" aria-live="off"></span>
       <button
         type="button"
         data-cr-theme-cycle
@@ -105,7 +113,7 @@
   ></label>
   <aside
     id="cr-sidebar"
-    class="fixed inset-y-0 left-0 z-30 w-[17rem] pointer-events-none md:pointer-events-auto bg-cr-nav border-r border-cr-border shadow-lg md:shadow-none"
+    class="fixed inset-y-0 left-0 z-30 w-[17rem] pointer-events-none md:pointer-events-auto bg-cr-nav/95 border-r border-cr-border backdrop-blur-md shadow-lg md:shadow-none"
     aria-label="Navigazione principale"
   >
     <div class="cr-sidebar-inner pointer-events-auto flex min-h-0 flex-col mt-14 h-[calc(100%-3.5rem)] md:mt-0 md:h-full md:pt-16">
@@ -122,9 +130,21 @@
       <%- include(contentPartial || 'dashboard') %>
     </div>
   </main>
+  </div>
 
   <%- typeof scripts !== 'undefined' ? scripts : '' %>
   <%- include('partials/password-toggle-script') %>
+  <script>
+    (function () {
+      var el = document.getElementById('cr-header-clock');
+      if (!el) return;
+      function tick() {
+        el.textContent = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      }
+      tick();
+      setInterval(tick, 1000);
+    })();
+  </script>
   <script>
     window.crToastStack = function () {
       return {

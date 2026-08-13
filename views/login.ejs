@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0d9488">
+  <meta name="theme-color" content="#020617">
   <title>Login - Control Room</title>
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
@@ -12,11 +12,11 @@
   <script defer src="/js/cr-theme.js"></script>
 </head>
 <body class="min-h-screen bg-cr-canvas text-cr-text font-mono text-body-md antialiased flex flex-col items-center justify-center p-4 relative">
-  <div class="absolute top-4 right-4">
+  <div class="absolute top-4 right-4 z-10">
     <button
       type="button"
       data-cr-theme-cycle
-      class="p-2.5 rounded-lg border border-cr-border bg-cr-surface hover:bg-cr-surface2 text-cr-muted hover:text-cr-text focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas min-h-[44px] min-w-[44px] flex items-center justify-center"
+      class="p-2.5 rounded-lg border border-cr-border bg-cr-surface hover:bg-cr-surface2 text-cr-muted hover:text-cr-text focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas min-h-[44px] min-w-[44px] flex items-center justify-center cr-glass"
       title="Cambia tema"
       aria-label="Cambia tema"
     >
@@ -25,12 +25,16 @@
       </svg>
     </button>
   </div>
-  <main class="w-full max-w-md" role="main">
+  <main class="w-full max-w-md relative z-10" role="main">
     <div class="text-center mb-8">
-      <h1 class="font-sans text-headline-lg text-cr-text">Control Room</h1>
-      <p class="text-cr-muted mt-2 font-mono text-body-md">PM2 dashboard</p>
+      <svg class="w-12 h-12 mx-auto text-cr-accent mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 2L20.66 7v10L12 22 3.34 17V7L12 2z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 22V12M3.34 7L12 12l8.66-5"/>
+      </svg>
+      <h1 class="font-sans text-headline-lg cr-gradient-text font-bold">Control Room</h1>
+      <p class="text-cr-muted mt-2 font-mono text-body-md">PM2 ops console</p>
     </div>
-    <div class="bg-cr-surface rounded-2xl shadow-xl p-8 border border-cr-border">
+    <div class="cr-glass rounded-2xl shadow-xl p-8">
       <% if (typeof rateLimited !== 'undefined' && rateLimited) { %>
         <div class="mb-4 p-3 bg-[var(--cr-warning-bg)] border border-cr-warning rounded-lg text-cr-warning text-sm" role="alert">
           Troppi tentativi di login. Riprova tra 15 minuti.

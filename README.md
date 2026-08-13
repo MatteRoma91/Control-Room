@@ -4,6 +4,10 @@ Dashboard Node.js/Express per gestire i processi PM2 senza accesso SSH.
 
 **Repo:** [MatteRoma91/Control-Room](https://github.com/MatteRoma91/Control-Room) · **Produzione:** https://matteroma.duckdns.org · PM2 `control-room` :3005
 
+## Skin UI (NEXUS)
+
+Tema dark cyan/slate (card vetro, metriche live, barre gradient, particelle). Resta Express + EJS: niente React. Token e utility in `public/css/theme.css`; canvas in `public/js/cr-particles.js`. Dettaglio UX: [docs/UX-UI-BASELINE.md](../docs/UX-UI-BASELINE.md).
+
 ## Requisiti
 
 - Node.js 18+ (22 LTS consigliato per coerenza con le altre webapp)
@@ -108,9 +112,9 @@ Poi modifica `/etc/nginx/sites-available/matteroma.duckdns.conf`:
    - **Aggiorna tutto**: pulsante per refresh di Overview, Processi PM2, Health check e Processi di sistema
    - **Overview server**: uptime, load, RAM, disco, stato Nginx
    - **Azioni globali**: riavvia tutte le webapp, ripristina tutti i processi
-   - **Porte in ascolto**: tabella siti con porta backend (3000, 3001, 3002, 3003, 3005, **3006** JetHealth, 4000) e Nginx (80, 443), verificata con `ss` sul server
-   - **Health check**: verifica via HTTP le webapp con URL pubblico (incluso `jethealth.duckdns.org`)
-   - **Link rapidi** alle webapp (Padel, Ibuche, Veicoli, MattGame, JetHealth, SmartShell, …)
+   - **Porte in ascolto**: tabella da `lib/constants.js` (`WEB_SITES`): 3000 Padel, 3001 Ibuche, 3002 Veicoli, 3003 MattGame, 3010 Ogar WS, 3005 Control Room, 3006 JetHealth, 4000 SmartShell, Nginx 80/443. Verifica con `ss`. Altre app live sul VPS (Tiberi 3008/3009, TSTFXME 3011, FantaMatt 3012, oneshot 3099) **non sono ancora nel catalogo** Control Room.
+   - **Health check**: verifica via HTTP le webapp del catalogo (incluso `jethealth.duckdns.org`)
+   - **Link rapidi** alle webapp del catalogo (Padel, Ibuche, Veicoli, MattGame, JetHealth, SmartShell, …)
    - **Processi PM2**: griglia di **card mini-dashboard** (desktop e mobile) con metriche (CPU, RAM, uptime, restart), stato crash loop, badge modulo, azioni Start/Stop/Restart/Flush/Azzera restart; aggiornamento live ogni 3s; link al dettaglio processo e log
    - **Processi di sistema**: top 25 per CPU (nginx, node, systemd, ecc.), tabella ordinabile cliccando sulle colonne (PID, Nome, CPU %, RAM, Utente)
    - **Reload Nginx** (richiede sudoers configurato)

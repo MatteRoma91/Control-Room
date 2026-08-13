@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0d9488">
+  <meta name="theme-color" content="#020617">
   <title>Verifica 2FA - Control Room</title>
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
@@ -27,10 +27,10 @@
   </div>
   <main class="w-full max-w-md" role="main">
     <div class="text-center mb-8">
-      <h1 class="font-sans text-headline-lg text-cr-text">Control Room</h1>
+      <h1 class="font-sans text-headline-lg cr-gradient-text font-bold">Control Room</h1>
       <p class="text-cr-muted mt-2 font-mono text-body-md">Autenticazione a due fattori</p>
     </div>
-    <div class="bg-cr-surface rounded-2xl shadow-xl p-8 border border-cr-border">
+    <div class="cr-glass rounded-2xl shadow-xl p-8">
       <% if (typeof rateLimited !== 'undefined' && rateLimited) { %>
         <div class="mb-4 p-3 bg-[var(--cr-warning-bg)] border border-cr-warning rounded-lg text-cr-warning text-sm" role="alert">
           Troppi tentativi. Riprova tra 15 minuti.

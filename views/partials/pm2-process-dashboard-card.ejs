@@ -9,7 +9,7 @@
 <% var titleId = 'pm2-card-title-' + sid + idSuf; %>
 <% var stOk = p.status === 'online'; var stStop = p.status === 'stopped'; %>
 <article
-  class="rounded-xl border border-cr-border bg-cr-surface p-4 shadow-sm hover:shadow-md transition-shadow focus-within:ring-2 focus-within:ring-cr-accent/30 <%= (p.restart_time >= 3) ? 'ring-1 ring-cr-danger/50 border-cr-danger/40' : '' %>"
+  class="cr-glass rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow focus-within:ring-2 focus-within:ring-cr-accent/30 <%= (p.restart_time >= 3) ? 'ring-1 ring-cr-danger/50 border-cr-danger/40' : '' %>"
   role="region"
   aria-labelledby="<%= titleId %>"
 >

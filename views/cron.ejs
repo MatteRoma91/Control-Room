@@ -1,8 +1,8 @@
 <section class="mb-8" aria-labelledby="cron-heading">
-  <h1 id="cron-heading" class="font-sans text-headline-lg text-cr-text mb-6">Cron Jobs (Pianificazione)</h1>
+  <h1 id="cron-heading" class="font-sans text-headline-lg cr-gradient-text font-bold mb-6">Cron Jobs (Pianificazione)</h1>
   <p class="text-cr-muted mb-6">Pianifica riavvii PM2, backup database o comandi personalizzati. Formato cron: minuto ora giorno mese giorno_settimana (es. <code class="text-cr-accent">0 4 * * *</code> = ogni giorno alle 04:00, <code class="text-cr-accent">0 4 * * 5</code> = ogni venerdì alle 04:00).</p>
 
-  <div class="rounded-lg border border-cr-border bg-cr-surface p-6 mb-8">
+  <div class="cr-glass p-6 mb-8">
     <h2 class="font-sans text-label-md font-medium text-cr-text mb-2">Daily App Check (auto-ripristino)</h2>
     <p class="text-cr-muted text-sm mb-4">Controllo automatico giornaliero di tutte le webapp (locale + internet) con tentativo di ripristino automatico in caso di problemi.</p>
     <div class="flex flex-wrap gap-3 items-center mb-4">
@@ -24,7 +24,7 @@
   <script>window.cronProcesses = <%- JSON.stringify((processes && processes.length) ? processes.map(p => p.name) : ['padel-tour','roma-buche','gestione-veicoli','jethealth','control-room']) %>;</script>
   <div class="space-y-4 mb-8" id="cronJobsList">
     <% (cronJobs || []).forEach((job) => { %>
-    <div class="cron-job-card flex flex-wrap items-center gap-4 p-4 rounded-lg border border-cr-border bg-cr-surface" data-id="<%= job.id %>">
+    <div class="cron-job-card flex flex-wrap items-center gap-4 p-4 cr-glass" data-id="<%= job.id %>">
       <div class="flex-1 min-w-0 space-y-2">
         <input type="text" class="cron-name w-full bg-transparent border-b border-cr-inputBorder px-0 py-1 text-cr-text font-medium focus:ring-0 focus:border-cr-accent" value="<%= (job.name || '') %>" placeholder="Nome" />
         <input type="text" class="cron-schedule block w-full bg-transparent border-b border-cr-inputBorder px-0 py-1 text-cr-muted font-mono text-sm focus:ring-0 focus:border-cr-accent" value="<%= (job.schedule || '') %>" placeholder="0 4 * * *" />
@@ -56,7 +56,7 @@
     <% }); %>
   </div>
 
-  <div class="rounded-lg border border-cr-border bg-cr-surface p-6 mb-6">
+  <div class="cr-glass p-6 mb-6">
     <h2 class="font-sans text-label-md font-medium text-cr-text mb-4">Aggiungi job</h2>
     <div class="space-y-4">
       <div>
@@ -112,7 +112,7 @@
     Salva configurazione
   </button>
 
-  <div class="rounded-lg border border-cr-border bg-cr-surface p-6 mt-6">
+  <div class="cr-glass p-6 mt-6">
     <h2 class="font-sans text-label-md font-medium text-cr-text mb-2">Storico esecuzioni cron</h2>
     <div id="cronHistory" class="text-xs text-cr-text font-mono whitespace-pre-wrap">Caricamento...</div>
   </div>
@@ -192,7 +192,7 @@
       return `<option value="${name}"${sel}>${name}</option>`;
     }).join('');
     const card = document.createElement('div');
-    card.className = 'cron-job-card flex flex-wrap items-center gap-4 p-4 rounded-lg border border-cr-border bg-cr-surface';
+    card.className = 'cron-job-card flex flex-wrap items-center gap-4 p-4 cr-glass';
     card.dataset.id = job.id || 'cron-' + Date.now();
     const showTarget = job.action === 'pm2-restart' || job.action === 'pm2-start';
     const showCommand = job.action === 'command';

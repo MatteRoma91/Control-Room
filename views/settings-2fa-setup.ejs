@@ -3,10 +3,10 @@
 </a>
 
 <section class="mb-8" aria-labelledby="2fa-heading">
-  <h1 id="2fa-heading" class="font-sans text-headline-lg text-cr-text mb-6">Autenticazione a due fattori</h1>
+  <h1 id="2fa-heading" class="font-sans text-headline-lg cr-gradient-text font-bold mb-6">Autenticazione a due fattori</h1>
 
   <% if (settings.totpEnabled) { %>
-    <div class="rounded-lg border border-cr-border bg-cr-surface p-6 max-w-xl">
+    <div class="cr-glass p-6 max-w-xl">
       <div class="flex items-center gap-2 mb-4">
         <span class="px-2 py-0.5 rounded text-xs font-medium bg-[var(--cr-success-bg)] text-cr-accent">Attivo</span>
       </div>
@@ -33,7 +33,7 @@
       </div>
     </div>
   <% } else { %>
-    <div class="rounded-lg border border-cr-border bg-cr-surface p-6 max-w-xl" id="setup2FASection">
+    <div class="cr-glass p-6 max-w-xl" id="setup2FASection">
       <p class="text-cr-text mb-4">Configura Google Authenticator (o un'app compatibile) per proteggere l'accesso con un secondo fattore.</p>
       <button
         type="button"
