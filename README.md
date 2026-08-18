@@ -112,7 +112,7 @@ Poi modifica `/etc/nginx/sites-available/matteroma.duckdns.conf`:
    - **Aggiorna tutto**: pulsante per refresh di Overview, Processi PM2, Health check e Processi di sistema
    - **Overview server**: uptime, load, RAM, disco, stato Nginx
    - **Azioni globali**: riavvia tutte le webapp, ripristina tutti i processi
-   - **Porte in ascolto**: tabella da `lib/constants.js` (`WEB_SITES`): 3000 Padel, 3001 Ibuche, 3002 Veicoli, 3003 MattGame, 3010 Ogar WS, 3005 Control Room, 3006 JetHealth, 4000 SmartShell, Nginx 80/443. Verifica con `ss`. Altre app live sul VPS (Tiberi 3008/3009, TSTFXME 3011, FantaMatt 3012, oneshot 3099) **non sono ancora nel catalogo** Control Room.
+   - **Porte in ascolto**: tabella da `lib/constants.js` (`WEB_SITES`): 3000 Padel, 3001 Ibuche, 3002 Veicoli, 3003 MattGame, 3010 Ogar WS, 3005 Control Room, 3006 JetHealth, 4000 SmartShell, Nginx 80/443. Verifica con `ss`. Altre app live sul VPS (Tiberi 3008/3009, TSTFXME 3011, oneshot 3099) **non sono ancora nel catalogo** Control Room.
    - **Health check**: verifica via HTTP le webapp del catalogo (incluso `jethealth.duckdns.org`)
    - **Link rapidi** alle webapp del catalogo (Padel, Ibuche, Veicoli, MattGame, JetHealth, SmartShell, …)
    - **Processi PM2**: griglia di **card mini-dashboard** (desktop e mobile) con metriche (CPU, RAM, uptime, restart), stato crash loop, badge modulo, azioni Start/Stop/Restart/Flush/Azzera restart; aggiornamento live ogni 3s; link al dettaglio processo e log
