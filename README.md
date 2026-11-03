@@ -112,7 +112,7 @@ Poi modifica `/etc/nginx/sites-available/matteroma.duckdns.conf`:
    - **Aggiorna tutto**: pulsante per refresh di Overview, Processi PM2, Health check e Processi di sistema
    - **Overview server**: uptime, load, RAM, disco, stato Nginx
    - **Azioni globali**: riavvia tutte le webapp, ripristina tutti i processi
-   - **Porte in ascolto**: tabella da `lib/constants.js` (`WEB_SITES`): 3000 Padel, 3001 Ibuche, 3002 Veicoli, 3003 MattGame, 3010 Ogar WS, 3005 Control Room, 3006 JetHealth, 4000 SmartShell, Nginx 80/443. Verifica con `ss`. Altre app live sul VPS (Tiberi 3008/3009, DrumTeacher 4010, oneshot 3099) **non sono ancora nel catalogo** Control Room.
+   - **Porte in ascolto**: tabella da `lib/constants.js` (`WEB_SITES`): 3000 Padel, 3001 Ibuche, 3002 Veicoli, 3003 MattGame, 3010 Ogar WS, 3005 Control Room, 3006 JetHealth, 3008 Tiberi demo A, 3009 Tiberi Payload v2, 3099 Oneshot (systemd `ampb-sync`, senza PM2), 4000 SmartShell, 4010 DrumTeacher API, Nginx 80/443. Verifica con `ss`.
    - **Health check**: verifica via HTTP le webapp del catalogo (incluso `jethealth.duckdns.org`)
    - **Link rapidi** alle webapp del catalogo (Padel, Ibuche, Veicoli, MattGame, JetHealth, SmartShell, …)
    - **Processi PM2**: griglia di **card mini-dashboard** (desktop e mobile) con metriche (CPU, RAM, uptime, restart), stato crash loop, badge modulo, azioni Start/Stop/Restart/Flush/Azzera restart; aggiornamento live ogni 3s; link al dettaglio processo e log
@@ -137,23 +137,31 @@ Nella pagina **dettaglio processo** (log PM2 in tempo reale):
 Se il pulsante "Reload Nginx" non funziona, aggiungi la regola sudoers:
 
 ```bash
-echo 'ubuntu ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx' | sudo tee /etc/sudoers.d/control-room
+sudo tee /etc/sudoers.d/control-room << 'EOF'
+ubuntu ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
+ubuntu ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload nginx
+EOF
 sudo chmod 440 /etc/sudoers.d/control-room
+sudo visudo -cf /etc/sudoers.d/control-room
 ```
 
 ### Nginx Config Generator
 
-La pagina **Nginx** (menu laterale) permette di generare e applicare configurazioni Nginx per nuovi domini. Per abilitarla, aggiungi le regole sudoers:
+La pagina **Nginx** (menu laterale) permette di generare e applicare configurazioni Nginx per nuovi domini. Mostra un badge **Sudo Nginx: configurato / da configurare** (`GET /api/nginx-sudo-status`) e un box setup collassabile. Per abilitarla, aggiungi le regole sudoers (incluse backup/rollback `cp`):
 
 ```bash
 sudo tee /etc/sudoers.d/control-room-nginx << 'EOF'
 ubuntu ALL=(ALL) NOPASSWD: /usr/bin/cp /tmp/controlroom-nginx-*.conf /etc/nginx/sites-available/
+ubuntu ALL=(ALL) NOPASSWD: /usr/bin/cp /etc/nginx/sites-available/* /tmp/controlroom-nginx-backup-*
+ubuntu ALL=(ALL) NOPASSWD: /usr/bin/cp /tmp/controlroom-nginx-backup-* /etc/nginx/sites-available/
 ubuntu ALL=(ALL) NOPASSWD: /usr/bin/ln -sf /etc/nginx/sites-available/* /etc/nginx/sites-enabled/
 ubuntu ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t
 ubuntu ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
+ubuntu ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload nginx
 ubuntu ALL=(ALL) NOPASSWD: /usr/bin/certbot certonly --nginx -d *
 EOF
 sudo chmod 440 /etc/sudoers.d/control-room-nginx
+sudo visudo -cf /etc/sudoers.d/control-room-nginx
 ```
 
 Per Certbot, opzionalmente imposta `CR_CONTACT_EMAIL` nel `.env` (email per Let's Encrypt).

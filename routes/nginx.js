@@ -16,6 +16,62 @@ function registerNginxRoutes(app, ctx) {
     }
   });
 
+  /** Non-destructive probe: passwordless sudo for nginx ops (never reloads nginx). */
+  app.get('/api/nginx-sudo-status', requireAuth, (req, res) => {
+    const hints = [];
+    let reloadOk = false;
+    let generateOk = false;
+    let listed = '';
+    try {
+      listed = execFileSync('sudo', ['-n', '-l'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (err) {
+      hints.push('Impossibile leggere sudo -l (NOPASSWD mancante o sudo non disponibile).');
+      if (err.stderr) hints.push(String(err.stderr).trim().slice(0, 200));
+      return res.json({ ok: false, reloadOk: false, generateOk: false, hints });
+    }
+
+    reloadOk =
+      listed.includes('/bin/systemctl reload nginx') ||
+      listed.includes('/usr/bin/systemctl reload nginx');
+    if (!reloadOk) {
+      hints.push('Manca NOPASSWD per systemctl reload nginx (/etc/sudoers.d/control-room).');
+    }
+
+    const hasNginxT = listed.includes('/usr/sbin/nginx -t');
+    const hasCpApply = listed.includes('/tmp/controlroom-nginx-') && listed.includes('/etc/nginx/sites-available');
+    const hasLn = listed.includes('/usr/bin/ln -sf') && listed.includes('sites-enabled');
+    generateOk = hasNginxT && hasCpApply && hasLn;
+    if (!generateOk) {
+      if (!hasNginxT) hints.push('Manca NOPASSWD per /usr/sbin/nginx -t.');
+      if (!hasCpApply) hints.push('Mancano regole cp per /tmp/controlroom-nginx-* → sites-available.');
+      if (!hasLn) hints.push('Manca regola ln -sf per sites-enabled.');
+      hints.push('Vedi /etc/sudoers.d/control-room-nginx.');
+    }
+
+    // Optional soft confirm: nginx -t is read-only and safe
+    if (generateOk) {
+      try {
+        execFileSync('sudo', ['-n', '/usr/sbin/nginx', '-t'], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      } catch (err) {
+        generateOk = false;
+        hints.push('nginx -t fallito: ' + String(err.stderr || err.message || err).trim().slice(0, 200));
+      }
+    }
+
+    res.json({
+      ok: reloadOk && generateOk,
+      reloadOk,
+      generateOk,
+      hints: [...new Set(hints.filter(Boolean))],
+    });
+  });
+
   app.post('/api/nginx-reload', requireAuth, (req, res) => {
     if (!hasStrongConfirmation(req, 'nginxReload')) {
       return res.status(400).json({ ok: false, error: `Conferma richiesta. Frase: ${HIGH_RISK_PHRASES.nginxReload}` });
