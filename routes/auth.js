@@ -30,7 +30,11 @@ function registerAuthRoutes(app, ctx) {
         return res.redirect('/login/2fa');
       }
       req.session.user = username;
-      await audit('login', { user: username });
+      await audit('login', {
+        user: username,
+        mfa: false,
+        ...(settings.totpEnabled && !settings.totpSecret ? { reason: 'totp_enabled_without_secret' } : {}),
+      });
       return res.redirect('/');
     }
     await audit('login_fail', { reason: 'invalid_credentials' });

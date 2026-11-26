@@ -5,7 +5,7 @@
 <section class="mb-8" aria-labelledby="2fa-heading">
   <h1 id="2fa-heading" class="font-sans text-headline-lg cr-gradient-text font-bold mb-6">Autenticazione a due fattori</h1>
 
-  <% if (settings.totpEnabled) { %>
+  <% if (settings.totpEnabled && settings.totpSecret) { %>
     <div class="cr-glass p-6 max-w-xl">
       <div class="flex items-center gap-2 mb-4">
         <span class="px-2 py-0.5 rounded text-xs font-medium bg-[var(--cr-success-bg)] text-cr-accent">Attivo</span>

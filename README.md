@@ -112,9 +112,10 @@ Poi modifica `/etc/nginx/sites-available/matteroma.duckdns.conf`:
    - **Aggiorna tutto**: pulsante per refresh di Overview, Processi PM2, Health check e Processi di sistema
    - **Overview server**: uptime, load, RAM, disco, stato Nginx
    - **Azioni globali**: riavvia tutte le webapp, ripristina tutti i processi
-   - **Porte in ascolto**: tabella da `lib/constants.js` (`WEB_SITES`): 3000 Padel, 3001 Ibuche, 3002 Veicoli, 3003 MattGame, 3010 Ogar WS, 3005 Control Room, 3006 JetHealth, 3008 Tiberi demo A, 3009 Tiberi Payload v2, 3099 Oneshot (systemd `ampb-sync`, senza PM2), 4000 SmartShell, 4010 DrumTeacher API, Nginx 80/443. Verifica con `ss`.
-   - **Health check**: verifica via HTTP le webapp del catalogo (incluso `jethealth.duckdns.org`)
-   - **Link rapidi** alle webapp del catalogo (Padel, Ibuche, Veicoli, MattGame, JetHealth, SmartShell, …)
+   - **Porte in ascolto**: tabella da `lib/constants.js` (`WEB_SITES`): 3000 Padel, 3001 Ibuche, 3002 Veicoli, 3003 MattGame, 3010 Ogar WS, 3005 Control Room, 3006 JetHealth, 3008 Tiberi demo A, 3009 Tiberi Payload v2, **3012 MattMaps** (`gta6-map`), 3099 Oneshot (systemd `ampb-sync`, senza PM2), 4000 SmartShell, 4010 DrumTeacher API, Nginx 80/443. Verifica con `ss`.
+   - **Health check**: verifica via HTTP le webapp del catalogo (incluso `jethealth.duckdns.org` e `mattmaps.duckdns.org`)
+   - **Link rapidi** e voce **Siti** in sidebar: generati da `WEB_SITES` (stesso elenco della dashboard)
+   - **Accessi IP** (`/access`) e **Sicurezza** (`/security`): panoramiche da `lib/access-report.js` e `lib/security-report.js`
    - **Processi PM2**: griglia di **card mini-dashboard** (desktop e mobile) con metriche (CPU, RAM, uptime, restart), stato crash loop, badge modulo, azioni Start/Stop/Restart/Flush/Azzera restart; aggiornamento live ogni 3s; link al dettaglio processo e log
    - **Processi di sistema**: top 25 per CPU (nginx, node, systemd, ecc.), tabella ordinabile cliccando sulle colonne (PID, Nome, CPU %, RAM, Utente)
    - **Reload Nginx** (richiede sudoers configurato)
@@ -172,7 +173,7 @@ Per Certbot, opzionalmente imposta `CR_CONTACT_EMAIL` nel `.env` (email per Let'
 - **Processi di sistema**: Top 25 per CPU, ordinamento cliccando sulle intestazioni di colonna
 - **Editor .env**: Modifica variabili d'ambiente con valori mascherati (Rivela) e backup `.env.bak`
 - **Cron Jobs**: Crea e personalizza job pianificati (PM2 restart, backup DB, comandi)
-- **Notifiche**: Discord, Slack o Telegram; master globali (crash, loop restart, eccezioni, stderr, runbook, incidenti, security) e **filtri per processo PM2** in Impostazioni (ambito «tutte le app» vs «solo app selezionate», matrice per disattivare tipi per singola app, sincronizzazione elenco da PM2). Con ambito ristretto, anche le notifiche runbook «recover» per singola app rispettano l’elenco. Persistenza in `settings.json` (non committare URL/token in repo)
+- **Notifiche**: Discord, Slack o Telegram; master globali (crash, loop restart, eccezioni, stderr, runbook, incidenti, security, **login SSH riusciti** sul server) e **filtri per processo PM2** in Impostazioni (ambito «tutte le app» vs «solo app selezionate», matrice per disattivare tipi per singola app, sincronizzazione elenco da PM2). Con ambito ristretto, anche le notifiche runbook «recover» per singola app rispettano l’elenco. Persistenza in `settings.json` (non committare URL/token in repo). Il flag SSH è `notifyOnSshLogin` (default attivo); non riguarda il login della Control Room. Il badge 2FA è «Attivo» solo se `totpEnabled` e il segreto sono entrambi presenti.
 - **Feedback UI**: toast con icone e durate differenziate; stati **In corso…** / **Salvato ✓** su salvataggio impostazioni e pulsanti di verifica dove applicabile; dashboard e layout con `aria-busy` su azioni lunghe dove previsto
 - **Firewall IP**: Whitelist e Panic Mode per restringere l'accesso
 - **Nginx Generator**: Form per generare e applicare config per nuovi domini

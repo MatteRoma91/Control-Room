@@ -33,6 +33,12 @@
   <a href="/nginx" class="<%= navItem('/nginx', p === '/nginx') %>">
     Nginx
   </a>
+  <a href="/access" class="<%= navItem('/access', p === '/access') %>">
+    Accessi IP
+  </a>
+  <a href="/security" class="<%= navItem('/security', p === '/security') %>">
+    Sicurezza
+  </a>
   <a href="/audit" class="<%= navItem('/audit', p === '/audit') %>">
     Audit log
   </a>
@@ -56,34 +62,12 @@
   </div>
 
   <p class="px-4 pt-5 pb-1 font-sans text-label-md font-medium uppercase tracking-wider text-cr-muted">Siti</p>
-  <a href="https://bananapadeltour.duckdns.org/" target="_blank" rel="noopener" onclick="window.crCloseMobileDrawer && window.crCloseMobileDrawer()" class="flex items-center min-h-[44px] px-4 py-2 text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2 gap-2">
+  <% (navSites || []).forEach(function (site) { %>
+  <a href="<%= site.url %>" target="_blank" rel="noopener" onclick="window.crCloseMobileDrawer && window.crCloseMobileDrawer()" class="flex items-center min-h-[44px] px-4 py-2 text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2 gap-2">
     <span class="opacity-60" aria-hidden="true">↗</span>
-    Banana Padel Tour
+    <%= site.name %>
   </a>
-  <a href="https://ibuche.duckdns.org/" target="_blank" rel="noopener" onclick="window.crCloseMobileDrawer && window.crCloseMobileDrawer()" class="flex items-center min-h-[44px] px-4 py-2 text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2 gap-2">
-    <span class="opacity-60" aria-hidden="true">↗</span>
-    Roma-Buche
-  </a>
-  <a href="https://gestione-veicoli.duckdns.org/" target="_blank" rel="noopener" onclick="window.crCloseMobileDrawer && window.crCloseMobileDrawer()" class="flex items-center min-h-[44px] px-4 py-2 text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2 gap-2">
-    <span class="opacity-60" aria-hidden="true">↗</span>
-    Gestione Veicoli
-  </a>
-  <a href="https://jethealth.duckdns.org/" target="_blank" rel="noopener" onclick="window.crCloseMobileDrawer && window.crCloseMobileDrawer()" class="flex items-center min-h-[44px] px-4 py-2 text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2 gap-2">
-    <span class="opacity-60" aria-hidden="true">↗</span>
-    JetHealth
-  </a>
-  <a href="https://mattgame.duckdns.org/" target="_blank" rel="noopener" onclick="window.crCloseMobileDrawer && window.crCloseMobileDrawer()" class="flex items-center min-h-[44px] px-4 py-2 text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2 gap-2">
-    <span class="opacity-60" aria-hidden="true">↗</span>
-    MattGame
-  </a>
-  <a href="https://smartshellterminal.duckdns.org/" target="_blank" rel="noopener" onclick="window.crCloseMobileDrawer && window.crCloseMobileDrawer()" class="flex items-center min-h-[44px] px-4 py-2 text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2 gap-2">
-    <span class="opacity-60" aria-hidden="true">↗</span>
-    SmartShell Terminal
-  </a>
-  <a href="https://matteroma.duckdns.org/" target="_blank" rel="noopener" onclick="window.crCloseMobileDrawer && window.crCloseMobileDrawer()" class="flex items-center min-h-[44px] px-4 py-2 text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2 gap-2">
-    <span class="opacity-60" aria-hidden="true">↗</span>
-    Control Room
-  </a>
+  <% }) %>
 
   <form method="POST" action="/logout" class="md:hidden mt-auto border-t border-cr-border pt-3 pb-4">
     <button type="submit" class="flex items-center min-h-[44px] w-full px-4 py-2 text-left text-sm text-cr-muted hover:bg-cr-navHover hover:text-cr-text rounded-r-md mr-2">

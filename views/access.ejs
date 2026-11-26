@@ -1,0 +1,84 @@
+<section aria-labelledby="access-heading">
+  <div class="flex items-center justify-between gap-3 mb-2">
+    <h1 id="access-heading" class="font-sans text-headline-lg cr-gradient-text font-bold">Accessi</h1>
+    <button id="btnRefreshAccess" class="px-4 py-2 rounded-lg bg-cr-surface2 hover:bg-cr-navHover">Aggiorna</button>
+  </div>
+  <p class="text-sm text-cr-muted mb-4">Chi è dentro in SSH, chi è stato bannato da Fail2ban e quali IP hanno chiamato i siti (log Nginx di oggi, senza distinguere il dominio).</p>
+  <p id="accessMeta" class="text-xs text-cr-muted mb-4"></p>
+  <div id="accessRoot" class="space-y-6">
+    <p class="text-cr-muted">Caricamento...</p>
+  </div>
+</section>
+
+<script>
+  function esc(v) {
+    const d = document.createElement('div');
+    d.textContent = String(v == null ? '' : v);
+    return d.innerHTML;
+  }
+  function note(row) {
+    return row.note ? `<span class="ml-2 text-xs text-cr-accent">${esc(row.note)}</span>` : '';
+  }
+  function table(headers, rowsHtml) {
+    return `<div class="cr-glass overflow-x-auto"><table class="w-full text-sm"><thead class="cr-thead"><tr>${headers.map((h) => `<th class="text-left px-4 py-2">${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml || `<tr><td colspan="${headers.length}" class="px-4 py-6 text-center text-cr-muted">Nessuno</td></tr>`}</tbody></table></div>`;
+  }
+  function render(data) {
+    const ssh = data.ssh || { sessions: [], logins: [] };
+    const fb = data.fail2ban || {};
+    const web = (data.web && data.web.rows) || [];
+    const sessions = (ssh.sessions || []).map((r) =>
+      `<tr class="border-t border-cr-border"><td class="px-4 py-2 font-mono">${esc(r.ip)}${note(r)}</td><td class="px-4 py-2">${esc(r.port)}</td></tr>`
+    ).join('');
+    const logins = (ssh.logins || []).map((r) =>
+      `<tr class="border-t border-cr-border"><td class="px-4 py-2 whitespace-nowrap">${esc(r.at.replace('T', ' ').replace('+00:00', ' UTC'))}</td><td class="px-4 py-2 font-mono">${esc(r.ip)}${note(r)}</td><td class="px-4 py-2">${esc(r.user)}</td><td class="px-4 py-2">${esc(r.method)}</td></tr>`
+    ).join('');
+    const bannedNow = (fb.banned || []).map((r) =>
+      `<tr class="border-t border-cr-border"><td class="px-4 py-2 font-mono">${esc(r.ip)}${note(r)}</td></tr>`
+    ).join('');
+    const events = (fb.recent || []).map((r) =>
+      `<tr class="border-t border-cr-border"><td class="px-4 py-2 whitespace-nowrap">${esc(r.at)}</td><td class="px-4 py-2">${esc(r.action)}</td><td class="px-4 py-2 font-mono">${esc(r.ip)}</td></tr>`
+    ).join('');
+    const ips = web.map((r) =>
+      `<tr class="border-t border-cr-border"><td class="px-4 py-2 font-mono">${esc(r.ip)}${note(r)}</td><td class="px-4 py-2">${esc(r.requests)}</td><td class="px-4 py-2">${esc(r.ok)}</td><td class="px-4 py-2">${esc(r.denied)}</td><td class="px-4 py-2 text-cr-muted">${esc(r.lastStatus)} ${esc(r.lastPath)}</td></tr>`
+    ).join('');
+    document.getElementById('accessMeta').textContent = 'Aggiornato ' + new Date(data.generatedAt).toLocaleString('it-IT') + (data.errors && data.errors.length ? ' — ' + data.errors.join('; ') : '');
+    document.getElementById('accessRoot').innerHTML = `
+      <div>
+        <h2 class="font-semibold mb-2">SSH aperto adesso</h2>
+        ${table(['IP', 'Porta client'], sessions)}
+      </div>
+      <div>
+        <h2 class="font-semibold mb-2">Login SSH riusciti</h2>
+        <p class="text-xs text-cr-muted mb-2">Dal file auth.log corrente. Password e chiave pubblica.</p>
+        ${table(['Quando', 'IP', 'Utente', 'Metodo'], logins)}
+      </div>
+      <div>
+        <h2 class="font-semibold mb-2">Fail2ban SSH</h2>
+        <p class="text-sm text-cr-muted mb-2">Falliti in corso: ${esc(fb.currentlyFailed ?? '—')} · Bannati ora: ${esc(fb.currentlyBanned ?? '—')} · Ban totali da avvio: ${esc(fb.totalBanned ?? '—')}</p>
+        ${fb.ok === false ? `<p class="text-sm text-cr-danger mb-2">${esc(fb.error || 'stato non disponibile')}</p>` : ''}
+        <h3 class="text-sm font-medium mb-2">Bannati in questo momento</h3>
+        ${table(['IP'], bannedNow)}
+        <h3 class="text-sm font-medium mt-4 mb-2">Ultimi ban e sblocchi</h3>
+        ${table(['Quando', 'Azione', 'IP'], events)}
+      </div>
+      <div>
+        <h2 class="font-semibold mb-2">Chi ha chiamato i siti</h2>
+        <p class="text-xs text-cr-muted mb-2">Conteggio sul log Nginx corrente. «Ok» sono risposte 2xx/3xx. Non indica quale dominio.</p>
+        ${table(['IP', 'Richieste', 'Ok', '4xx', 'Ultima'], ips)}
+      </div>
+    `;
+  }
+  async function loadAccess() {
+    document.getElementById('accessRoot').innerHTML = '<p class="text-cr-muted">Caricamento...</p>';
+    try {
+      const res = await fetch('/api/access/overview');
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || res.statusText);
+      render(json);
+    } catch (e) {
+      document.getElementById('accessRoot').innerHTML = `<p class="text-cr-danger">Errore: ${esc(e.message)}</p>`;
+    }
+  }
+  document.getElementById('btnRefreshAccess').addEventListener('click', loadAccess);
+  loadAccess();
+</script>

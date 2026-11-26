@@ -33,13 +33,13 @@
       href="/settings/2fa-setup"
       class="inline-block px-4 py-2 rounded-lg bg-cr-surface2 hover:bg-cr-navHover focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-canvas"
     >
-      <% if (settings.totpEnabled) { %>
+      <% if (settings.totpEnabled && settings.totpSecret) { %>
         Gestisci 2FA
       <% } else { %>
         Configura 2FA
       <% } %>
     </a>
-    <% if (settings.totpEnabled) { %>
+    <% if (settings.totpEnabled && settings.totpSecret) { %>
       <span class="ml-3 px-2 py-0.5 rounded text-xs font-medium bg-[var(--cr-success-bg)] text-cr-accent">Attivo</span>
     <% } else { %>
       <span class="ml-3 px-2 py-0.5 rounded text-xs font-medium bg-cr-surface2 text-cr-muted">Non configurato</span>
@@ -184,6 +184,14 @@
                 <span class="text-cr-text">Security admin</span>
               </label>
               <span class="text-xs text-cr-muted">Revoca sessioni e azioni security sensibili.</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <label class="flex items-center gap-2 cursor-pointer shrink-0 mt-0.5">
+                <input type="checkbox" name="notifyOnSshLogin" value="1" <%= settings.notifyOnSshLogin !== false ? 'checked' : '' %>
+                  class="rounded border-cr-inputBorder bg-cr-surface2 text-cr-accent focus:ring-cr-accent" />
+                <span class="text-cr-text">Login SSH riusciti</span>
+              </label>
+              <span class="text-xs text-cr-muted">Un messaggio Discord a ogni accesso riuscito sul server, non sul login della Control Room.</span>
             </li>
           </ul>
         </div>
@@ -684,6 +692,7 @@
       notifyOnRunbook: form.notifyOnRunbook?.checked === true,
       notifyOnIncident: form.notifyOnIncident?.checked === true,
       notifyOnSecurity: form.notifyOnSecurity?.checked === true,
+      notifyOnSshLogin: form.notifyOnSshLogin?.checked === true,
       sshProfiles: collectSshProfiles(),
       ...collectNotifyPm2Payload(),
     };

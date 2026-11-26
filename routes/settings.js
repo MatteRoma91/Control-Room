@@ -33,7 +33,8 @@ function registerSettingsRoutes(app, ctx) {
 
   app.get('/api/settings', requireAuth, async (req, res) => {
     const settings = await loadSettings();
-    res.json(settings);
+    const { totpSecret, ...safe } = settings;
+    res.json({ ...safe, totpConfigured: !!(settings.totpEnabled && totpSecret) });
   });
 
   app.post('/api/settings', requireAuth, async (req, res) => {
@@ -141,6 +142,7 @@ function registerSettingsRoutes(app, ctx) {
       current.totpEnabled = true;
       await saveSettings(current);
       delete req.session.temp2FASecret;
+      await audit('2fa_enabled', { user: req.session?.user });
       res.json({ ok: true });
     } catch (err) {
       console.error('2FA verify-setup error:', err);

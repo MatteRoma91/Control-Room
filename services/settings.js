@@ -88,6 +88,7 @@ function sanitizeSettings(raw) {
     notifyOnRunbook: source.notifyOnRunbook === true,
     notifyOnIncident: source.notifyOnIncident !== false,
     notifyOnSecurity: source.notifyOnSecurity === true,
+    notifyOnSshLogin: source.notifyOnSshLogin !== false,
     notifyPm2Scope: source.notifyPm2Scope === 'onlyListed' ? 'onlyListed' : 'all',
     notifyPm2OnlyApps: sanitizeNotifyPm2OnlyApps(source.notifyPm2OnlyApps),
     notifyPm2PerApp: sanitizeNotifyPm2PerApp(source.notifyPm2PerApp),

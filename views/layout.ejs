@@ -97,6 +97,8 @@
         <a href="/settings" class="px-2.5 py-1.5 rounded-md text-sm border transition-colors focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav <%= hp.indexOf('/settings') === 0 ? 'border-cr-accent bg-cr-surface2 text-cr-accent font-medium' : 'border-transparent bg-cr-surface2 hover:bg-cr-navHover text-cr-text' %>" aria-current="<%= hp.indexOf('/settings') === 0 ? 'page' : 'false' %>">Impostazioni</a>
         <a href="/cron" class="px-2.5 py-1.5 rounded-md text-sm border transition-colors focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav <%= hp === '/cron' ? 'border-cr-accent bg-cr-surface2 text-cr-accent font-medium' : 'border-transparent bg-cr-surface2 hover:bg-cr-navHover text-cr-text' %>" aria-current="<%= hp === '/cron' ? 'page' : 'false' %>">Cron</a>
         <a href="/nginx" class="px-2.5 py-1.5 rounded-md text-sm border transition-colors focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav <%= hp === '/nginx' ? 'border-cr-accent bg-cr-surface2 text-cr-accent font-medium' : 'border-transparent bg-cr-surface2 hover:bg-cr-navHover text-cr-text' %>" aria-current="<%= hp === '/nginx' ? 'page' : 'false' %>">Nginx</a>
+        <a href="/access" class="px-2.5 py-1.5 rounded-md text-sm border transition-colors focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav <%= hp === '/access' ? 'border-cr-accent bg-cr-surface2 text-cr-accent font-medium' : 'border-transparent bg-cr-surface2 hover:bg-cr-navHover text-cr-text' %>" aria-current="<%= hp === '/access' ? 'page' : 'false' %>">Accessi</a>
+        <a href="/security" class="px-2.5 py-1.5 rounded-md text-sm border transition-colors focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav <%= hp === '/security' ? 'border-cr-accent bg-cr-surface2 text-cr-accent font-medium' : 'border-transparent bg-cr-surface2 hover:bg-cr-navHover text-cr-text' %>" aria-current="<%= hp === '/security' ? 'page' : 'false' %>">Sicurezza</a>
         <a href="/audit" class="px-2.5 py-1.5 rounded-md text-sm border transition-colors focus:outline-none focus:ring-2 focus:ring-cr-accent focus:ring-offset-2 focus:ring-offset-cr-nav <%= hp === '/audit' ? 'border-cr-accent bg-cr-surface2 text-cr-accent font-medium' : 'border-transparent bg-cr-surface2 hover:bg-cr-navHover text-cr-text' %>" aria-current="<%= hp === '/audit' ? 'page' : 'false' %>">Audit</a>
       </div>
       <form method="POST" action="/logout" class="inline">
@@ -143,6 +145,44 @@
       }
       tick();
       setInterval(tick, 1000);
+    })();
+  </script>
+  <script>
+    (function () {
+      if (!document.getElementById('crSidebarCore')) return;
+      function setBar(id, val, barId) {
+        if (val == null || !isFinite(val)) return;
+        var el = document.getElementById(id);
+        var bar = document.getElementById(barId);
+        if (el) el.textContent = Math.round(val) + '%';
+        if (bar) bar.style.width = Math.min(100, Math.max(0, val)) + '%';
+      }
+      async function tickStats() {
+        try {
+          var res = await fetch('/api/system/stats', { credentials: 'same-origin' });
+          if (!res.ok) return;
+          var data = await res.json();
+          if (data.cpuPercent == null) return;
+          var ram = data.memoryPercent;
+          if (ram == null && data.memoryTotalMB) ram = (data.memoryUsedMB / data.memoryTotalMB) * 100;
+          setBar('crSidebarCore', data.cpuPercent, 'crSidebarCoreBar');
+          setBar('crSidebarRam', ram, 'crSidebarRamBar');
+        } catch (_) {}
+      }
+      async function tickHealth() {
+        try {
+          var res = await fetch('/api/health/summary', { credentials: 'same-origin' });
+          if (!res.ok) return;
+          var data = await res.json();
+          var summary = data.healthSummary;
+          if (!summary || !summary.total) return;
+          setBar('crSidebarHealth', ((summary.total - summary.failing) / summary.total) * 100, 'crSidebarHealthBar');
+        } catch (_) {}
+      }
+      tickStats();
+      tickHealth();
+      setInterval(tickStats, 3000);
+      setInterval(tickHealth, 20000);
     })();
   </script>
   <script>

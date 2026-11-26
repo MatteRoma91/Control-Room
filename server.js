@@ -55,6 +55,7 @@ const { registerSystemRoutes } = require('./routes/system');
 const { registerRunbookRoutes } = require('./routes/runbook');
 const { registerIncidentRoutes } = require('./routes/incidents');
 const { registerNginxRoutes } = require('./routes/nginx');
+const { registerFail2banRoutes } = require('./routes/fail2ban');
 const { registerSettingsRoutes } = require('./routes/settings');
 const {
   loadSettings,
@@ -70,6 +71,7 @@ const {
   executeRunbook,
 } = require('./services/runbook');
 const { isPathAllowed } = require('./lib/path-utils');
+const { pollSshLogins } = require('./services/ssh-login-notify');
 const {
   formatUptime,
   resolveManagedProjectCwd,
@@ -260,6 +262,14 @@ const sessionMiddleware = session(sessionConfig);
 app.use(sessionMiddleware);
 
 /** Path corrente per evidenziazione nav nelle viste EJS */
+const seenNavUrls = new Set();
+app.locals.navSites = WEB_SITES.filter((site) => {
+  if (!site.url || site.kind !== 'app') return false;
+  if (seenNavUrls.has(site.url)) return false;
+  seenNavUrls.add(site.url);
+  return true;
+}).map((site) => ({ name: site.name, url: site.url }));
+
 app.use((req, res, next) => {
   res.locals.reqPath = req.path || '';
   next();
@@ -707,6 +717,8 @@ registerNginxRoutes(app, {
   hasStrongConfirmation,
   HIGH_RISK_PHRASES,
 });
+
+registerFail2banRoutes(app, { requireAuth, audit });
 
 // API: db backup (mysqldump | gzip, stream download)
 app.get('/api/db-backup', requireAuth, (req, res) => {
@@ -1688,6 +1700,10 @@ pm2.connect(async (err) => {
   httpServer.listen(PORT, () => {
     logEvent('startup', { port: PORT });
     console.log(`Control Room running on http://localhost:${PORT}`);
+    pollSshLogins(logEvent).catch((err) => logEvent('ssh_login_watch_error', { error: err.message }));
+    setInterval(() => {
+      pollSshLogins(logEvent).catch((err) => logEvent('ssh_login_watch_error', { error: err.message }));
+    }, 15000);
   });
 });
 

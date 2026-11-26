@@ -1,0 +1,307 @@
+<section aria-labelledby="security-heading">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+    <h1 id="security-heading" class="font-sans text-headline-lg cr-gradient-text font-bold">Sicurezza</h1>
+    <button id="btnRefreshSecurity" type="button" class="px-4 py-2 rounded-lg bg-cr-surface2 hover:bg-cr-navHover">Aggiorna</button>
+  </div>
+  <p class="text-sm text-cr-muted mb-2 max-w-3xl">Tentativi di forza su SSH e sulle app, letti dai log già presenti sul server. Un 200 su <span class="font-mono">/.env</span> o su un backup è quasi sempre la pagina HTML del sito, non il file.</p>
+  <p id="securityMeta" class="text-xs text-cr-muted mb-4"></p>
+
+  <section class="cr-glass rounded-xl p-4 mb-6" aria-labelledby="fail2ban-heading">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
+      <h2 id="fail2ban-heading" class="font-semibold">Ban Fail2ban</h2>
+      <button id="btnRefreshBans" type="button" class="px-3 py-1.5 rounded-lg bg-cr-surface2 hover:bg-cr-navHover text-sm">Aggiorna ban</button>
+    </div>
+    <p id="banPolicy" class="text-xs text-cr-muted mb-3">Lettura della jail…</p>
+    <form id="banForm" class="flex flex-wrap items-end gap-2 mb-4">
+      <label class="block text-sm">
+        <span class="block text-cr-muted mb-1">IP da bannare</span>
+        <input id="banIpInput" name="ip" required autocomplete="off" spellcheck="false" placeholder="203.0.113.10" class="w-56 px-3 py-2 rounded-lg bg-cr-surface2 border border-cr-inputBorder text-cr-text font-mono" />
+      </label>
+      <label id="banJailWrap" class="hidden text-sm">
+        <span class="block text-cr-muted mb-1">Jail</span>
+        <select id="banJail" class="px-3 py-2 rounded-lg bg-cr-surface2 border border-cr-inputBorder text-cr-text"></select>
+      </label>
+      <button type="submit" class="px-4 py-2 rounded-lg bg-cr-danger hover:opacity-90 text-white text-sm font-medium">Banna</button>
+    </form>
+    <p id="banMessage" class="text-sm mb-3 hidden" role="status"></p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="cr-thead">
+          <tr>
+            <th class="text-left px-4 py-2">IP bannato</th>
+            <th class="text-left px-4 py-2">Dal</th>
+            <th class="text-left px-4 py-2">Fino a</th>
+            <th class="text-right px-4 py-2"></th>
+          </tr>
+        </thead>
+        <tbody id="banBody">
+          <tr><td colspan="4" class="px-4 py-6 text-center text-cr-muted">Caricamento…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div id="securityRoot" class="space-y-6">
+    <p class="text-cr-muted">Caricamento...</p>
+  </div>
+</section>
+
+<script>
+  function esc(v) {
+    const d = document.createElement('div');
+    d.textContent = String(v == null ? '' : v);
+    return d.innerHTML;
+  }
+  let bannedSet = new Set();
+  let bansReady = false;
+  let lastSecurity = null;
+  let securityLoading = false;
+  function isBanned(ip, reportBanned) {
+    const value = String(ip || '');
+    if (bansReady) return bannedSet.has(value);
+    return !!(reportBanned && reportBanned.has(value));
+  }
+  function ipText(ip, reportBanned) {
+    const cls = isBanned(ip, reportBanned) ? ' class="text-cr-danger font-semibold"' : '';
+    return `<span${cls}>${esc(ip)}</span>`;
+  }
+  function note(row) {
+    return row.note ? `<span class="ml-2 text-xs text-cr-accent">${esc(row.note)}</span>` : '';
+  }
+  function card(label, value, detail) {
+    return `<div class="cr-metric"><p class="cr-metric__label">${esc(label)}</p><p class="cr-metric__value">${esc(value)}</p>${detail ? `<p class="text-xs text-cr-muted mt-1">${esc(detail)}</p>` : ''}</div>`;
+  }
+  function bars(items, labelKey, valueKey, reportBanned) {
+    if (!items.length) return '<p class="text-sm text-cr-muted">Niente in questo intervallo.</p>';
+    const max = Math.max(...items.map((item) => Number(item[valueKey]) || 0), 1);
+    return items.map((item) => {
+      const width = Math.max(2, Math.round((Number(item[valueKey]) || 0) / max * 100));
+      const bannedLabel = labelKey === 'ip' && isBanned(item[labelKey], reportBanned);
+      const labelCls = bannedLabel ? 'text-cr-danger font-semibold' : 'text-cr-muted';
+      return `<div class="flex items-center gap-2 text-xs mb-1.5">
+        <span class="w-28 shrink-0 truncate font-mono ${labelCls}" title="${esc(item[labelKey])}">${esc(item[labelKey])}</span>
+        <div class="cr-bar flex-1"><div class="cr-bar__fill cr-bar__fill--cyan" style="width:${width}%"></div></div>
+        <span class="w-14 text-right tabular-nums">${esc(item[valueKey])}</span>
+      </div>`;
+    }).join('');
+  }
+  function table(headers, body) {
+    return `<div class="cr-glass overflow-x-auto"><table class="w-full text-sm"><thead class="cr-thead"><tr>${headers.map((h) => `<th class="text-left px-4 py-2">${h}</th>`).join('')}</tr></thead><tbody>${body || `<tr><td colspan="${headers.length}" class="px-4 py-6 text-center text-cr-muted">Nessuno</td></tr>`}</tbody></table></div>`;
+  }
+  function when(value) {
+    return String(value || '').replace('T', ' ').replace(/\.\d+\+.*/, ' UTC').replace('+00:00', ' UTC');
+  }
+  function render(data) {
+    const s = data.summary || {};
+    const p = data.posture || {};
+    const fb = data.fail2ban || {};
+    const reportBanned = new Set(fb.banned || []);
+    const unknown = (data.sshAccepted || []).filter((row) => row.unknown);
+    const acceptedRows = (data.sshAccepted || []).map((row) =>
+      `<tr class="border-t border-cr-border ${row.unknown ? 'bg-[var(--cr-danger-bg)]' : ''}"><td class="px-4 py-2 whitespace-nowrap">${esc(when(row.at))}</td><td class="px-4 py-2 font-mono">${ipText(row.ip, reportBanned)}${note(row)}</td><td class="px-4 py-2">${esc(row.user)}</td><td class="px-4 py-2">${esc(row.method)}</td></tr>`
+    ).join('');
+    const failRows = (data.sshTop || []).map((row) =>
+      `<tr class="border-t border-cr-border"><td class="px-4 py-2 font-mono">${ipText(row.ip, reportBanned)}${note(row)}</td><td class="px-4 py-2">${esc(row.count)}</td><td class="px-4 py-2 text-cr-muted">${esc(row.users)}</td><td class="px-4 py-2 text-right">${row.note ? '' : `<button type="button" data-ban-ip="${esc(row.ip)}" class="px-2 py-1 rounded bg-cr-danger/90 hover:opacity-90 text-white text-xs">Banna</button>`}</td></tr>`
+    ).join('');
+    const webRows = (data.webRows || []).map((row) =>
+      `<tr class="border-t border-cr-border"><td class="px-4 py-2 font-mono">${ipText(row.ip, reportBanned)}${note(row)}</td><td class="px-4 py-2">${esc(row.verdict)}</td><td class="px-4 py-2">${esc(row.probes)}</td><td class="px-4 py-2">${esc(row.phpPaths)}</td><td class="px-4 py-2">${esc(row.loginFails)}</td><td class="px-4 py-2 text-cr-muted">${esc(row.lastStatus)} ${esc(row.lastPath)}${row.repeatedPage ? ' · stessa pagina' : ''}</td></tr>`
+    ).join('');
+    const loginRows = (data.webLogins || []).map((row) =>
+      `<tr class="border-t border-cr-border"><td class="px-4 py-2 whitespace-nowrap">${esc(row.at)}</td><td class="px-4 py-2 font-mono">${ipText(row.ip, reportBanned)}${note(row)}</td><td class="px-4 py-2 font-mono">${esc(row.path)}</td><td class="px-4 py-2">${esc(row.status)}</td></tr>`
+    ).join('');
+    const banRows = (fb.banned || []).map((ip) =>
+      `<tr class="border-t border-cr-border"><td class="px-4 py-2 font-mono text-cr-danger font-semibold">${esc(ip)}</td></tr>`
+    ).join('');
+    const password = p.passwordAuth === 'yes' ? 'attiva' : (p.passwordAuth === 'no' ? 'spenta' : 'non letta');
+    document.getElementById('securityMeta').textContent =
+      'Aggiornato ' + new Date(data.generatedAt).toLocaleString('it-IT') +
+      (data.cached ? ' · da cache di un minuto' : '') +
+      (data.errors && data.errors.length ? ' — ' + data.errors.join('; ') : '');
+    document.getElementById('securityRoot').innerHTML = `
+      <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        ${card('SSH falliti', s.sshFailed, s.sshFailIps + ' IP nel log corrente')}
+        ${card('SSH riusciti fuori dai tuoi IP', s.sshAcceptedUnknown, s.sshAccepted + ' riusciti negli archivi')}
+        ${card('Richieste da scanner web', s.webProbeRequests, s.webProbeIps + ' IP nel registro')}
+        ${card('Login web falliti, IP esterni', s.webLoginFailures, 'esclusi i tuoi due IP')}
+        ${card('Bannati SSH adesso', s.bannedNow, 'jail sshd, gestibili nel riquadro sopra')}
+        ${card('Password SSH', password, p.permitRoot ? 'root: ' + p.permitRoot : '')}
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="cr-glass rounded-xl p-4">
+          <h2 class="font-semibold mb-1">Forza bruta SSH per ora</h2>
+          <p class="text-xs text-cr-muted mb-3">${esc(data.window && data.window.sshFailures)}</p>
+          ${bars(data.sshHourly || [], 'hour', 'count')}
+        </div>
+        <div class="cr-glass rounded-xl p-4">
+          <h2 class="font-semibold mb-1">IP con più password SSH sbagliate</h2>
+          <p class="text-xs text-cr-muted mb-3">Solo il log corrente. Il firewall e Fail2ban li fermano per qualche minuto, poi riprovano.</p>
+          ${bars(data.sshTop || [], 'ip', 'count', reportBanned)}
+        </div>
+      </div>
+      ${unknown.length ? `<p class="text-sm rounded-lg border border-cr-danger/40 bg-[var(--cr-danger-bg)] px-4 py-3">C’è ${unknown.length === 1 ? 'un ingresso SSH' : unknown.length + ' ingressi SSH'} da un IP che non è nella whitelist. La riga è evidenziata nella tabella sotto: se non eri tu, la password di ubuntu è stata usata da qualcun altro.</p>` : '<p class="text-sm text-cr-muted">Nessun ingresso SSH riuscito fuori da ' + esc(p.serverIp ? 'questo server e ' : '') + 'i due IP già segnati come tuoi.</p>'}
+      <div>
+        <h2 class="font-semibold mb-2">Login SSH riusciti</h2>
+        <p class="text-xs text-cr-muted mb-2">${esc(data.window && data.window.sshSuccess)}</p>
+        ${table(['Quando', 'IP', 'Utente', 'Metodo'], acceptedRows)}
+      </div>
+      <div>
+        <h2 class="font-semibold mb-2">Chi ha forzato SSH</h2>
+        ${table(['IP', 'Password sbagliate', 'Utenti provati', ''], failRows)}
+      </div>
+      <div>
+        <h2 class="font-semibold mb-2">Scanner e prove di login sul web</h2>
+        <p class="text-xs text-cr-muted mb-2">${esc(data.window && data.window.web)}. «Scanner» ha chiesto file segreti o pannelli noti. «Scanner firmato» dice chi è (Censys, LeakIX). «Prova login» ha mandato un POST di accesso ed è stato rifiutato. «Stessa pagina» significa che tanti percorsi diversi hanno risposto con lo stesso numero di byte.</p>
+        ${table(['IP', 'Lettura', 'Percorsi sospetti', 'PHP', 'Login falliti', 'Ultimo'], webRows)}
+      </div>
+      <div>
+        <h2 class="font-semibold mb-2">POST di login</h2>
+        <p class="text-xs text-cr-muted mb-2">Sono nascosti solo i 200 dei due IP già segnati come tuoi. Un 200 da un altro IP è un accesso riuscito, per esempio dal telefono.</p>
+        ${table(['Quando', 'IP', 'Percorso', 'Codice'], loginRows)}
+      </div>
+      <div>
+        <h2 class="font-semibold mb-2">Fail2ban</h2>
+        <p class="text-sm text-cr-muted mb-2">Firewall: ${esc(p.ufw || 'non letto')} · Falliti in corso: ${esc(fb.currentlyFailed ?? '—')} · Ban totali da avvio del jail: ${esc(fb.totalBanned ?? '—')}</p>
+        ${fb.ok === false ? `<p class="text-sm text-cr-danger mb-2">${esc(fb.error || 'stato non disponibile')}</p>` : ''}
+        ${table(['IP bannati adesso'], banRows)}
+      </div>
+    `;
+  }
+  async function loadSecurity() {
+    securityLoading = true;
+    document.getElementById('securityRoot').innerHTML = '<p class="text-cr-muted">Lettura dei log...</p>';
+    try {
+      const res = await fetch('/api/security/overview');
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || res.statusText);
+      lastSecurity = json;
+      securityLoading = false;
+      render(json);
+    } catch (e) {
+      securityLoading = false;
+      document.getElementById('securityRoot').innerHTML = `<p class="text-cr-danger">Errore: ${esc(e.message)}</p>`;
+    }
+  }
+  document.getElementById('btnRefreshSecurity').addEventListener('click', loadSecurity);
+  loadSecurity();
+
+  function durationLabel(seconds) {
+    const n = Number(seconds);
+    if (!Number.isFinite(n)) return '—';
+    if (n === -1) return 'permanente';
+    if (n % 86400 === 0) return (n / 86400) + ' giorni';
+    if (n % 3600 === 0) return (n / 3600) + ' ore';
+    if (n % 60 === 0) return (n / 60) + ' minuti';
+    return n + ' secondi';
+  }
+  function currentJail() {
+    const select = document.getElementById('banJail');
+    return select && select.value ? select.value : 'sshd';
+  }
+  function setBanMessage(text, kind) {
+    const el = document.getElementById('banMessage');
+    if (!text) {
+      el.classList.add('hidden');
+      el.textContent = '';
+      return;
+    }
+    el.textContent = text;
+    el.className = 'text-sm mb-3 ' + (kind === 'error' ? 'text-cr-danger' : 'text-cr-accent');
+  }
+  function renderBans(data) {
+    const policy = data.policy || {};
+    const windowLabel = durationLabel(policy.findtime);
+    const banLabel = policy.permanent ? 'permanente' : durationLabel(policy.bantime);
+    document.getElementById('banPolicy').textContent =
+      'Jail ' + data.jail + ': ' + (policy.maxretry ?? '—') + ' tentativi in ' + windowLabel + ', ban ' + banLabel +
+      '. Falliti in corso: ' + (data.currentlyFailed ?? '—') + '. Bannati adesso: ' + (data.currentlyBanned ?? '—') + '.';
+    const wrap = document.getElementById('banJailWrap');
+    const select = document.getElementById('banJail');
+    const jails = data.jails || [];
+    if (jails.length > 1) {
+      const previous = select.value || data.jail;
+      select.innerHTML = jails.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join('');
+      select.value = jails.includes(previous) ? previous : data.jail;
+      wrap.classList.remove('hidden');
+    } else {
+      wrap.classList.add('hidden');
+      select.innerHTML = `<option value="${esc(data.jail)}">${esc(data.jail)}</option>`;
+    }
+    const rows = (data.bans || []).map((row) =>
+      `<tr class="border-t border-cr-border">
+        <td class="px-4 py-2 font-mono text-cr-danger font-semibold">${esc(row.ip)}</td>
+        <td class="px-4 py-2 whitespace-nowrap">${esc(row.bannedAt || '—')}</td>
+        <td class="px-4 py-2">${row.permanent ? 'per sempre' : esc(row.until || '—')}</td>
+        <td class="px-4 py-2 text-right"><button type="button" data-unban-ip="${esc(row.ip)}" class="px-3 py-1 rounded-lg bg-cr-surface2 hover:bg-cr-navHover text-xs">Rimuovi</button></td>
+      </tr>`
+    ).join('');
+    document.getElementById('banBody').innerHTML = rows || '<tr><td colspan="4" class="px-4 py-6 text-center text-cr-muted">Nessun IP bannato</td></tr>';
+    bannedSet = new Set((data.bans || []).map((row) => String(row.ip)));
+    bansReady = true;
+    if (!securityLoading && lastSecurity) render(lastSecurity);
+  }
+  async function loadBans() {
+    try {
+      const res = await fetch('/api/fail2ban?jail=' + encodeURIComponent(currentJail()));
+      const json = await res.json();
+      if (!res.ok || json.ok === false) throw new Error(json.error || res.statusText);
+      renderBans(json);
+    } catch (e) {
+      setBanMessage(e.message, 'error');
+      document.getElementById('banBody').innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-cr-danger">Ban non disponibili</td></tr>';
+    }
+  }
+  async function changeBan(path, ip) {
+    setBanMessage('');
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip, jail: currentJail() }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.ok === false) throw new Error(json.error || res.statusText);
+    renderBans(json);
+    return json;
+  }
+  document.getElementById('banForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const ip = document.getElementById('banIpInput').value.trim();
+    try {
+      await changeBan('/api/fail2ban/ban', ip);
+      document.getElementById('banIpInput').value = '';
+      setBanMessage(ip + ' bannato.', 'ok');
+      loadSecurity();
+    } catch (e) {
+      setBanMessage(e.message, 'error');
+    }
+  });
+  document.getElementById('banBody').addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-unban-ip]');
+    if (!button) return;
+    const ip = button.getAttribute('data-unban-ip');
+    try {
+      await changeBan('/api/fail2ban/unban', ip);
+      setBanMessage(ip + ' rimosso dal ban.', 'ok');
+      loadSecurity();
+    } catch (e) {
+      setBanMessage(e.message, 'error');
+    }
+  });
+  document.getElementById('securityRoot').addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-ban-ip]');
+    if (!button) return;
+    const ip = button.getAttribute('data-ban-ip');
+    document.getElementById('banIpInput').value = ip;
+    document.getElementById('fail2ban-heading').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    try {
+      await changeBan('/api/fail2ban/ban', ip);
+      document.getElementById('banIpInput').value = '';
+      setBanMessage(ip + ' bannato.', 'ok');
+      loadSecurity();
+    } catch (e) {
+      setBanMessage(e.message, 'error');
+    }
+  });
+  document.getElementById('btnRefreshBans').addEventListener('click', loadBans);
+  document.getElementById('banJail').addEventListener('change', loadBans);
+  loadBans();
+</script>

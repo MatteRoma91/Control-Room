@@ -55,6 +55,32 @@ function registerPageRoutes(app, ctx) {
     res.render('layout', { contentPartial: 'audit', title: 'Audit log' });
   });
 
+  app.get('/access', requireAuth, async (req, res) => {
+    res.render('layout', { contentPartial: 'access', title: 'Accessi' });
+  });
+
+  app.get('/security', requireAuth, (req, res) => {
+    res.render('layout', { contentPartial: 'security', title: 'Sicurezza' });
+  });
+
+  app.get('/api/security/overview', requireAuth, (req, res) => {
+    try {
+      const { buildSecurityReport } = require('../lib/security-report');
+      res.json(buildSecurityReport());
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  app.get('/api/access/overview', requireAuth, (req, res) => {
+    try {
+      const { buildAccessReport } = require('../lib/access-report');
+      res.json(buildAccessReport());
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
   app.get('/incidents', requireAuth, async (req, res) => {
     res.render('layout', { contentPartial: 'incidents', title: 'Incident Center' });
   });
